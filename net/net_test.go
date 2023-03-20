@@ -48,11 +48,15 @@ func (suite *ConfigSuite) TestNet(c *C) {
 	caFile7777 := filepath.Join(certPath, "ca2.crt")
 	key1Path := filepath.Join(certPath, "key1.key")
 	cert1Path := filepath.Join(certPath, "cert1.crt")
+	// gmKey1Path := filepath.Join(certPath, "gmsignkey1.key")
+	// gmCert1Path := filepath.Join(certPath, "gmsigncert1.crt")
 	pid1Bytes, err := ioutil.ReadFile(filepath.Join(pidPath, "pid1.nodeid"))
 	c.Assert(err, IsNil)
 	pid1 := string(pid1Bytes)
 	key2Path := filepath.Join(certPath, "key2.key")
 	cert2Path := filepath.Join(certPath, "cert2.crt")
+	// gmKey2Path := filepath.Join(certPath, "gmsignkey2.key")
+	// gmCert2Path := filepath.Join(certPath, "gmsigncert2.crt")
 	pid2Bytes, err := ioutil.ReadFile(filepath.Join(pidPath, "pid2.nodeid"))
 	c.Assert(err, IsNil)
 	pid2 := string(pid2Bytes)
@@ -62,7 +66,7 @@ func (suite *ConfigSuite) TestNet(c *C) {
 	// start node A
 	a, err := InitNet(&conf.Config{
 		NetConfig: conf.NetConfig{
-			Provider:   "libp2p", //libp2p,liquid
+			Provider:   "liquid", //libp2p,liquid
 			ListenAddr: "/ip4/127.0.0.1/tcp/6666",
 			TLSConfig: conf.TLSConfig{
 				PrivKeyFile: key1Path,
@@ -107,7 +111,7 @@ func (suite *ConfigSuite) TestNet(c *C) {
 	// start node B
 	b, err := InitNet(&conf.Config{
 		NetConfig: conf.NetConfig{
-			Provider:   "libp2p", //libp2p,liquid
+			Provider:   "liquid", //libp2p,liquid
 			ListenAddr: "/ip4/127.0.0.1/tcp/7777",
 			TLSConfig: conf.TLSConfig{
 				PrivKeyFile: key2Path,

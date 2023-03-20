@@ -17,17 +17,22 @@ import (
 
 func loadFile(filePath string) ([]byte, error) {
 	if len(filePath) > 0 {
+		var absFilePath string
+		var err error
 		if !filepath.IsAbs(filePath) {
-			absFilePath, err := filepath.Abs(filePath)
-			if err != nil {
-				return nil, err
-			}
-			fileBytes, err := ioutil.ReadFile(absFilePath)
-			if err != nil {
-				return nil, err
-			}
-			return fileBytes, nil
+			absFilePath, err = filepath.Abs(filePath)
+		} else {
+			absFilePath = filePath
+			err = nil
 		}
+		if err != nil {
+			return nil, err
+		}
+		fileBytes, err := ioutil.ReadFile(absFilePath)
+		if err != nil {
+			return nil, err
+		}
+		return fileBytes, nil
 	}
 	return nil, errors.New("empty file path")
 }
@@ -136,12 +141,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 		return nil, errors.New(errMsg)
 	}
 
-	// read key file, then set the NodeId
-	file, err := ioutil.ReadFile(keyPath)
-	if err != nil {
-		return nil, err
-	}
-	privateKey, err := asym.PrivateKeyFromPEM(file, nil)
+	privateKey, err := asym.PrivateKeyFromPEM(keyBytes, nil)
 	if err != nil {
 		return nil, err
 	}
