@@ -1,3 +1,4 @@
 /node
 /node.crt
 /node.key
+/*.wasm
