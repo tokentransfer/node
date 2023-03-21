@@ -1,32 +1,37 @@
 package main
 
 import (
-	"github.com/tokentransfer/node/conf"
-	"github.com/tokentransfer/node/net"
+	"fmt"
+	"os"
+
+	"github.com/mitchellh/cli"
 )
 
 func main() {
-	readyC := make(chan struct{})
-	c, err := conf.NewConfig("./config.json")
-	if err != nil {
-		panic(err)
+	// Get the command line args. We shortcut "--version" and "-v" to
+	// just show the version.
+	args := os.Args[1:]
+	for _, arg := range args {
+		if arg == "-v" || arg == "--version" {
+			newArgs := make([]string, len(args)+1)
+			newArgs[0] = "version"
+			copy(newArgs[1:], args)
+			args = newArgs
+			break
+		}
 	}
-	n, err := net.InitNet(c, readyC)
-	if err != nil {
-		panic(err)
-	}
-	err = n.Start()
-	if err != nil {
-		panic(err)
-	}
-	err = n.InitPubSub(c.GetChainId(), 0)
-	if err != nil {
-		panic(err)
-	}
-	close(readyC)
 
-	err = n.Stop()
-	if err != nil {
-		panic(err)
+	cli := &cli.CLI{
+		Args:     args,
+		Commands: Commands,
+		HelpFunc: cli.BasicHelpFunc("node"),
 	}
+
+	exitCode, err := cli.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error executing CLI: %s\n", err.Error())
+		os.Exit(1)
+	}
+
+	os.Exit(exitCode)
 }

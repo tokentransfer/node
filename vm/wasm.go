@@ -2,10 +2,10 @@ package vm
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/tokentransfer/node/core"
 )
 
 func RunWasm(wasmCode []byte, method string, params ...uint64) ([]uint64, error) {
@@ -19,7 +19,7 @@ func RunWasm(wasmCode []byte, method string, params ...uint64) ([]uint64, error)
 	}
 	f := mod.ExportedFunction(method)
 	if f == nil {
-		return nil, fmt.Errorf("no such method: %s", method)
+		return nil, core.ErrorOfNonexists("method in wasm module", method)
 	}
 	results, err := f.Call(ctx, params...)
 	if err != nil {
