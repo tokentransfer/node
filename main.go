@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -20,6 +21,7 @@ func main() {
 			break
 		}
 	}
+	flag.Parse()
 
 	cli := &cli.CLI{
 		Args:     args,
