@@ -17,7 +17,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tetratelabs/wazero v0.0.0-00010101000000-000000000000
 	github.com/tokentransfer/check v0.0.0-20220325011756-9433b88b4878
-	github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20210222205017-07801edbd6f3
+	github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20230322010733-91ec8f899a24
 	github.com/tokentransfer/interfaces v0.0.0-20210511064306-7a259547c68f
 	golang.org/x/crypto v0.1.0
 	google.golang.org/protobuf v1.28.1
@@ -162,7 +162,6 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/tidwall/tinylru v1.1.0 // indirect
 	github.com/tjfoc/gmsm v1.4.1 // indirect
-	github.com/tokentransfer/chain v0.0.0-20210511064615-9f1887ce9302 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect

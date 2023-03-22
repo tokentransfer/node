@@ -548,12 +548,3 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		Date:        int64(time.Now().UnixNano() / 1e9),
 	}, nil
 }
-
-func (service *ConsensusService) HashState(s libblock.State) (libcore.Hash, error) {
-	cs := service.CryptoService
-	h, _, err := cs.Raw(s, libcrypto.RawBinary)
-	if err != nil {
-		return nil, err
-	}
-	return h, nil
-}

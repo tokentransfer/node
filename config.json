@@ -4,10 +4,7 @@
         "tls_config":{
             "private_key_file":"./node.key",
             "cert_file":"./node.crt"
-        },
-        "seeds":[
-            "localhost:7000"
-        ]
+        }
     },
     "address":"localhost",
     "port":7001,

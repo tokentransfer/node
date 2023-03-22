@@ -2,25 +2,25 @@ package consensus
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
-	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"chainmaker.org/chainmaker/protocol/v2"
-	"github.com/tokentransfer/chain/node"
+	"github.com/caivega/glog"
 	"github.com/tokentransfer/node/account"
 	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/conf"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/crypto"
+	"github.com/tokentransfer/node/merkle"
 	"github.com/tokentransfer/node/p2p"
+	"github.com/tokentransfer/node/util"
 
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libblock "github.com/tokentransfer/interfaces/block"
@@ -53,14 +53,16 @@ func (s Status) String() string {
 }
 
 const (
-	BLOCK_DURATION = 10
+	BLOCK_DURATION       = 10
+	TOPIC_PEER_DISCOVERY = "peer_discovery"
+	TOPIC_PEER_MESSAGE   = "peer_message"
 )
 
 type Peer struct {
-	Address string
-	Key     libaccount.PublicKey
-	Status  Status
+	Key    libaccount.PublicKey
+	Status Status
 
+	id    string
 	index uint64
 }
 
@@ -74,15 +76,32 @@ func (p *Peer) GetIndex() uint64 {
 		if err != nil {
 			return 0
 		}
-		data, err := address.MarshalBinary()
+		index, err := core.GetIndex(address.String())
 		if err != nil {
 			return 0
 		}
-		n := new(big.Int)
-		m := n.SetBytes(data)
-		p.index = m.Uint64()
+
+		p.id = address.String()
+		p.index = index
 	}
 	return p.index
+}
+
+func (p *Peer) GetAddress() string {
+	if len(p.id) == 0 {
+		address, err := p.Key.GenerateAddress()
+		if err != nil {
+			return ""
+		}
+		index, err := core.GetIndex(address.String())
+		if err != nil {
+			return ""
+		}
+
+		p.id = address.String()
+		p.index = index
+	}
+	return p.id
 }
 
 type Node struct {
@@ -112,7 +131,6 @@ type Node struct {
 	self       *Peer
 	peers      map[uint64]*Peer
 	peerLocker *sync.RWMutex
-	bootmap    map[string]*Peer
 }
 
 func NewNode() *Node {
@@ -128,8 +146,7 @@ func NewNode() *Node {
 		peers:      map[uint64]*Peer{},
 		peerLocker: &sync.RWMutex{},
 
-		bootmap: map[string]*Peer{},
-		ready:   ready,
+		ready: ready,
 
 		transactionLocker: &sync.Mutex{},
 
@@ -152,44 +169,20 @@ func (n *Node) Init(c libcore.Config) error {
 		return err
 	}
 	n.self = &Peer{
-		Key:     pubKey,
-		Address: fmt.Sprintf("%s:%d", c.GetAddress(), c.GetPort()),
-		Status:  PeerConsensused,
+		Key:    pubKey,
+		Status: PeerConsensused,
 	}
 
 	return nil
 }
 
-func ToInt64(m *map[string]interface{}, key string) int64 {
-	s := ToString(m, key)
-	if len(s) > 0 {
-		n := new(big.Int)
-		_, ok := n.SetString(s, 10)
-		if ok {
-			return n.Int64()
-		}
-	}
-	return 0
-}
-
-func ToString(m *map[string]interface{}, key string) string {
-	item, ok := (*m)[key]
-	if ok {
-		s, ok := item.(string)
-		if ok {
-			return s
-		}
-	}
-	return ""
-}
-
 func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Transaction, error) {
 	as := n.accountService
 
-	from := ToString(&txm, "from")
-	secret := ToString(&txm, "secret")
-	to := ToString(&txm, "to")
-	value := ToString(&txm, "value")
+	from := util.ToString(&txm, "from")
+	secret := util.ToString(&txm, "secret")
+	to := util.ToString(&txm, "to")
+	value := util.ToString(&txm, "value")
 
 	_, fromKey, err := as.NewKeyFromSecret(secret)
 	if err != nil {
@@ -496,6 +489,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			}
 			return s, nil
 		}
+		return nil, errors.New("error")
 	case "receiveStateByName":
 		stateType := libblock.GetStateTypeByName(params[0].(string))
 		switch stateType {
@@ -594,31 +588,33 @@ func (n *Node) generate() {
 	for {
 		t := <-n.timer.C
 
-		block, err := n.GenerateBlock()
-		if err != nil {
-			panic(err)
-		}
-		_, err = n.HashBlock(block)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("=== generate block %d, %s, %d\n", block.GetIndex(), t.String(), len(block.GetTransactions()))
+		if len(n.transactions) > 0 {
+			block, err := n.GenerateBlock()
+			if err != nil {
+				panic(err)
+			}
+			_, err = n.HashBlock(block)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("=== generate block %d, %s, %d\n", block.GetIndex(), t.String(), len(block.GetTransactions()))
 
-		_, err = n.consensusService.VerifyBlock(block)
-		if err != nil {
-			panic(err)
-		}
+			_, err = n.consensusService.VerifyBlock(block)
+			if err != nil {
+				panic(err)
+			}
 
-		err = n.consensusService.AddBlock(block)
-		if err != nil {
-			panic(err)
-		}
+			err = n.consensusService.AddBlock(block)
+			if err != nil {
+				panic(err)
+			}
 
-		data, err := block.MarshalBinary()
-		if err != nil {
-			panic(err)
+			data, err := block.MarshalBinary()
+			if err != nil {
+				panic(err)
+			}
+			n.broadcast(data)
 		}
-		n.broadcast(data)
 	}
 }
 
@@ -628,9 +624,9 @@ func (n *Node) newId() uint64 {
 
 func (n *Node) broadcast(data []byte) {
 	msg := &pb.Message{
-		Id:        n.newId(),
-		Data:      data,
-		NodeIndex: n.self.GetIndex(),
+		Id:   n.newId(),
+		Data: data,
+		Node: n.self.GetIndex(),
 	}
 	n.outs <- msg
 }
@@ -641,10 +637,10 @@ func (n *Node) connect() {
 	for {
 		list := n.ListPeer()
 
-		fmt.Println(">>>", 0, n.self.GetIndex(), n.self.Address, n.self.Status)
+		fmt.Println(">>>", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Status)
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			fmt.Println(">>>", i+1, p.GetIndex(), p.Address, p.Status)
+			fmt.Println(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Status)
 		}
 
 		if !lastConsensused && n.Consensused {
@@ -657,41 +653,11 @@ func (n *Node) connect() {
 }
 
 func (n *Node) ConnectTo(p *Peer) {
-	fmt.Println("dial", p.Address)
-	if err != nil {
-		log.Println(err)
-	} else {
-		p.Status = PeerConnected
-		fmt.Println("connected to", p.Address)
-	}
+	fmt.Println("connected to", p.GetAddress())
 }
 
 func (n *Node) SendRequestInfo(p *Peer) {
-	as := n.accountService
-
-	fmt.Println("request to", p.Address)
-	reply, err := p.client.SendRequest(context.Background(), &pb.RequestInfo{
-		Address: n.self.Address,
-	})
-	if err != nil {
-		log.Println(err)
-	} else {
-		fmt.Println("reply from", p.Address)
-
-		data := reply.GetPublicKey()
-		_, publicKey, err := as.NewPublicFromBytes(data)
-		if err != nil {
-			log.Println(err)
-		} else {
-			address := reply.GetAddress()
-			p := n.bootmap[address]
-			if p != nil {
-				p.Key = publicKey
-				p.Status = PeerKnown
-				n.AddPeer(p)
-			}
-		}
-	}
+	fmt.Println("request to", p.GetAddress())
 }
 
 func (n *Node) PrepareConsensus() bool {
@@ -703,7 +669,7 @@ func (n *Node) PrepareConsensus() bool {
 			count++
 		}
 	}
-	if count == len(n.bootmap) {
+	if count == len(n.config.GetBootstraps()) {
 		for i := 0; i < len(list); i++ {
 			p := list[i]
 			p.Status = PeerConsensused
@@ -730,27 +696,8 @@ func (n *Node) discoveryPeer(p *Peer) {
 	}
 }
 
-func (n *Node) discovery() {
-	bootstraps := n.config.GetBootstraps()
-	for i := 0; i < len(bootstraps); i++ {
-		address := bootstraps[i]
-		if address != n.self.Address {
-			p := n.bootmap[address]
-			if p == nil {
-				p = &Peer{
-					Address: address,
-					Status:  PeerNone,
-				}
-				n.bootmap[address] = p
-
-				go n.discoveryPeer(p)
-			}
-		}
-	}
-}
-
 func (n *Node) load() {
-	merkleService, err := node.NewMerkleService(n.config, n.cryptoService)
+	merkleService, err := merkle.NewMerkleService(n.config, n.cryptoService)
 	if err != nil {
 		panic(err)
 	}
@@ -800,16 +747,21 @@ func (n *Node) load() {
 func (n *Node) send() {
 	for {
 		m := <-n.outs
-		data := m.GetData()
-		list := n.ListPeer()
-		for i := 0; i < len(list); i++ {
-			p := list[i]
-			_, err := p.client.SendMessage(context.Background(), m)
-			if err != nil {
-				fmt.Println(">>>", core.GetInfo(data), libcore.Bytes(data).String())
-				log.Println(err)
-			} else {
-				fmt.Printf(">>> send %d(%s) to %d\n", m.Id, core.GetInfo(data), p.GetIndex())
+		msgBytes, err := core.Marshal(m)
+		if err != nil {
+			log.Println(err)
+		} else {
+			data := m.GetData()
+			list := n.ListPeer()
+			for i := 0; i < len(list); i++ {
+				p := list[i]
+				err := n.net.SendMsg(n.config.GetChainId(), p.GetAddress(), TOPIC_PEER_MESSAGE, msgBytes)
+				if err != nil {
+					fmt.Println(">>>", core.GetInfo(data), libcore.Bytes(data).String())
+					log.Println(err)
+				} else {
+					fmt.Printf(">>> send %d(%s) to %d\n", m.Id, core.GetInfo(data), p.GetIndex())
+				}
 			}
 		}
 	}
@@ -820,7 +772,7 @@ func (n *Node) receive() {
 		m := <-n.ins
 
 		data := m.GetData()
-		fromIndex := m.GetNodeIndex()
+		fromIndex := m.GetNode()
 		fmt.Printf("<<< receive message from node %d, length: %d\n", fromIndex, len(data))
 
 		fromPeer, ok := n.peers[fromIndex]
@@ -900,6 +852,39 @@ func (n *Node) receive() {
 	}
 }
 
+func (n *Node) discoveryHandler(publisher string, msg []byte) error {
+	glog.Infof("[%s][%s] recv discovery from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), publisher, len(msg))
+	_, publicKey, err := n.accountService.NewPublicFromBytes(msg)
+	if err != nil {
+		return err
+	} else {
+		index, err := core.GetIndex(publisher)
+		if err != nil {
+			return err
+		}
+		p := n.peers[index]
+		if p == nil {
+			p = &Peer{
+				Key: publicKey,
+			}
+		}
+		p.Status = PeerKnown
+		n.AddPeer(p)
+	}
+	return nil
+}
+
+func (n *Node) messageHandler(id string, data []byte) error {
+	glog.Infof("[%s][%s] recv data from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), id, len(data))
+	_, m, err := core.Unmarshal(data)
+	if err != nil {
+		return err
+	}
+	msg := m.(*pb.Message)
+	n.ins <- msg
+	return nil
+}
+
 func (n *Node) start() {
 	readyC := make(chan struct{})
 
@@ -916,6 +901,15 @@ func (n *Node) start() {
 	if err != nil {
 		panic(err)
 	}
+
+	err = n.net.SubscribeWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY, n.discoveryHandler)
+	if err != nil {
+		panic(err)
+	}
+	err = n.net.DirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_MESSAGE, n.messageHandler)
+	if err != nil {
+		panic(err)
+	}
 	close(readyC)
 }
 
@@ -927,8 +921,8 @@ func (n *Node) Start() error {
 	go n.receive()
 
 	go n.connect()
-	go n.discovery()
 	go n.generate()
+	go n.discovery()
 
 	return nil
 }
@@ -937,6 +931,22 @@ func (n *Node) Stop() error {
 	n.net.Stop()
 
 	return nil
+}
+
+func (n *Node) discovery() {
+	for {
+		pubKeyData, err := n.self.Key.MarshalBinary()
+		if err != nil {
+			glog.Error(err)
+		} else {
+			err = n.net.BroadcastWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY, pubKeyData)
+			if err != nil {
+				glog.Error(err)
+			}
+		}
+
+		time.Sleep(10 * time.Second)
+	}
 }
 
 func (n *Node) GetNodeKey() libaccount.Key {
@@ -1040,23 +1050,4 @@ func (n *Node) HashState(s libblock.State) (libcore.Hash, error) {
 		return nil, err
 	}
 	return h, nil
-}
-
-func (n *Node) SendMessage(c context.Context, m *pb.Message) (*pb.Reply, error) {
-	n.ins <- m
-	return &pb.Reply{}, nil
-}
-
-func (n *Node) SendRequest(c context.Context, req *pb.RequestInfo) (*pb.ReplyInfo, error) {
-	fmt.Println("<<< receive request from", req.GetAddress())
-
-	data, err := n.self.Key.MarshalBinary()
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-	return &pb.ReplyInfo{
-		PublicKey: data,
-		Address:   n.self.Address,
-	}, nil
 }

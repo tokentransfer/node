@@ -5,17 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 
 	"github.com/tokentransfer/node/core/pb"
 	"google.golang.org/protobuf/proto"
 )
 
 const (
+	CORE_MESSAGE = byte(10)
+
 	CORE_BLOCK                 = byte(100)
 	CORE_TRANSACTION           = byte(101)
 	CORE_RECEIPT               = byte(102)
 	CORE_TRANSACTION_WITH_DATA = byte(103)
-	CORE_MESSAGE               = byte(104)
+	CORE_MESSAGE_KEY           = byte(104)
 
 	// CORE_STATE         = byte(110)
 	CORE_ACCOUNT_STATE  = byte(111)
@@ -28,6 +31,8 @@ func GetInfo(data []byte) string {
 	if len(data) > 0 {
 		meta := data[0]
 		switch meta {
+		case CORE_MESSAGE:
+			return "message"
 		case CORE_BLOCK:
 			return "block"
 		case CORE_TRANSACTION:
@@ -36,8 +41,8 @@ func GetInfo(data []byte) string {
 			return "receipt"
 		case CORE_TRANSACTION_WITH_DATA:
 			return "transaction_with_data"
-		case CORE_MESSAGE:
-			return "message"
+		case CORE_MESSAGE_KEY:
+			return "message_key"
 
 		case CORE_ACCOUNT_STATE:
 			return "account_state"
@@ -65,6 +70,8 @@ func Clone(t proto.Message) (proto.Message, error) {
 func Marshal(message proto.Message) ([]byte, error) {
 	var meta byte
 	switch message.(type) {
+	case *pb.Message:
+		meta = CORE_MESSAGE
 	case *pb.Block:
 		meta = CORE_BLOCK
 	case *pb.Transaction:
@@ -74,7 +81,7 @@ func Marshal(message proto.Message) ([]byte, error) {
 	case *pb.TransactionWithData:
 		meta = CORE_TRANSACTION_WITH_DATA
 	case *pb.MessageKey:
-		meta = CORE_MESSAGE
+		meta = CORE_MESSAGE_KEY
 
 	case *pb.AccountState:
 		meta = CORE_ACCOUNT_STATE
@@ -106,6 +113,8 @@ func Unmarshal(data []byte) (byte, proto.Message, error) {
 
 		var msg proto.Message
 		switch meta {
+		case CORE_MESSAGE:
+			msg = &pb.Message{}
 		case CORE_BLOCK:
 			msg = &pb.Block{}
 		case CORE_TRANSACTION:
@@ -114,7 +123,7 @@ func Unmarshal(data []byte) (byte, proto.Message, error) {
 			msg = &pb.Receipt{}
 		case CORE_TRANSACTION_WITH_DATA:
 			msg = &pb.TransactionWithData{}
-		case CORE_MESSAGE:
+		case CORE_MESSAGE_KEY:
 			msg = &pb.MessageKey{}
 
 		case CORE_ACCOUNT_STATE:
@@ -174,4 +183,18 @@ func ReadBytes(r io.Reader, maxSize uint32) ([]byte, error) {
 		}
 	}
 	return b, nil
+}
+
+func GetIndex(address string) (uint64, error) {
+	_, a, err := as.NewAccountFromAddress(address)
+	if err != nil {
+		return 0, err
+	}
+	data, err := a.MarshalBinary()
+	if err != nil {
+		return 0, err
+	}
+	n := new(big.Int)
+	m := n.SetBytes(data)
+	return m.Uint64(), nil
 }

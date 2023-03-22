@@ -5,10 +5,9 @@ import (
 	"log"
 	"testing"
 
+	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/conf"
 	"github.com/tokentransfer/node/util"
-
-	"github.com/tokentransfer/chain/block"
 
 	. "github.com/tokentransfer/check"
 )

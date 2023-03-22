@@ -1125,12 +1125,10 @@ github.com/tmthrgd/go-byte-test v0.0.0-20190904060354-2794345b9929/go.mod h1:MEz
 github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc/go.mod h1:bciPuU6GHm1iF1pBvUfxfsH0Wmnc2VbpgvbI9ZWuIRs=
 github.com/tmthrgd/go-memset v0.0.0-20190904060434-6fb7a21f88f1/go.mod h1:xUkvcKF3VBDKFmmqCtW333lognWBHzSScj4fgjVB0Ek=
 github.com/tmthrgd/go-popcount v0.0.0-20190904054823-afb1ace8b04f/go.mod h1:FcUQfrsAsSSqM3n9xf4EtPzB8tWzt58/y0AV+wNNM8Q=
-github.com/tokentransfer/chain v0.0.0-20210511064615-9f1887ce9302 h1:WOi16s3WalV4yKRLfs5Q/Vp2M7tIAetldsvm4eF7k3o=
-github.com/tokentransfer/chain v0.0.0-20210511064615-9f1887ce9302/go.mod h1:UkvFk+B//t/PJFc/3xNypsPxBSw6PZdX5hbkB+KNKCM=
 github.com/tokentransfer/check v0.0.0-20220325011756-9433b88b4878 h1:yebE3Rmc/NJTzBgMWYhqzokWonf5qEh/I8Ju6oqmN8A=
 github.com/tokentransfer/check v0.0.0-20220325011756-9433b88b4878/go.mod h1:yuC9Oy38bIUYzVyoWoCUDYsPKUhJLbh4+/92vGMegQA=
-github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20210222205017-07801edbd6f3 h1:Armlq1Cb/a7KwZZDk1EeuLdYCvYPsghRreW+QV96meY=
-github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20210222205017-07801edbd6f3/go.mod h1:1IF/xMM5DHQrU6bvDvQTTbPU++myFiW/5zti2s2BPMc=
+github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20230322010733-91ec8f899a24 h1:ztJjNMk4pSNxKDz10jzFeYbVzXPKnwKID9nWrbYlxtc=
+github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20230322010733-91ec8f899a24/go.mod h1:1IF/xMM5DHQrU6bvDvQTTbPU++myFiW/5zti2s2BPMc=
 github.com/tokentransfer/interfaces v0.0.0-20210511064306-7a259547c68f h1:KRm3QTkI4RjP6KtojLHAvBpDbWhlipiBAetE7GXP3Ow=
 github.com/tokentransfer/interfaces v0.0.0-20210511064306-7a259547c68f/go.mod h1:Vjvw/upC0ADBMjQiJLsFF4wJGrgWHZO7/A9FmyXeIeQ=
 github.com/twitchyliquid64/golang-asm v0.0.0-20190126203739-365674df15fc/go.mod h1:NoCfSFWosfqMqmmD7hApkirIK9ozpHjxRnRxs1l413A=

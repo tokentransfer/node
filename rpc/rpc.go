@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/tokentransfer/node/conf"
-	"github.com/tokentransfer/node/node"
+	"github.com/tokentransfer/node/consensus"
 	"github.com/tokentransfer/node/util"
 
 	libcore "github.com/tokentransfer/interfaces/core"
@@ -15,10 +15,10 @@ import (
 
 type RPCService struct {
 	config *conf.Config
-	node   *node.Node
+	node   *consensus.Node
 }
 
-func NewRPCService(n *node.Node) *RPCService {
+func NewRPCService(n *consensus.Node) *RPCService {
 	rpc := &RPCService{
 		node: n,
 	}

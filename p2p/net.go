@@ -103,6 +103,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 		}
 		listenAddr = fmt.Sprintf("/ip4/%s/tcp/%d", address, c.GetPort())
 	}
+	bootstraps := append(c.GetBootstraps(), c.NetConfig.Seeds...)
 
 	// new net
 	var netFactory NetFactory
@@ -114,7 +115,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 		WithPeerStreamPoolSize(c.NetConfig.PeerStreamPoolSize),
 		WithMaxPeerCountAllowed(c.NetConfig.MaxPeerCountAllow),
 		WithPeerEliminationStrategy(c.NetConfig.PeerEliminationStrategy),
-		WithSeeds(c.NetConfig.Seeds...),
+		WithSeeds(bootstraps...),
 		WithBlackAddresses(c.NetConfig.BlackList.Addresses...),
 		WithBlackNodeIds(c.NetConfig.BlackList.NodeIds...),
 		WithMsgCompression(c.NetConfig.DebugConfig.UseNetMsgCompression),

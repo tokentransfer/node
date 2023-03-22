@@ -11,6 +11,7 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/tokentransfer/node/conf"
 	"github.com/tokentransfer/node/consensus"
+	"github.com/tokentransfer/node/rpc"
 )
 
 const (
@@ -67,6 +68,13 @@ func (c *StartCommand) startNode(config *conf.Config) *consensus.Node {
 	if err != nil {
 		panic(err)
 	}
+
+	r := rpc.NewRPCService(n)
+	err = r.Init(config)
+	if err != nil {
+		panic(err)
+	}
+	go r.Start()
 
 	return n
 }
