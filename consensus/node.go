@@ -947,7 +947,23 @@ func (n *Node) discovery() {
 			}
 		}
 
-		time.Sleep(10 * time.Second)
+		peers, err := n.net.ChainNodesInfo(n.config.GetChainId())
+		if err != nil {
+			glog.Error(err)
+		} else {
+			for _, p := range peers {
+				fmt.Println("discovery", p.NodeUid)
+				for index, addr := range p.NodeAddress {
+					fmt.Printf("  %d: %s", index, addr)
+				}
+			}
+		}
+
+		if n.Consensused {
+			time.Sleep(60 * 10 * time.Second)
+		} else {
+			time.Sleep(10 * time.Second)
+		}
 	}
 }
 
