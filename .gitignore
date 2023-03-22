@@ -1,4 +1,5 @@
 /node
 /node.crt
 /node.key
+/config.json
 /*.wasm
