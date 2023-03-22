@@ -8,6 +8,6 @@ openssl rsa -in node.key -out node.key
 echo '> 生成csr'
 openssl req -new -key node.key -out node.csr
 echo '> 生成crt'
-openssl x509 -req -days 365 -in node.csr -CA ca.crt -CAkey node.key -CAcreateserial -out node.crt
+openssl x509 -req -days 365 -in node.csr -CA ca.crt -CAkey server.key -CAcreateserial -out node.crt
 echo '> 证书合并'
 cat node.key node.crt > node.pem

@@ -1,4 +1,5 @@
 /node
 /test/node.*
+/test/ca.srl
 /config.json
 /*.wasm
