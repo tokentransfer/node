@@ -158,6 +158,7 @@ func NewNode() *Node {
 
 func (n *Node) Init(c libcore.Config) error {
 	n.config = c.(*conf.Config)
+	core.Init(n.config)
 
 	_, key, err := n.accountService.NewKeyFromSecret(n.config.GetSecret())
 	if err != nil {
@@ -173,6 +174,19 @@ func (n *Node) Init(c libcore.Config) error {
 		Key:    pubKey,
 		Status: PeerConsensused,
 	}
+
+	merkleService, err := merkle.NewMerkleService(n.config, n.cryptoService)
+	if err != nil {
+		panic(err)
+	}
+	consensusService := &ConsensusService{
+		CryptoService:  n.cryptoService,
+		MerkleService:  merkleService,
+		Config:         n.config,
+		AccountService: n.accountService,
+	}
+	n.merkleService = merkleService
+	n.consensusService = consensusService
 
 	return nil
 }
@@ -574,6 +588,14 @@ func (n *Node) GenerateBlock() (libblock.Block, error) {
 	return n.consensusService.GenerateBlock(list)
 }
 
+func (n *Node) VerifyBlock(b libblock.Block) (ok bool, err error) {
+	return n.consensusService.VerifyBlock(b)
+}
+
+func (n *Node) AddBlock(b libblock.Block) error {
+	return n.consensusService.AddBlock(b)
+}
+
 func (n *Node) generate() {
 	n.ready.Wait()
 
@@ -697,20 +719,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 	}
 }
 
-func (n *Node) load() {
-	merkleService, err := merkle.NewMerkleService(n.config, n.cryptoService)
-	if err != nil {
-		panic(err)
-	}
-	consensusService := &ConsensusService{
-		CryptoService:  n.cryptoService,
-		MerkleService:  merkleService,
-		Config:         n.config,
-		AccountService: n.accountService,
-	}
-	n.merkleService = merkleService
-	n.consensusService = consensusService
-
+func (n *Node) Load() {
 	current := uint64(0)
 	for {
 		b, err := n.merkleService.GetBlockByIndex(current)
@@ -722,11 +731,11 @@ func (n *Node) load() {
 			break
 		}
 
-		if consensusService.ValidatedBlock != nil {
-			if b.GetIndex() != (consensusService.ValidatedBlock.GetIndex() + 1) {
+		if n.consensusService.ValidatedBlock != nil {
+			if b.GetIndex() != (n.consensusService.ValidatedBlock.GetIndex() + 1) {
 				break
 			}
-			if !b.GetParentHash().Equals(consensusService.ValidatedBlock.GetHash()) {
+			if !b.GetParentHash().Equals(n.consensusService.ValidatedBlock.GetHash()) {
 				break
 			}
 		} else {
@@ -738,11 +747,32 @@ func (n *Node) load() {
 			}
 		}
 
-		consensusService.ValidatedBlock = b
+		n.consensusService.ValidatedBlock = b
 		fmt.Println("load block", current, b.GetHash().String())
 
 		current++
 	}
+}
+
+func (n *Node) GetBlockNumber() int64 {
+	if n.consensusService != nil {
+		return n.consensusService.GetBlockNumber()
+	}
+	return -1
+}
+
+func (n *Node) GetBlockHash() string {
+	if n.consensusService != nil {
+		return n.consensusService.GetBlockHash()
+	}
+	return ""
+}
+
+func (n *Node) GetBlock() libblock.Block {
+	if n.consensusService != nil {
+		return n.consensusService.GetBlock()
+	}
+	return nil
 }
 
 func (n *Node) send() {
@@ -918,7 +948,7 @@ func (n *Node) start() {
 }
 
 func (n *Node) Start() error {
-	n.load()
+	n.Load()
 	n.start()
 
 	go n.send()

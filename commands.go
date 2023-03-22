@@ -27,6 +27,11 @@ func init() {
 				ShutdownCh: makeShutdownCh(),
 			}, nil
 		},
+		"genesis": func() (cli.Command, error) {
+			return &cmd.GenesisCommand{
+				Ui: ui,
+			}, nil
+		},
 	}
 }
 

@@ -1,4 +1,5 @@
 /node
+/data
 /test/node.*
 /test/ca.srl
 /config.json
