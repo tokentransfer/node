@@ -954,7 +954,7 @@ func (n *Node) discovery() {
 			for _, p := range peers {
 				fmt.Println("discovery", p.NodeUid)
 				for index, addr := range p.NodeAddress {
-					fmt.Printf("  %d: %s", index, addr)
+					fmt.Printf("  %d: %s\n", index, addr)
 				}
 			}
 		}
