@@ -928,6 +928,8 @@ func (n *Node) Start() error {
 }
 
 func (n *Node) Stop() error {
+	n.net.CancelSubscribeWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY)
+	n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_MESSAGE)
 	n.net.Stop()
 
 	return nil
