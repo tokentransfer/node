@@ -4,7 +4,8 @@ package pb;
 option go_package = ".;pb";
 
 message Message {
-    uint64 Id	= 1;
-    bytes  Data = 2;
-    uint64 Node = 3;
+    uint64 Id	            = 1;
+    bytes  Data             = 2;
+    uint64 Node             = 3;
+    map<string, bytes> Map  = 4;
 }
