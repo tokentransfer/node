@@ -138,6 +138,9 @@ func (c *StartCommand) handleSignals(config *conf.Config, n *consensus.Node) int
 	// Attempt a graceful leave
 	gracefulCh := make(chan struct{})
 	go func() {
+		if err := n.Stop(); err != nil {
+			panic(err)
+		}
 		close(gracefulCh)
 	}()
 
