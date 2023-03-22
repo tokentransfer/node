@@ -59,11 +59,12 @@ const (
 )
 
 type Peer struct {
+	Id     string
 	Key    libaccount.PublicKey
 	Status Status
 
-	id    string
-	index uint64
+	address string
+	index   uint64
 }
 
 func (p *Peer) GetPublicKey() libaccount.PublicKey {
@@ -81,14 +82,14 @@ func (p *Peer) GetIndex() uint64 {
 			return 0
 		}
 
-		p.id = address.String()
+		p.address = address.String()
 		p.index = index
 	}
 	return p.index
 }
 
 func (p *Peer) GetAddress() string {
-	if len(p.id) == 0 {
+	if len(p.address) == 0 {
 		address, err := p.Key.GenerateAddress()
 		if err != nil {
 			return ""
@@ -98,10 +99,10 @@ func (p *Peer) GetAddress() string {
 			return ""
 		}
 
-		p.id = address.String()
+		p.address = address.String()
 		p.index = index
 	}
-	return p.id
+	return p.address
 }
 
 type Node struct {
@@ -865,6 +866,7 @@ func (n *Node) discoveryHandler(publisher string, msg []byte) error {
 		p := n.peers[index]
 		if p == nil {
 			p = &Peer{
+				Id:  publisher,
 				Key: publicKey,
 			}
 		}
@@ -911,6 +913,8 @@ func (n *Node) start() {
 		panic(err)
 	}
 	close(readyC)
+
+	n.self.Id = n.config.GetNodeId()
 }
 
 func (n *Node) Start() error {
@@ -951,10 +955,18 @@ func (n *Node) discovery() {
 		if err != nil {
 			glog.Error(err)
 		} else {
+			peerMap := make(map[string]struct{})
 			for _, p := range peers {
-				fmt.Println("discovery", p.NodeUid)
+				fmt.Println("> discovery", p.NodeUid)
 				for index, addr := range p.NodeAddress {
 					fmt.Printf("  %d: %s\n", index, addr)
+				}
+				peerMap[p.NodeUid] = struct{}{}
+			}
+			for _, p := range n.peers {
+				_, ok := peerMap[p.Id]
+				if !ok {
+					n.RemovePeer(p)
 				}
 			}
 		}
