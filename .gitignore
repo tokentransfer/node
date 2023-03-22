@@ -1,5 +1,5 @@
 /node
-/node.crt
-/node.key
+/test/node.*
+/test/ca.*
 /config.json
 /*.wasm
