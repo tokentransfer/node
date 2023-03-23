@@ -88,7 +88,7 @@ message TokenInfo {
 }
 
 message ContractInfo {
-    bytes Account           = 1
+    bytes Account           = 1;
     string Method           = 2;
     repeated bytes Params   = 3;
     bytes Code              = 4;
