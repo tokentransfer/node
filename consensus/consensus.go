@@ -7,6 +7,7 @@ import (
 
 	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/core/pb"
 
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libblock "github.com/tokentransfer/interfaces/block"
@@ -46,7 +47,6 @@ func (service *ConsensusService) GetBlock() libblock.Block {
 }
 
 func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithData) (libblock.Block, error) {
-	config := service.Config
 	cs := service.CryptoService
 	as := service.AccountService
 
@@ -69,17 +69,6 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 			return nil, err
 		}
 		states := []libblock.State{
-			&block.CurrencyState{
-				State: block.State{
-					StateType:  block.CURRENCY_STATE,
-					Account:    rootAccount,
-					Sequence:   uint64(0),
-					BlockIndex: uint64(0),
-				},
-				Symbol:      config.GetSystemCode(),
-				Decimals:    6,
-				TotalSupply: *a,
-			},
 			&block.AccountState{
 				State: block.State{
 					StateType:  block.ACCOUNT_STATE,
@@ -404,10 +393,23 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	}
 
 	if tx.Payload != nil && len(tx.Payload) > 0 {
-		// meta, msg, err := core.Unmarshal(tx.Payload)
-		// if err != nil {
-		// 	return false, err
-		// }
+		meta, msg, err := core.Unmarshal(tx.Payload)
+		if err != nil {
+			return false, err
+		}
+		if meta != core.CORE_PAYLOAD_INFO {
+			return false, core.ErrorOfInvalid("format", "payload")
+		}
+		info := msg.(*pb.PayloadInfo)
+		for _, payload := range info.Payload {
+			meta, _, err = core.Unmarshal(payload)
+			if err != nil {
+				return false, err
+			}
+			if meta != core.CORE_PAYLOAD_INFO && meta != core.CORE_CONTRACT_INFO && meta != core.CORE_META_INFO && meta != core.CORE_TOKEN_INFO && meta != core.CORE_DATA_INFO {
+				return false, core.ErrorOfInvalid("format", "info")
+			}
+		}
 	}
 
 	return true, nil
@@ -531,10 +533,19 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	states = append(states, s)
 
 	if tx.Payload != nil && len(tx.Payload) > 0 {
-		// meta, msg, err := core.Unmarshal(tx.Payload)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		meta, msg, err := core.Unmarshal(tx.Payload)
+		if err != nil {
+			return nil, err
+		}
+		if meta != core.CORE_PAYLOAD_INFO {
+			return nil, core.ErrorOfInvalid("format", "payload")
+		}
+		info := msg.(*pb.PayloadInfo)
+		payloadStates, err := service.ProcessPayload(tx, info)
+		if err != nil {
+			return nil, err
+		}
+		states = append(states, payloadStates...)
 	}
 
 	r := &block.Receipt{
@@ -547,4 +558,32 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		Receipt:     r,
 		Date:        int64(time.Now().UnixNano() / 1e9),
 	}, nil
+}
+
+func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.PayloadInfo) ([]libblock.State, error) {
+	states := make([]libblock.State, 0)
+	for _, payload := range info.Payload {
+		meta, msg, err := core.Unmarshal(payload)
+		if err != nil {
+			return nil, err
+		}
+		switch meta {
+		case core.CORE_PAYLOAD_INFO:
+			info := msg.(*pb.PayloadInfo)
+			payloadStates, err := service.ProcessPayload(tx, info)
+			if err != nil {
+				return nil, err
+			}
+			states = append(states, payloadStates...)
+
+		case core.CORE_CONTRACT_INFO:
+		case core.CORE_META_INFO:
+		case core.CORE_TOKEN_INFO:
+		case core.CORE_DATA_INFO:
+		default:
+			return nil, core.ErrorOfUnknown("format", "info")
+		}
+	}
+
+	return states, nil
 }

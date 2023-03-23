@@ -8,6 +8,10 @@ import (
 	"github.com/tokentransfer/node/core"
 )
 
+func CreateWasm(wasmCode []byte, method string, params ...uint64) ([]uint64, error) {
+	return nil, nil
+}
+
 func RunWasm(wasmCode []byte, method string, params ...uint64) ([]uint64, error) {
 	ctx := context.Background()
 	r := wazero.NewRuntime(ctx)

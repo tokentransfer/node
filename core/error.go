@@ -9,3 +9,7 @@ func ErrorOfNonexists(t string, target string) error {
 func ErrorOfInvalid(t string, target string) error {
 	return fmt.Errorf("invalid %s: %s", t, target)
 }
+
+func ErrorOfUnknown(t string, target string) error {
+	return fmt.Errorf("unknown %s: %s", t, target)
+}

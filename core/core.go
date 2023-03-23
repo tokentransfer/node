@@ -20,9 +20,15 @@ const (
 	CORE_TRANSACTION_WITH_DATA = byte(103)
 	CORE_MESSAGE_KEY           = byte(104)
 
-	// CORE_STATE         = byte(110)
-	CORE_ACCOUNT_STATE  = byte(111)
-	CORE_CURRENCY_STATE = byte(112)
+	// CORE_STATE         = byte(120)
+	CORE_ACCOUNT_STATE = byte(121)
+
+	// CORE_INFO
+	CORE_PAYLOAD_INFO  = byte(141)
+	CORE_CONTRACT_INFO = byte(142)
+	CORE_META_INFO     = byte(143)
+	CORE_TOKEN_INFO    = byte(144)
+	CORE_DATA_INFO     = byte(145)
 )
 
 var SYSTEM_CODE = "TEST"
@@ -46,8 +52,17 @@ func GetInfo(data []byte) string {
 
 		case CORE_ACCOUNT_STATE:
 			return "account_state"
-		case CORE_CURRENCY_STATE:
-			return "currency_state"
+
+		case CORE_PAYLOAD_INFO:
+			return "payload_info"
+		case CORE_CONTRACT_INFO:
+			return "contract_info"
+		case CORE_META_INFO:
+			return "meta_info"
+		case CORE_TOKEN_INFO:
+			return "token_info"
+		case CORE_DATA_INFO:
+			return "data_info"
 		default:
 			return "unknown"
 		}
@@ -85,8 +100,17 @@ func Marshal(message proto.Message) ([]byte, error) {
 
 	case *pb.AccountState:
 		meta = CORE_ACCOUNT_STATE
-	case *pb.CurrencyState:
-		meta = CORE_CURRENCY_STATE
+
+	case *pb.PayloadInfo:
+		meta = CORE_PAYLOAD_INFO
+	case *pb.ContractInfo:
+		meta = CORE_CONTRACT_INFO
+	case *pb.MetaInfo:
+		meta = CORE_META_INFO
+	case *pb.TokenInfo:
+		meta = CORE_TOKEN_INFO
+	case *pb.DataInfo:
+		meta = CORE_DATA_INFO
 
 	default:
 		err := errors.New("error data type")
@@ -128,8 +152,17 @@ func Unmarshal(data []byte) (byte, proto.Message, error) {
 
 		case CORE_ACCOUNT_STATE:
 			msg = &pb.AccountState{}
-		case CORE_CURRENCY_STATE:
-			msg = &pb.CurrencyState{}
+
+		case CORE_PAYLOAD_INFO:
+			msg = &pb.PayloadInfo{}
+		case CORE_CONTRACT_INFO:
+			msg = &pb.ContractInfo{}
+		case CORE_META_INFO:
+			msg = &pb.MetaInfo{}
+		case CORE_TOKEN_INFO:
+			msg = &pb.TokenInfo{}
+		case CORE_DATA_INFO:
+			msg = &pb.DataInfo{}
 
 		default:
 			err := errors.New("error data format")

@@ -16,6 +16,7 @@ type State struct {
 	Account    libcore.Address
 	Sequence   uint64
 	BlockIndex uint64
+	Previous   libcore.Hash
 
 	StateType libblock.StateType
 }
@@ -38,6 +39,10 @@ func (s *State) GetBlockIndex() uint64 {
 
 func (s *State) SetBlockIndex(index uint64) {
 	s.BlockIndex = index
+}
+
+func (s *State) GetPrevious() libcore.Hash {
+	return s.Previous
 }
 
 func (s *State) GetAccount() libcore.Address {
@@ -69,7 +74,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 
 	state := msg.(*pb.AccountState)
 
-	_, account, err := as.NewAccountFromBytes(state.Account[:])
+	_, account, err := as.NewAccountFromBytes(state.State.Account[:])
 	if err != nil {
 		return err
 	}
@@ -79,10 +84,11 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	s.StateType = libblock.StateType(core.CORE_ACCOUNT_STATE)
-	s.BlockIndex = state.BlockIndex
-	s.Account = account
-	s.Sequence = state.Sequence
+	s.State.StateType = libblock.StateType(core.CORE_ACCOUNT_STATE)
+	s.State.BlockIndex = state.State.BlockIndex
+	s.State.Account = account
+	s.State.Sequence = state.State.Sequence
+	s.State.Previous = state.State.Previous
 	s.Amount = *a
 	return nil
 }
@@ -94,11 +100,14 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 	}
 
 	return core.Marshal(&pb.AccountState{
-		StateType:  uint32(core.CORE_ACCOUNT_STATE),
-		BlockIndex: s.BlockIndex,
-		Account:    a,
-		Sequence:   s.Sequence,
-		Amount:     s.Amount.String(),
+		State: &pb.State{
+			StateType:  uint32(core.CORE_ACCOUNT_STATE),
+			BlockIndex: s.BlockIndex,
+			Account:    a,
+			Sequence:   s.Sequence,
+			Previous:   []byte(s.Previous),
+		},
+		Amount: s.Amount.String(),
 	})
 }
 
@@ -109,90 +118,13 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 	}
 
 	return core.Marshal(&pb.AccountState{
-		StateType: uint32(core.CORE_ACCOUNT_STATE),
-		Account:   a,
-		Sequence:  s.Sequence,
-		Amount:    s.Amount.String(),
-	})
-}
-
-type CurrencyState struct {
-	State
-
-	Name        string
-	Symbol      string
-	Decimals    uint32
-	TotalSupply core.Amount
-}
-
-func (s *CurrencyState) GetStateKey() string {
-	return core.GetCurrencyKey(s.TotalSupply.Currency, s.TotalSupply.Issuer, "-")
-}
-
-func (s *CurrencyState) UnmarshalBinary(data []byte) error {
-	meta, msg, err := core.Unmarshal(data)
-	if err != nil {
-		return err
-	}
-	if meta != core.CORE_CURRENCY_STATE {
-		return errors.New("error state data")
-	}
-	state := msg.(*pb.CurrencyState)
-
-	_, issuer, err := as.NewAccountFromBytes(state.Account[:])
-	if err != nil {
-		return err
-	}
-
-	a, err := core.NewAmount(state.TotalSupply)
-	if err != nil {
-		return err
-	}
-
-	s.StateType = libblock.StateType(core.CORE_CURRENCY_STATE)
-	s.BlockIndex = state.BlockIndex
-	s.Account = issuer
-	s.Sequence = state.Sequence
-	s.Name = state.Name
-	s.Symbol = state.Symbol
-	s.Decimals = state.Decimals
-	s.TotalSupply = *a
-
-	return nil
-}
-
-func (s *CurrencyState) MarshalBinary() ([]byte, error) {
-	issuer, err := s.Account.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	return core.Marshal(&pb.CurrencyState{
-		StateType:   uint32(core.CORE_CURRENCY_STATE),
-		BlockIndex:  s.BlockIndex,
-		Account:     issuer,
-		Sequence:    s.Sequence,
-		Name:        s.Name,
-		Symbol:      s.Symbol,
-		Decimals:    s.Decimals,
-		TotalSupply: s.TotalSupply.String(),
-	})
-}
-
-func (s *CurrencyState) Raw(ignoreSigningFields bool) ([]byte, error) {
-	issuer, err := s.Account.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	return core.Marshal(&pb.CurrencyState{
-		StateType:   uint32(core.CORE_CURRENCY_STATE),
-		Account:     issuer,
-		Sequence:    s.Sequence,
-		Name:        s.Name,
-		Symbol:      s.Symbol,
-		Decimals:    s.Decimals,
-		TotalSupply: s.TotalSupply.String(),
+		State: &pb.State{
+			StateType: uint32(core.CORE_ACCOUNT_STATE),
+			Account:   a,
+			Sequence:  s.Sequence,
+			Previous:  []byte(s.Previous),
+		},
+		Amount: s.Amount.String(),
 	})
 }
 
@@ -204,13 +136,6 @@ func ReadState(data []byte) (libblock.State, error) {
 	switch meta {
 	case core.CORE_ACCOUNT_STATE:
 		s := &AccountState{}
-		err := s.UnmarshalBinary(data)
-		if err != nil {
-			return nil, err
-		}
-		return s, nil
-	case core.CORE_CURRENCY_STATE:
-		s := &CurrencyState{}
 		err := s.UnmarshalBinary(data)
 		if err != nil {
 			return nil, err
