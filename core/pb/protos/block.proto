@@ -11,8 +11,8 @@ message Block {
     bytes StateHash         = 5;
     int64 Timestamp         = 6;
 
-    repeated TransactionWithData    Transactions    = 7;
-    repeated bytes            States                = 8;
+    repeated TransactionWithData  Transactions  = 7;
+    repeated bytes States                       = 8;
 }
 
 message Transaction {
@@ -21,7 +21,7 @@ message Transaction {
     bytes Account       = 2;
     uint64 Sequence     = 3;
     string Amount       = 4;
-    int64 Gas          = 5;
+    int64 Gas           = 5;
     bytes Destination   = 6;
     bytes Payload       = 7;
 
@@ -34,29 +34,68 @@ message Receipt {
     uint32 TransactionIndex  = 2;
     uint32 TransactionResult = 3;
 
-    repeated bytes States   = 4;
+    repeated bytes States    = 4;
 }
 
-message AccountState {
+message State {
     uint32 StateType  = 1;
     uint64 BlockIndex = 2;
 
     bytes Account     = 3;
     uint64 Sequence   = 4;
-    string Amount      = 5;
+    bytes Previous    = 5;
 }
 
-message CurrencyState {
-    uint32 StateType    = 1;
-    uint64 BlockIndex   = 2;
+message AccountState {
+    State State       = 1;
 
-    bytes Account       = 3;
-    uint64 Sequence     = 4;
+    string Amount     = 2;
+    DataInfo Code     = 3;
+    DataInfo Token    = 4;
+    DataInfo Data     = 5;
+    DataInfo Storage  = 6;
+}
 
-	string Name         = 5;
-	string Symbol       = 6; 
-	uint32 Decimals     = 7;
-	string TotalSupply  = 8;
+message DataInfo {
+    bytes GroupHash   = 1;
+    bytes DataHash    = 2;
+}
+
+message MetaItem {
+    string Name             = 1;
+    string Type             = 2;
+    repeated string Options = 3;
+    string Desc             = 4;
+}
+
+message MetaInfo {
+    string Symbol           = 1;
+    uint64 Index            = 2;
+    uint64 Count            = 3;
+    int64 Total             = 4;
+    repeated MetaItem Items = 5;
+}
+
+message TokenItem {
+    string Name  = 1;
+    string Value = 2;
+}
+
+message TokenInfo {
+    string Symbol            = 1;
+    uint64 Index             = 2;
+    repeated TokenItem Items = 3;
+}
+
+message ContractInfo {
+    bytes Account           = 1
+    string Method           = 2;
+    repeated bytes Params   = 3;
+    bytes Code              = 4;
+}
+
+message PayloadInfo {
+    repeated bytes Payload  = 1;
 }
 
 message TransactionWithData {
