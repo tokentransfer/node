@@ -6,14 +6,14 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 
-	"github.com/tokentransfer/interfaces/core"
+	libcore "github.com/tokentransfer/interfaces/core"
 )
 
 type LevelService struct {
 	Path string
 	Name string
 
-	config core.Config
+	config libcore.Config
 	db     *leveldb.DB
 }
 
@@ -46,7 +46,7 @@ func (service *LevelService) open() error {
 	return nil
 }
 
-func (service *LevelService) Init(c core.Config) error {
+func (service *LevelService) Init(c libcore.Config) error {
 	service.config = c
 	return service.open()
 }

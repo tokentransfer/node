@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"hash"
 
 	"github.com/tokentransfer/node/account"
 
@@ -21,8 +22,12 @@ func (service *CryptoService) GetSize() int {
 	return 32
 }
 
+func (service *CryptoService) NewHasher() hash.Hash {
+	return sha256.New()
+}
+
 func (service *CryptoService) Hash(msg []byte) (libcore.Hash, error) {
-	h := sha256.New()
+	h := service.NewHasher()
 	h.Write(msg)
 	b := h.Sum(nil)
 	return libcore.Hash(b), nil

@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -179,11 +181,16 @@ func (n *Node) Init(c libcore.Config) error {
 	if err != nil {
 		panic(err)
 	}
+	storageService, err := NewStorageService(n.config)
+	if err != nil {
+		panic(err)
+	}
 	consensusService := &ConsensusService{
 		CryptoService:  n.cryptoService,
 		MerkleService:  merkleService,
 		Config:         n.config,
 		AccountService: n.accountService,
+		StorageService: storageService,
 	}
 	n.merkleService = merkleService
 	n.consensusService = consensusService
@@ -229,6 +236,72 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 		Gas:         int64(10),
 		Destination: toAccount,
 	}
+
+	payloadInfo := &pb.PayloadInfo{}
+	if util.Has(&txm, "contract") {
+		contractInfo := &pb.ContractInfo{}
+
+		cm := util.ToMap(&txm, "contract")
+		if util.Has(&cm, "account") {
+			accountString := util.ToString(&cm, "account")
+			_, account, err := as.NewAccountFromAddress(accountString)
+			if err != nil {
+				return "", nil, err
+			}
+			accountData, err := account.MarshalBinary()
+			if err != nil {
+				return "", nil, err
+			}
+			contractInfo.Account = accountData
+		}
+		if util.Has(&cm, "method") {
+			contractInfo.Method = util.ToString(&cm, "method")
+		}
+		if util.Has(&cm, "params") {
+			params := util.ToArray(&cm, "params")
+			list := make([][]byte, 0)
+			for i := 0; i < len(params); i++ {
+				s := params[i].(string)
+				list = append(list, []byte(s))
+			}
+			contractInfo.Params = list
+		}
+		if util.Has(&cm, "code") {
+			codeString := util.ToString(&cm, "code")
+			codeData, err := hex.DecodeString(codeString)
+			if err != nil {
+				return "", nil, err
+			}
+			contractInfo.Code = codeData
+		} else if util.Has(&cm, "file") {
+			filePath := util.ToString(&cm, "file")
+			f, err := os.Open(filePath)
+			if err != nil {
+				return "", nil, err
+			}
+			defer f.Close()
+			fileData, err := io.ReadAll(f)
+			if err != nil {
+				return "", nil, err
+			}
+			contractInfo.Code = fileData
+		}
+
+		contractData, err := core.Marshal(contractInfo)
+		if err != nil {
+			return "", nil, err
+		}
+
+		payloadInfo.Payload = append(payloadInfo.Payload, contractData)
+	}
+	if len(payloadInfo.Payload) > 0 {
+		payloadData, err := core.Marshal(payloadInfo)
+		if err != nil {
+			return "", nil, err
+		}
+		tx.Payload = libcore.Bytes(payloadData)
+	}
+
 	err = n.cryptoService.Sign(fromKey, tx)
 	if err != nil {
 		return "", nil, err
@@ -637,6 +710,8 @@ func (n *Node) generate() {
 				panic(err)
 			}
 			n.broadcast(data)
+		} else {
+			fmt.Printf("=== prepare block %d, %s, %d\n", n.GetBlockNumber(), n.GetBlockHash(), len(n.transactions))
 		}
 	}
 }
@@ -896,11 +971,14 @@ func (n *Node) discoveryHandler(publisher string, msg []byte) error {
 		p := n.peers[index]
 		if p == nil {
 			p = &Peer{
-				Id:  publisher,
-				Key: publicKey,
+				Id:     publisher,
+				Key:    publicKey,
+				Status: PeerKnown,
 			}
+			go n.discoveryPeer(p)
+		} else {
+			p.Status = PeerKnown
 		}
-		p.Status = PeerKnown
 		n.AddPeer(p)
 	}
 	return nil

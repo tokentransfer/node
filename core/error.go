@@ -13,3 +13,7 @@ func ErrorOfInvalid(t string, target string) error {
 func ErrorOfUnknown(t string, target string) error {
 	return fmt.Errorf("unknown %s: %s", t, target)
 }
+
+func ErrorOf(reason string, t string, target string) error {
+	return fmt.Errorf("%s %s: %s", reason, t, target)
+}

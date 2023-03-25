@@ -406,7 +406,7 @@ func CheckValueInteger(key string, item interface{}) (bool, error) {
 	return false, nil
 }
 
-func CheckSupply(key string, s string, decimals int64) (int64, error) {
+func CheckTotal(key string, s string, decimals int64) (int64, error) {
 	a, err := decimal.NewFromString(s)
 	if err != nil {
 		return 0, err

@@ -57,6 +57,11 @@ type AccountState struct {
 	State
 
 	Amount core.Amount
+
+	Code    *pb.DataInfo
+	Token   *pb.DataInfo
+	Data    *pb.DataInfo
+	Storage *pb.DataInfo
 }
 
 func (s *AccountState) GetStateKey() string {
@@ -90,6 +95,11 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.State.Sequence = state.State.Sequence
 	s.State.Previous = state.State.Previous
 	s.Amount = *a
+
+	s.Code = state.Code
+	s.Token = state.Token
+	s.Data = state.Data
+	s.Storage = state.Storage
 	return nil
 }
 
@@ -108,6 +118,11 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 			Previous:   []byte(s.Previous),
 		},
 		Amount: s.Amount.String(),
+
+		Code:    s.Code,
+		Token:   s.Token,
+		Data:    s.Data,
+		Storage: s.Storage,
 	})
 }
 
@@ -125,6 +140,11 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 			Previous:  []byte(s.Previous),
 		},
 		Amount: s.Amount.String(),
+
+		Code:    s.Code,
+		Token:   s.Token,
+		Data:    s.Data,
+		Storage: s.Storage,
 	})
 }
 

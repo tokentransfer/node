@@ -7,6 +7,7 @@ import (
 	"github.com/tokentransfer/go-MerklePatriciaTree/mpt"
 
 	"github.com/tokentransfer/node/block"
+	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/store"
 
 	libblock "github.com/tokentransfer/interfaces/block"
@@ -266,7 +267,7 @@ func (service *MerkleService) PutState(state libblock.State, s ...interface{}) e
 func (service *MerkleService) GetStateByHash(h libcore.Hash, s ...interface{}) (libblock.State, error) {
 	data, err := service.sm.GetData(h)
 	if err != nil {
-		return nil, ErrorOfNonexists("state", h.String())
+		return nil, core.ErrorOfNonexists("state", h.String())
 	}
 	state, err := block.ReadState(data)
 	if err != nil {
@@ -279,7 +280,7 @@ func (service *MerkleService) GetStateByTypeAndKey(stateType libblock.StateType,
 	stateTypeAndKey := getStateKeyWithType(stateKey, stateType)
 	h, err := service.im.GetData([]byte(stateTypeAndKey))
 	if err != nil {
-		return nil, ErrorOfNonexists("state", stateTypeAndKey)
+		return nil, core.ErrorOfNonexists("state", stateTypeAndKey)
 	}
 	return service.GetStateByHash(libcore.Hash(h))
 }
@@ -288,7 +289,7 @@ func (service *MerkleService) GetStateByTypeAndAddress(stateType libblock.StateT
 	stateTypeTypeAndAddress := getStateKeyWithType(account.String(), stateType)
 	h, err := service.im.GetData([]byte(stateTypeTypeAndAddress))
 	if err != nil {
-		return nil, ErrorOfNonexists("state", stateTypeTypeAndAddress)
+		return nil, core.ErrorOfNonexists("state", stateTypeTypeAndAddress)
 	}
 	return service.GetStateByHash(libcore.Hash(h))
 }
@@ -297,7 +298,7 @@ func (service *MerkleService) GetStateByAddressAndIndex(account libcore.Address,
 	stateAddressAndIndexKey := getStateKey(fmt.Sprintf("%s:%d", account.String(), index))
 	h, err := service.im.GetData([]byte(stateAddressAndIndexKey))
 	if err != nil {
-		return nil, ErrorOfNonexists("state", stateAddressAndIndexKey)
+		return nil, core.ErrorOfNonexists("state", stateAddressAndIndexKey)
 	}
 	return service.GetStateByHash(libcore.Hash(h))
 }
@@ -306,7 +307,7 @@ func (service *MerkleService) GetStateByAddress(account libcore.Address, s ...in
 	stateAddressKey := getStateKey(account.String())
 	h, err := service.im.GetData([]byte(stateAddressKey))
 	if err != nil {
-		return nil, ErrorOfNonexists("state", stateAddressKey)
+		return nil, core.ErrorOfNonexists("state", stateAddressKey)
 	}
 	return service.GetStateByHash(libcore.Hash(h))
 }
@@ -341,7 +342,7 @@ func (service *MerkleService) PutTransaction(txWithData libblock.TransactionWith
 func (service *MerkleService) GetTransactionByHash(h libcore.Hash, s ...interface{}) (libblock.TransactionWithData, error) {
 	data, err := service.tm.GetData(h)
 	if err != nil {
-		return nil, ErrorOfNonexists("transaction", h.String())
+		return nil, core.ErrorOfNonexists("transaction", h.String())
 	}
 	txWithData := &block.TransactionWithData{}
 	err = txWithData.UnmarshalBinary(data)
@@ -355,7 +356,7 @@ func (service *MerkleService) GetTransactionByIndex(account libcore.Address, ind
 	accountKey := getTransactionKey(fmt.Sprintf("%s:%d", account.String(), index))
 	h, err := service.im.GetData([]byte(accountKey))
 	if err != nil {
-		return nil, ErrorOfNonexists("transaction", fmt.Sprintf("%s, %d", account.String(), index))
+		return nil, core.ErrorOfNonexists("transaction", fmt.Sprintf("%s, %d", account.String(), index))
 	}
 	return service.GetTransactionByHash(libcore.Hash(h))
 }
@@ -386,7 +387,7 @@ func (service *MerkleService) PutBlock(b libblock.Block, s ...interface{}) error
 func (service *MerkleService) GetBlockByHash(hash libcore.Hash, s ...interface{}) (libblock.Block, error) {
 	data, err := service.bm.GetData(hash)
 	if err != nil {
-		return nil, ErrorOfNonexists("block", hash.String())
+		return nil, core.ErrorOfNonexists("block", hash.String())
 	}
 	b := &block.Block{}
 	err = b.UnmarshalBinary(data)
@@ -400,7 +401,7 @@ func (service *MerkleService) GetBlockByIndex(index uint64, s ...interface{}) (l
 	name := getBlockKey(index)
 	data, err := service.im.GetData([]byte(name))
 	if err != nil {
-		return nil, ErrorOfNonexists("block", fmt.Sprintf("%d", index))
+		return nil, core.ErrorOfNonexists("block", fmt.Sprintf("%d", index))
 	}
 	h := libcore.Hash(data)
 	return service.GetBlockByHash(h)
@@ -464,8 +465,4 @@ func getStateKey(key string) string {
 
 func getStateKeyWithType(key string, t libblock.StateType) string {
 	return fmt.Sprintf("state@%s@%s", t.String(), key)
-}
-
-func ErrorOfNonexists(t string, target string) error {
-	return fmt.Errorf("can't find %s: %s", t, target)
 }

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/tokentransfer/interfaces/core"
+	libcore "github.com/tokentransfer/interfaces/core"
 )
 
 type MemoryService struct {
@@ -18,7 +18,7 @@ func (service *MemoryService) Close() error {
 	return nil
 }
 
-func (service *MemoryService) Init(c core.Config) error {
+func (service *MemoryService) Init(c libcore.Config) error {
 	service.db = &sync.Map{}
 	return nil
 }

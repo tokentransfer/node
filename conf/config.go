@@ -5,12 +5,16 @@ import (
 	"os"
 
 	libcore "github.com/tokentransfer/interfaces/core"
+	"github.com/tokentransfer/node/account"
 )
+
+var as = &account.AccountService{}
 
 type Config struct {
 	// address 0xc287B1266732495Fe8c93CE3Ba631597153fdd91
 	// secret 86d3350f255e5b6259d3d3a615b363f23c042971d89b7f9cb84aa7fadeeb2736
 	GasAddress string `json:"gas_address"`
+	gasAccount libcore.Address
 
 	DataDir string `json:"data_dir"`
 	Address string `json:"address"`
@@ -110,6 +114,13 @@ func NewConfig(configFile string) (*Config, error) {
 		return nil, err
 	}
 
+	gasAddress := config.GasAddress
+	_, gasAccount, err := as.NewAccountFromAddress(gasAddress)
+	if err != nil {
+		return nil, err
+	}
+	config.gasAccount = gasAccount
+
 	return config, nil
 }
 
@@ -134,7 +145,7 @@ func (c *Config) GetType() int {
 }
 
 func (c *Config) GetGasAccount() libcore.Address {
-	return nil
+	return c.gasAccount
 }
 
 func (c *Config) GetDataDir() string {
