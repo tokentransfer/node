@@ -29,6 +29,7 @@ const (
 	CORE_META_INFO     = byte(143)
 	CORE_TOKEN_INFO    = byte(144)
 	CORE_DATA_INFO     = byte(145)
+	CORE_PEER_INFO     = byte(146)
 )
 
 var SYSTEM_CODE = "TEST"
@@ -63,6 +64,8 @@ func GetInfo(data []byte) string {
 			return "token_info"
 		case CORE_DATA_INFO:
 			return "data_info"
+		case CORE_PEER_INFO:
+			return "peer_info"
 		default:
 			return "unknown"
 		}
@@ -111,6 +114,8 @@ func Marshal(message proto.Message) ([]byte, error) {
 		meta = CORE_TOKEN_INFO
 	case *pb.DataInfo:
 		meta = CORE_DATA_INFO
+	case *pb.PeerInfo:
+		meta = CORE_PEER_INFO
 
 	default:
 		err := errors.New("error data type")
@@ -163,6 +168,8 @@ func Unmarshal(data []byte) (byte, proto.Message, error) {
 			msg = &pb.TokenInfo{}
 		case CORE_DATA_INFO:
 			msg = &pb.DataInfo{}
+		case CORE_PEER_INFO:
+			msg = &pb.PeerInfo{}
 
 		default:
 			err := errors.New("error data format")

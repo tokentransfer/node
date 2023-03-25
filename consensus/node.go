@@ -57,13 +57,15 @@ func (s Status) String() string {
 const (
 	BLOCK_DURATION       = 10
 	TOPIC_PEER_DISCOVERY = "peer_discovery"
+	TOPIC_PEER_DATA      = "peer_data"
 	TOPIC_PEER_MESSAGE   = "peer_message"
 )
 
 type Peer struct {
-	Id     string
-	Key    libaccount.PublicKey
-	Status Status
+	Id          string
+	Key         libaccount.PublicKey
+	BlockNumber int64
+	Status      Status
 
 	address string
 	index   uint64
@@ -790,7 +792,43 @@ func (n *Node) discoveryPeer(p *Peer) {
 			n.Consensused = n.PrepareConsensus()
 		}
 
-		time.Sleep(time.Duration(config.GetBlockDuration()) * time.Second)
+		currentBlock := n.GetBlockNumber()
+		if currentBlock > p.BlockNumber {
+			block, err := n.merkleService.GetBlockByIndex(uint64(p.BlockNumber + 1))
+			if err != nil {
+				glog.Error(err)
+			} else {
+				_, err = n.HashBlock(block)
+				if err != nil {
+					glog.Error(err)
+				} else {
+					blockData, err := block.MarshalBinary()
+					if err != nil {
+						glog.Error(err)
+					}
+					m := &pb.Message{
+						Id:   n.newId(),
+						Data: blockData,
+						Node: n.self.GetIndex(),
+					}
+					msgData, err := core.Marshal(m)
+					if err != nil {
+						glog.Error(err)
+					} else {
+						err = n.net.SendMsg(n.config.GetChainId(), p.GetAddress(), TOPIC_PEER_DATA, msgData)
+						if err != nil {
+							glog.Error(err)
+						} else {
+							fmt.Printf(">>> send data %d(%s) to %d\n", m.Id, core.GetInfo(blockData), p.GetIndex())
+						}
+					}
+				}
+			}
+
+			time.Sleep(time.Second)
+		} else {
+			time.Sleep(time.Duration(config.GetBlockDuration()) * time.Second)
+		}
 	}
 }
 
@@ -866,7 +904,7 @@ func (n *Node) send() {
 					fmt.Println(">>>", core.GetInfo(data), libcore.Bytes(data).String())
 					log.Println(err)
 				} else {
-					fmt.Printf(">>> send %d(%s) to %d\n", m.Id, core.GetInfo(data), p.GetIndex())
+					fmt.Printf(">>> send message %d(%s) to %d\n", m.Id, core.GetInfo(data), p.GetIndex())
 				}
 			}
 		}
@@ -958,9 +996,17 @@ func (n *Node) receive() {
 	}
 }
 
-func (n *Node) discoveryHandler(publisher string, msg []byte) error {
-	glog.Infof("[%s][%s] recv discovery from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), publisher, len(msg))
-	_, publicKey, err := n.accountService.NewPublicFromBytes(msg)
+func (n *Node) discoveryHandler(publisher string, peerData []byte) error {
+	glog.Infof("[%s][%s] recv discovery from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), publisher, len(peerData))
+	meta, msg, err := core.Unmarshal(peerData)
+	if err != nil {
+		return err
+	}
+	if meta != core.CORE_PEER_INFO {
+		return core.ErrorOfInvalid("format", "peer info")
+	}
+	peerInfo := msg.(*pb.PeerInfo)
+	_, publicKey, err := n.accountService.NewPublicFromBytes(peerInfo.PublicKey)
 	if err != nil {
 		return err
 	} else {
@@ -971,13 +1017,17 @@ func (n *Node) discoveryHandler(publisher string, msg []byte) error {
 		p := n.peers[index]
 		if p == nil {
 			p = &Peer{
-				Id:     publisher,
-				Key:    publicKey,
-				Status: PeerKnown,
+				Id:          publisher,
+				Key:         publicKey,
+				Status:      PeerKnown,
+				BlockNumber: peerInfo.BlockNumber,
 			}
 			go n.discoveryPeer(p)
 		} else {
-			p.Status = PeerKnown
+			if p.Status < PeerKnown {
+				p.Status = PeerKnown
+			}
+			p.BlockNumber = peerInfo.BlockNumber
 		}
 		n.AddPeer(p)
 	}
@@ -985,13 +1035,99 @@ func (n *Node) discoveryHandler(publisher string, msg []byte) error {
 }
 
 func (n *Node) messageHandler(id string, data []byte) error {
-	glog.Infof("[%s][%s] recv data from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), id, len(data))
+	glog.Infof("[%s][%s] recv message from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), id, len(data))
 	_, m, err := core.Unmarshal(data)
 	if err != nil {
 		return err
 	}
 	msg := m.(*pb.Message)
 	n.ins <- msg
+	return nil
+}
+
+func (n *Node) dataHandler(id string, msgData []byte) error {
+	glog.Infof("[%s][%s] recv data from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), id, len(msgData))
+	_, m, err := core.Unmarshal(msgData)
+	if err != nil {
+		return err
+	}
+	msg := m.(*pb.Message)
+	data := msg.GetData()
+	if len(data) > 0 {
+		meta := data[0]
+		switch meta {
+		case core.CORE_PEER_INFO:
+			meta, msg, err := core.Unmarshal(data)
+			if err != nil {
+				return err
+			}
+			if meta != core.CORE_PEER_INFO {
+				return core.ErrorOfInvalid("format", "peer info")
+			}
+			peerInfo := msg.(*pb.PeerInfo)
+			index, err := core.GetIndex(id)
+			if err != nil {
+				return err
+			}
+			p := n.peers[index]
+			if p != nil {
+				p.BlockNumber = peerInfo.BlockNumber
+			}
+
+		case core.CORE_BLOCK:
+			peerData, err := core.Marshal(&pb.PeerInfo{
+				BlockNumber: n.GetBlockNumber(),
+			})
+			if err != nil {
+				glog.Error(err)
+			} else {
+				m := &pb.Message{
+					Id:   n.newId(),
+					Data: peerData,
+					Node: n.self.GetIndex(),
+				}
+				msgData, err := core.Marshal(m)
+				if err != nil {
+					glog.Error(err)
+				} else {
+					err = n.net.SendMsg(n.config.GetChainId(), id, TOPIC_PEER_DATA, msgData)
+					if err != nil {
+						glog.Error(err)
+					} else {
+						fmt.Printf(">>> send data %d(%s) to %s\n", m.Id, core.GetInfo(peerData), id)
+					}
+				}
+			}
+
+			b := &block.Block{}
+			err = b.UnmarshalBinary(data)
+			if err != nil {
+				glog.Error(err)
+			} else {
+				h, err := n.HashBlock(b)
+				if err != nil {
+					glog.Error(err)
+				} else {
+					if int64(b.GetIndex()) <= n.consensusService.GetBlockNumber() {
+						fmt.Println("<<< drop block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+					} else {
+						fmt.Println("<<< receive block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+
+						_, err = n.consensusService.VerifyBlock(b)
+						if err != nil {
+							glog.Error(err)
+						} else {
+							fmt.Println("<<< verify block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+							err = n.consensusService.AddBlock(b)
+							if err != nil {
+								log.Println(err)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -1020,6 +1156,10 @@ func (n *Node) start() {
 	if err != nil {
 		panic(err)
 	}
+	err = n.net.DirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_DATA, n.dataHandler)
+	if err != nil {
+		panic(err)
+	}
 	close(readyC)
 
 	n.self.Id = n.config.GetNodeId()
@@ -1042,6 +1182,7 @@ func (n *Node) Start() error {
 func (n *Node) Stop() error {
 	n.net.CancelSubscribeWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY)
 	n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_MESSAGE)
+	n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_DATA)
 	n.net.Stop()
 
 	return nil
@@ -1053,9 +1194,17 @@ func (n *Node) discovery() {
 		if err != nil {
 			glog.Error(err)
 		} else {
-			err = n.net.BroadcastWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY, pubKeyData)
+			peerData, err := core.Marshal(&pb.PeerInfo{
+				PublicKey:   pubKeyData,
+				BlockNumber: n.GetBlockNumber(),
+			})
 			if err != nil {
 				glog.Error(err)
+			} else {
+				err = n.net.BroadcastWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY, peerData)
+				if err != nil {
+					glog.Error(err)
+				}
 			}
 		}
 
