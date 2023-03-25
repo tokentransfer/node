@@ -9,3 +9,8 @@ message Message {
     uint64 Node     = 3;
     bytes Signature = 4;
 }
+
+message PeerInfo {
+    bytes PublicKey   = 1;
+    int64 BlockNumber = 2;
+}
