@@ -737,10 +737,10 @@ func (n *Node) connect() {
 	for {
 		list := n.ListPeer()
 
-		fmt.Println(">>>", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Status)
+		fmt.Println(">>>", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Status, n.GetBlockNumber())
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			fmt.Println(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Status)
+			fmt.Println(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Status, p.BlockNumber)
 		}
 
 		if !lastConsensused && n.Consensused {
@@ -1075,30 +1075,6 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 			}
 
 		case core.CORE_BLOCK:
-			peerData, err := core.Marshal(&pb.PeerInfo{
-				BlockNumber: n.GetBlockNumber(),
-			})
-			if err != nil {
-				glog.Error(err)
-			} else {
-				m := &pb.Message{
-					Id:   n.newId(),
-					Data: peerData,
-					Node: n.self.GetIndex(),
-				}
-				msgData, err := core.Marshal(m)
-				if err != nil {
-					glog.Error(err)
-				} else {
-					err = n.net.SendMsg(n.config.GetChainId(), id, TOPIC_PEER_DATA, msgData)
-					if err != nil {
-						glog.Error(err)
-					} else {
-						fmt.Printf(">>> send data %d(%s) to %s\n", m.Id, core.GetInfo(peerData), id)
-					}
-				}
-			}
-
 			b := &block.Block{}
 			err = b.UnmarshalBinary(data)
 			if err != nil {
@@ -1120,7 +1096,31 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 							fmt.Println("<<< verify block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 							err = n.consensusService.AddBlock(b)
 							if err != nil {
-								log.Println(err)
+								glog.Error(err)
+							} else {
+								peerData, err := core.Marshal(&pb.PeerInfo{
+									BlockNumber: n.GetBlockNumber(),
+								})
+								if err != nil {
+									glog.Error(err)
+								} else {
+									m := &pb.Message{
+										Id:   n.newId(),
+										Data: peerData,
+										Node: n.self.GetIndex(),
+									}
+									msgData, err := core.Marshal(m)
+									if err != nil {
+										glog.Error(err)
+									} else {
+										err = n.net.SendMsg(n.config.GetChainId(), id, TOPIC_PEER_DATA, msgData)
+										if err != nil {
+											glog.Error(err)
+										} else {
+											fmt.Printf(">>> send data %d(%s) to %s\n", m.Id, core.GetInfo(peerData), id)
+										}
+									}
+								}
 							}
 						}
 					}
