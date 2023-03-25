@@ -763,9 +763,10 @@ func (n *Node) SendRequestInfo(p *Peer) {
 func (n *Node) PrepareConsensus() bool {
 	list := n.ListPeer()
 	count := 0
+	currentBlock := n.GetBlockNumber()
 	for i := 0; i < len(list); i++ {
 		p := list[i]
-		if p.Status >= PeerKnown {
+		if p.Status >= PeerKnown && p.BlockNumber == currentBlock {
 			count++
 		}
 	}
@@ -825,7 +826,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 				}
 			}
 
-			time.Sleep(time.Second)
+			time.Sleep(5 * time.Second)
 		} else {
 			time.Sleep(time.Duration(config.GetBlockDuration()) * time.Second)
 		}
@@ -1072,6 +1073,7 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 			p := n.peers[index]
 			if p != nil {
 				p.BlockNumber = peerInfo.BlockNumber
+				n.AddPeer(p)
 			}
 
 		case core.CORE_BLOCK:
