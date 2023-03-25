@@ -815,7 +815,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 					if err != nil {
 						glog.Error(err)
 					} else {
-						err = n.net.SendMsg(n.config.GetChainId(), p.GetAddress(), TOPIC_PEER_DATA, msgData)
+						err = n.net.SendMsg(n.config.GetChainId(), p.Id, TOPIC_PEER_DATA, msgData)
 						if err != nil {
 							glog.Error(err)
 						} else {
@@ -899,7 +899,7 @@ func (n *Node) send() {
 			list := n.ListPeer()
 			for i := 0; i < len(list); i++ {
 				p := list[i]
-				err := n.net.SendMsg(n.config.GetChainId(), p.GetAddress(), TOPIC_PEER_MESSAGE, msgBytes)
+				err := n.net.SendMsg(n.config.GetChainId(), p.Id, TOPIC_PEER_MESSAGE, msgBytes)
 				if err != nil {
 					fmt.Println(">>>", core.GetInfo(data), libcore.Bytes(data).String())
 					log.Println(err)
