@@ -820,7 +820,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 						if err != nil {
 							glog.Error(err)
 						} else {
-							fmt.Printf(">>> send data %d(%s) to %d\n", m.Id, core.GetInfo(blockData), p.GetIndex())
+							fmt.Printf(">>> send data %d(%s) to %s\n", m.Id, core.GetInfo(blockData), p.Id)
 						}
 					}
 				}
@@ -1023,6 +1023,8 @@ func (n *Node) discoveryHandler(publisher string, peerData []byte) error {
 				Status:      PeerKnown,
 				BlockNumber: peerInfo.BlockNumber,
 			}
+			n.AddPeer(p)
+
 			go n.discoveryPeer(p)
 		} else {
 			if p.Status < PeerKnown {
@@ -1030,7 +1032,6 @@ func (n *Node) discoveryHandler(publisher string, peerData []byte) error {
 			}
 			p.BlockNumber = peerInfo.BlockNumber
 		}
-		n.AddPeer(p)
 	}
 	return nil
 }
@@ -1073,7 +1074,6 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 			p := n.peers[index]
 			if p != nil {
 				p.BlockNumber = peerInfo.BlockNumber
-				n.AddPeer(p)
 			}
 
 		case core.CORE_BLOCK:
