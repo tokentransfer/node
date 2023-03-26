@@ -311,7 +311,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 			if err != nil {
 				return "", nil, err
 			}
-			pageInfo.Page = pageData
+			pageInfo.Data = pageData
 		} else if util.Has(&pm, "file") {
 			filePath := util.ToString(&pm, "file")
 			f, err := os.Open(filePath)
@@ -323,7 +323,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 			if err != nil {
 				return "", nil, err
 			}
-			pageInfo.Page = fileData
+			pageInfo.Data = fileData
 		}
 
 		pageData, err := core.Marshal(pageInfo)
