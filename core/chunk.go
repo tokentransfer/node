@@ -8,6 +8,7 @@ import (
 
 type Storage interface {
 	Root() Key
+	Update() error
 	Create(string) Temporary
 	Group(string) (Group, error)
 	Exists(Key) bool

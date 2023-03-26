@@ -72,6 +72,9 @@ func (s *StorageService) CommitSandbox() error {
 	if err := s.stackdb.Flush(); err != nil {
 		return err
 	}
+	if err := s.storage.Update(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -80,6 +83,9 @@ func (s *StorageService) CancelSandbox() error {
 
 	err := s.stackdb.Cancel()
 	if err != nil {
+		return err
+	}
+	if err := s.storage.Update(); err != nil {
 		return err
 	}
 	return nil

@@ -137,6 +137,10 @@ func (s *chunkStorage) add(name string, key core.Key) error {
 	return nil
 }
 
+func (s *chunkStorage) Update() error {
+	return s.load()
+}
+
 func (s *chunkStorage) load() error {
 	rootLink := core.GetKey("*")
 	entry, ok := s.getEntry(rootLink)
@@ -156,6 +160,7 @@ func (s *chunkStorage) load() error {
 		}
 		s.version = version
 	} else {
+		s.bytesUsed = 0
 		s.entries.ListData(func(k []byte, v []byte) error {
 			key, err := core.ParseKey(string(k))
 			if err != nil {
@@ -174,9 +179,9 @@ func (s *chunkStorage) load() error {
 			return nil
 		})
 
-		version := int64(-1)
+		version := int64(0)
 		for {
-			indexString := fmt.Sprintf("%d", version+1)
+			indexString := fmt.Sprintf("%d", version)
 			link := core.GetKey(indexString)
 			if s.Exists(link) {
 				version++
@@ -184,7 +189,7 @@ func (s *chunkStorage) load() error {
 				break
 			}
 		}
-		s.version = version
+		s.version = (version - 1)
 		err := s.flush()
 		if err != nil {
 			return err
