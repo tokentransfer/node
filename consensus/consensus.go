@@ -601,6 +601,21 @@ func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.
 					}
 				}
 			}
+		case core.CORE_PAGE_INFO:
+			info := msg.(*pb.PageInfo)
+			if len(info.Page) > 0 {
+				rootHash, pageHash, err := ss.CreatePage(tx.Destination, info.Page)
+				if err != nil {
+					return nil, err
+				}
+				accountInfo, ok := accountMap[tx.Destination.String()]
+				if ok {
+					accountInfo.Page = &pb.DataInfo{
+						GroupHash: rootHash,
+						DataHash:  pageHash,
+					}
+				}
+			}
 
 		case core.CORE_META_INFO:
 		case core.CORE_TOKEN_INFO:

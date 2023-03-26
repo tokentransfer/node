@@ -301,6 +301,38 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 
 		payloadInfo.Payload = append(payloadInfo.Payload, contractData)
 	}
+	if util.Has(&txm, "page") {
+		pageInfo := &pb.PageInfo{}
+
+		pm := util.ToMap(&txm, "page")
+		if util.Has(&pm, "data") {
+			pageString := util.ToString(&pm, "data")
+			pageData, err := hex.DecodeString(pageString)
+			if err != nil {
+				return "", nil, err
+			}
+			pageInfo.Page = pageData
+		} else if util.Has(&pm, "file") {
+			filePath := util.ToString(&pm, "file")
+			f, err := os.Open(filePath)
+			if err != nil {
+				return "", nil, err
+			}
+			defer f.Close()
+			fileData, err := io.ReadAll(f)
+			if err != nil {
+				return "", nil, err
+			}
+			pageInfo.Page = fileData
+		}
+
+		pageData, err := core.Marshal(pageInfo)
+		if err != nil {
+			return "", nil, err
+		}
+
+		payloadInfo.Payload = append(payloadInfo.Payload, pageData)
+	}
 	if len(payloadInfo.Payload) > 0 {
 		payloadData, err := core.Marshal(payloadInfo)
 		if err != nil {

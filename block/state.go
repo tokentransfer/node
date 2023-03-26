@@ -59,6 +59,7 @@ type AccountState struct {
 	Amount core.Amount
 
 	Code    *pb.DataInfo
+	Page    *pb.DataInfo
 	Token   *pb.DataInfo
 	Data    *pb.DataInfo
 	Storage *pb.DataInfo
@@ -97,6 +98,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.Amount = *a
 
 	s.Code = state.Code
+	s.Page = state.Page
 	s.Token = state.Token
 	s.Data = state.Data
 	s.Storage = state.Storage
@@ -120,6 +122,7 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 		Amount: s.Amount.String(),
 
 		Code:    s.Code,
+		Page:    s.Page,
 		Token:   s.Token,
 		Data:    s.Data,
 		Storage: s.Storage,
@@ -142,6 +145,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 		Amount: s.Amount.String(),
 
 		Code:    s.Code,
+		Page:    s.Page,
 		Token:   s.Token,
 		Data:    s.Data,
 		Storage: s.Storage,
