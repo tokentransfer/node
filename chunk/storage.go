@@ -642,3 +642,10 @@ func (s *chunkStorage) Group(name string) (core.Group, error) {
 	}
 	return dir, nil
 }
+
+type LogPrinter struct {
+}
+
+func (p LogPrinter) Printf(format string, v ...interface{}) {
+	fmt.Printf(format+"\n", v...)
+}

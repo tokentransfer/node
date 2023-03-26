@@ -66,8 +66,10 @@ func (s *StorageService) CreateSandbox() error {
 func (s *StorageService) CommitSandbox() error {
 	defer s.locker.Unlock()
 
-	err := s.stackdb.Commit()
-	if err != nil {
+	if err := s.stackdb.Commit(); err != nil {
+		return err
+	}
+	if err := s.stackdb.Flush(); err != nil {
 		return err
 	}
 	return nil

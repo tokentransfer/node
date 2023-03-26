@@ -201,6 +201,8 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 		if !ok || err != nil {
 			ss.CancelSandbox()
 			ms.Cancel()
+		} else {
+			ss.CommitSandbox()
 		}
 	}()
 
@@ -308,17 +310,12 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 
 func (service *ConsensusService) AddBlock(b libblock.Block) error {
 	ms := service.MerkleService
-	ss := service.StorageService
 
 	err := ms.PutBlock(b)
 	if err != nil {
 		return err
 	}
 	err = ms.Commit()
-	if err != nil {
-		return err
-	}
-	err = ss.CommitSandbox()
 	if err != nil {
 		return err
 	}

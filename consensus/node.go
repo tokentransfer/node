@@ -18,6 +18,7 @@ import (
 	"github.com/caivega/glog"
 	"github.com/tokentransfer/node/account"
 	"github.com/tokentransfer/node/block"
+	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
@@ -642,6 +643,11 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return hex.EncodeToString(data), nil
 		}
 		return nil, errors.New("error")
+
+	case "dump":
+		n.storageService.Dump(chunk.LogPrinter{})
+		return n.storageService.storage.Root().String(), nil
+
 	default:
 		return nil, fmt.Errorf("no such method %s", method)
 	}
@@ -739,7 +745,6 @@ func (n *Node) generate() {
 			if err != nil {
 				panic(err)
 			}
-
 			err = n.consensusService.AddBlock(block)
 			if err != nil {
 				panic(err)
@@ -1232,10 +1237,24 @@ func (n *Node) Start() error {
 }
 
 func (n *Node) Stop() error {
-	n.net.CancelSubscribeWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY)
-	n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_MESSAGE)
-	n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_DATA)
-	n.net.Stop()
+	if err := n.merkleService.Close(); err != nil {
+		return err
+	}
+	if err := n.storageService.Close(); err != nil {
+		return err
+	}
+	if err := n.net.CancelSubscribeWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY); err != nil {
+		return err
+	}
+	if err := n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_MESSAGE); err != nil {
+		return err
+	}
+	if err := n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_DATA); err != nil {
+		return err
+	}
+	if err := n.net.Stop(); err != nil {
+		return err
+	}
 
 	return nil
 }

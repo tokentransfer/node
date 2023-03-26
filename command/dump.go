@@ -48,6 +48,7 @@ func (i *DumpCommand) Run(args []string) int {
 	if err != nil {
 		panic(err)
 	}
+
 	storageService.Dump(i)
 	return 0
 }
