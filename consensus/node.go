@@ -898,7 +898,7 @@ func (n *Node) send() {
 		m := <-n.outs
 		msgBytes, err := core.Marshal(m)
 		if err != nil {
-			log.Println(err)
+			glog.Error(err)
 		} else {
 			data := m.GetData()
 			list := n.ListPeer()
@@ -906,8 +906,7 @@ func (n *Node) send() {
 				p := list[i]
 				err := n.net.SendMsg(n.config.GetChainId(), p.Id, TOPIC_PEER_MESSAGE, msgBytes)
 				if err != nil {
-					fmt.Println(">>>", core.GetInfo(data), libcore.Bytes(data).String())
-					log.Println(err)
+					glog.Error(err)
 				} else {
 					fmt.Printf(">>> send message %d(%s) to %s(%s)\n", m.Id, core.GetInfo(data), p.GetAddress(), p.Id)
 				}
@@ -950,9 +949,9 @@ func (n *Node) receive() {
 								}
 							}
 						}
-
 					}
 				}
+				n.SendPeerInfo(fromPeer)
 
 			case core.CORE_TRANSACTION:
 				tx := &block.Transaction{}
@@ -1105,30 +1104,33 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 					}
 				}
 			}
-
-			peers, _ := n.net.ChainNodesInfo(n.config.GetChainId())
-			peerData, err := core.Marshal(&pb.PeerInfo{
-				BlockNumber: n.GetBlockNumber(),
-				PeerCount:   int64(len(peers)),
-			})
-			if err != nil {
-				glog.Error(err)
-			} else {
-				mid, msgData, err := n.SendMessage(peerData)
-				if err != nil {
-					glog.Error(err)
-				} else {
-					err = n.net.SendMsg(n.config.GetChainId(), fromPeer.Id, TOPIC_PEER_DATA, msgData)
-					if err != nil {
-						glog.Error(err)
-					} else {
-						fmt.Printf(">>> send data %d(%s) to %s\n", mid, core.GetInfo(peerData), id)
-					}
-				}
-			}
+			n.SendPeerInfo(fromPeer)
 		}
 	}
 	return nil
+}
+
+func (n *Node) SendPeerInfo(toPeer *Peer) {
+	peers, _ := n.net.ChainNodesInfo(n.config.GetChainId())
+	peerData, err := core.Marshal(&pb.PeerInfo{
+		BlockNumber: n.GetBlockNumber(),
+		PeerCount:   int64(len(peers)),
+	})
+	if err != nil {
+		glog.Error(err)
+	} else {
+		mid, msgData, err := n.SendMessage(peerData)
+		if err != nil {
+			glog.Error(err)
+		} else {
+			err = n.net.SendMsg(n.config.GetChainId(), toPeer.Id, TOPIC_PEER_DATA, msgData)
+			if err != nil {
+				glog.Error(err)
+			} else {
+				fmt.Printf(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(peerData), toPeer.GetAddress(), toPeer.Id)
+			}
+		}
+	}
 }
 
 func (n *Node) start() {
