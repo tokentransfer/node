@@ -741,10 +741,10 @@ func (n *Node) connect() {
 	for {
 		list := n.ListPeer()
 
-		fmt.Println(">>>", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
+		fmt.Println("===", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Id, n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			fmt.Println(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Status, p.BlockNumber, p.PeerCount)
+			fmt.Println(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount)
 		}
 
 		if !lastConsensused && n.Consensused {
@@ -798,7 +798,6 @@ func (n *Node) discoveryPeer(p *Peer) {
 			n.Consensused = n.PrepareConsensus()
 		}
 
-		fmt.Println("=== discovery peer", p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount, n.GetBlockNumber())
 		if p.Status >= PeerKnown && n.GetBlockNumber() > p.BlockNumber {
 			for i := p.BlockNumber + 1; i <= n.GetBlockNumber() && n.GetBlockNumber() > p.BlockNumber; i++ {
 				block, err := n.merkleService.GetBlockByIndex(uint64(i))
@@ -1225,10 +1224,6 @@ func (n *Node) discovery() {
 		} else {
 			peerMap := make(map[string]struct{})
 			for _, p := range peers {
-				fmt.Println("> discovery", p.NodeUid)
-				for index, addr := range p.NodeAddress {
-					fmt.Printf("  %d: %s\n", index, addr)
-				}
 				peerMap[p.NodeUid] = struct{}{}
 			}
 			for _, p := range n.peers {
@@ -1240,7 +1235,7 @@ func (n *Node) discovery() {
 		}
 
 		if n.Consensused {
-			time.Sleep(30 * time.Second)
+			time.Sleep(60 * time.Second)
 		} else {
 			time.Sleep(10 * time.Second)
 		}
