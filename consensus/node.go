@@ -119,6 +119,7 @@ type Node struct {
 	accountService   libaccount.AccountService
 	merkleService    libstore.MerkleService
 	consensusService *ConsensusService
+	storageService   *StorageService
 
 	transactions      []libblock.TransactionWithData
 	transactionLocker *sync.Mutex
@@ -197,6 +198,7 @@ func (n *Node) Init(c libcore.Config) error {
 	}
 	n.merkleService = merkleService
 	n.consensusService = consensusService
+	n.storageService = storageService
 
 	return nil
 }
@@ -334,20 +336,12 @@ func (n *Node) sendTransaction(tx libblock.Transaction) (libblock.TransactionWit
 	if err != nil {
 		return nil, err
 	}
-
 	hash := tx.GetHash()
 	fmt.Println("verify transaction", hash.String())
 
 	txWithData, _, err := n.processTransaction(tx)
 	if err != nil {
 		fmt.Println("error", err) // ignore the error after verified transaction
-	} else {
-		data, err := tx.MarshalBinary()
-		if err != nil {
-			return nil, err
-		}
-		n.broadcast(data)
-		fmt.Println("send transaction", hash.String())
 	}
 	return txWithData, nil
 }
@@ -367,7 +361,16 @@ func (n *Node) processTransaction(tx libblock.Transaction) (libblock.Transaction
 	if !ok {
 		return nil, nil, errors.New("error transaction")
 	}
+
+	err = n.storageService.CreateSandbox()
+	if err != nil {
+		return nil, nil, err
+	}
 	txWithData, err := n.consensusService.ProcessTransaction(tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = n.storageService.CancelSandbox()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1235,7 +1238,7 @@ func (n *Node) discovery() {
 		}
 
 		if n.Consensused {
-			time.Sleep(60 * 10 * time.Second)
+			time.Sleep(30 * time.Second)
 		} else {
 			time.Sleep(10 * time.Second)
 		}

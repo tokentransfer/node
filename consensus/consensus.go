@@ -21,7 +21,7 @@ type ConsensusService struct {
 	MerkleService  libstore.MerkleService
 	Config         libcore.Config
 	AccountService libaccount.AccountService
-	StorageService *storageService
+	StorageService *StorageService
 
 	ValidatedBlock libblock.Block
 }

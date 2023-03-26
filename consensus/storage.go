@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sync"
 
 	libcore "github.com/tokentransfer/interfaces/core"
 	"github.com/tokentransfer/node/chunk"
@@ -12,13 +13,17 @@ import (
 	"github.com/tokentransfer/node/vm"
 )
 
-type storageService struct {
+type StorageService struct {
 	storage core.Storage
 	stackdb *store.StackService
+
+	locker sync.Mutex
 }
 
-func NewStorageService(c libcore.Config) (*storageService, error) {
-	service := &storageService{}
+func NewStorageService(c libcore.Config) (*StorageService, error) {
+	service := &StorageService{
+		locker: sync.Mutex{},
+	}
 	err := service.Init(c)
 	if err != nil {
 		return nil, err
@@ -30,7 +35,9 @@ func NewStorageService(c libcore.Config) (*storageService, error) {
 	return service, nil
 }
 
-func (s *storageService) CreateSandbox() error {
+func (s *StorageService) CreateSandbox() error {
+	s.locker.Lock()
+
 	memdb := &store.MemoryService{
 		Name: "memory",
 	}
@@ -49,7 +56,9 @@ func (s *storageService) CreateSandbox() error {
 	return nil
 }
 
-func (s *storageService) CommitSandbox() error {
+func (s *StorageService) CommitSandbox() error {
+	defer s.locker.Unlock()
+
 	err := s.stackdb.Commit()
 	if err != nil {
 		return err
@@ -57,7 +66,9 @@ func (s *storageService) CommitSandbox() error {
 	return nil
 }
 
-func (s *storageService) CancelSandbox() error {
+func (s *StorageService) CancelSandbox() error {
+	defer s.locker.Unlock()
+
 	err := s.stackdb.Cancel()
 	if err != nil {
 		return err
@@ -81,7 +92,7 @@ func getGroup(parent core.Group, name string) (core.Group, error) {
 	return g, nil
 }
 
-func (s *storageService) CreateContract(account libcore.Address, code []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) CreateContract(account libcore.Address, code []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
 		return nil, nil, err
@@ -118,7 +129,7 @@ func (s *storageService) CreateContract(account libcore.Address, code []byte) (l
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
 
-func (s *storageService) CreateData(account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) CreateData(account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
 		return nil, nil, err
@@ -155,7 +166,7 @@ func (s *storageService) CreateData(account libcore.Address, data []byte) (libco
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
 
-func (s *storageService) RunContract(cost int64, codeAccount libcore.Address, dataAccount libcore.Address, method string, params [][]byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, dataAccount libcore.Address, method string, params [][]byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
 		return nil, nil, err
@@ -194,7 +205,7 @@ func (s *storageService) RunContract(cost int64, codeAccount libcore.Address, da
 	return rootHash, dataHash, nil
 }
 
-func (s *storageService) Init(c libcore.Config) error {
+func (s *StorageService) Init(c libcore.Config) error {
 	datadb := &store.LevelService{Name: "data"}
 	err := datadb.Init(c)
 	if err != nil {
@@ -217,11 +228,11 @@ func (s *storageService) Init(c libcore.Config) error {
 	return nil
 }
 
-func (s *storageService) Start() error {
+func (s *StorageService) Start() error {
 	return nil
 }
 
-func (s *storageService) Close() error {
+func (s *StorageService) Close() error {
 	err := s.storage.Close()
 	if err != nil {
 		return err
