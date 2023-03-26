@@ -1208,9 +1208,14 @@ func (n *Node) discovery() {
 			if err != nil {
 				glog.Error(err)
 			} else {
-				err = n.net.BroadcastWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY, peerData)
+				_, msgData, err := n.SendMessage(peerData)
 				if err != nil {
 					glog.Error(err)
+				} else {
+					err = n.net.BroadcastWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY, msgData)
+					if err != nil {
+						glog.Error(err)
+					}
 				}
 			}
 		}
