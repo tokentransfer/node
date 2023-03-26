@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/spkg/zipfs"
+
 	"chainmaker.org/chainmaker/protocol/v2"
 	"github.com/caivega/glog"
 	"github.com/tokentransfer/node/account"
@@ -1130,6 +1132,23 @@ func (n *Node) SendPeerInfo(toPeer *Peer) {
 			}
 		}
 	}
+}
+
+func (n *Node) LoadPage(name string) (*zipfs.FileSystem, error) {
+	_, account, err := n.accountService.NewAccountFromAddress(name)
+	if err != nil {
+		return nil, err
+	}
+	data, err := n.storageService.ReadPage(account)
+	if err != nil {
+		return nil, err
+	}
+	reader := bytes.NewReader(data)
+	fs, err := zipfs.NewFromReaderAt(reader, int64(len(data)), nil)
+	if err != nil {
+		return nil, err
+	}
+	return fs, nil
 }
 
 func (n *Node) start() {

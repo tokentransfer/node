@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/spkg/zipfs"
+
 	"github.com/tokentransfer/node/conf"
 	"github.com/tokentransfer/node/consensus"
 	"github.com/tokentransfer/node/util"
@@ -92,7 +94,8 @@ func (service *RPCService) Start() error {
 
 	address := fmt.Sprintf("%s:%d", rpcAddress, rpcPort)
 
-	http.HandleFunc("/", IndexHandler)
+	// http.HandleFunc("/", IndexHandler)
+	http.HandleFunc("/", zipfs.FileServerWith(service.node.LoadPage).ServeHTTP)
 	http.HandleFunc("/v1/jsonrpc", service.rpcService)
 	log.Println("rpc server started on", address)
 	http.ListenAndServe(address, nil)

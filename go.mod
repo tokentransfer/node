@@ -15,6 +15,7 @@ require (
 	github.com/mitchellh/cli v1.1.0
 	github.com/mr-tron/base58 v1.2.0
 	github.com/shopspring/decimal v1.3.1
+	github.com/spkg/zipfs v0.0.0-00010101000000-000000000000
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tetratelabs/wazero v0.0.0-00010101000000-000000000000
 	github.com/tokentransfer/check v0.0.0-20220325011756-9433b88b4878
@@ -191,5 +192,6 @@ replace (
 	github.com/marten-seemann/qtls-go1-16 => chainmaker.org/third_party/qtls-go1-16 v1.0.0
 	github.com/marten-seemann/qtls-go1-17 => chainmaker.org/third_party/qtls-go1-17 v1.0.0
 	github.com/marten-seemann/qtls-go1-18 => chainmaker.org/third_party/qtls-go1-18 v1.0.0
+	github.com/spkg/zipfs => ../zipfs
 	github.com/tetratelabs/wazero => ../wazero
 )
