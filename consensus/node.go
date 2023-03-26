@@ -1016,7 +1016,7 @@ func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 		if err != nil {
 			return err
 		}
-		p := n.peers[index]
+		p := n.GetPeer(index)
 		if p == nil {
 			p = &Peer{
 				Id:          publisher,
@@ -1069,7 +1069,7 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 			if err != nil {
 				return err
 			}
-			p := n.peers[index]
+			p := n.GetPeer(index)
 			if p != nil {
 				p.BlockNumber = peerInfo.BlockNumber
 				p.PeerCount = peerInfo.PeerCount
@@ -1246,6 +1246,13 @@ func (n *Node) GetNodeKey() libaccount.Key {
 	return n.key
 }
 
+func (n *Node) GetPeer(index uint64) *Peer {
+	n.peerLocker.Lock()
+	defer n.peerLocker.Unlock()
+
+	return n.peers[index]
+}
+
 func (n *Node) AddPeer(p *Peer) error {
 	n.peerLocker.Lock()
 	defer n.peerLocker.Unlock()
@@ -1384,8 +1391,8 @@ func (n *Node) ReceiveMessage(t string, msg *pb.Message) (byte, *Peer, []byte) {
 	fromIndex := msg.GetNode()
 	data := msg.GetData()
 	fmt.Printf("<<< receive %s from node %d, length: %d\n", t, fromIndex, len(data))
-	fromPeer, ok := n.peers[fromIndex]
-	if ok {
+	fromPeer := n.GetPeer(fromIndex)
+	if fromPeer != nil {
 		fmt.Printf("<<< receive peer %s %d(%s) from %s(%s)\n", t, msg.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
 		if len(data) > 0 {
 			meta := data[0]
