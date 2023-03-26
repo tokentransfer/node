@@ -51,9 +51,10 @@ message AccountState {
 
     string Amount     = 2;
     DataInfo Code     = 3;
-    DataInfo Token    = 4;
-    DataInfo Data     = 5;
-    DataInfo Storage  = 6;
+    DataInfo Page     = 4;
+    DataInfo Token    = 5;
+    DataInfo Data     = 6;
+    DataInfo Storage  = 7;
 }
 
 message DataInfo {
@@ -92,6 +93,10 @@ message ContractInfo {
     string Method           = 2;
     repeated bytes Params   = 3;
     bytes Code              = 4;
+}
+
+message PageInfo {
+    bytes Page		    = 1;
 }
 
 message PayloadInfo {
