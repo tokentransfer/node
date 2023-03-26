@@ -738,10 +738,10 @@ func (n *Node) connect() {
 	for {
 		list := n.ListPeer()
 
-		fmt.Println(">>>", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Status, n.GetBlockNumber())
+		fmt.Println(">>>", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			fmt.Println(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Status, p.BlockNumber)
+			fmt.Println(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Status, p.BlockNumber, p.PeerCount)
 		}
 
 		if !lastConsensused && n.Consensused {
@@ -795,6 +795,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 			n.Consensused = n.PrepareConsensus()
 		}
 
+		fmt.Println("=== discovery peer", p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount, n.GetBlockNumber())
 		if p.Status >= PeerKnown && n.GetBlockNumber() > p.BlockNumber {
 			for i := p.BlockNumber + 1; i <= n.GetBlockNumber() && n.GetBlockNumber() > p.BlockNumber; i++ {
 				block, err := n.merkleService.GetBlockByIndex(uint64(i))
