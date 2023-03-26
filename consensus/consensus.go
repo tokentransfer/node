@@ -402,7 +402,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 			if err != nil {
 				return false, err
 			}
-			if meta != core.CORE_PAYLOAD_INFO && meta != core.CORE_CONTRACT_INFO && meta != core.CORE_META_INFO && meta != core.CORE_TOKEN_INFO && meta != core.CORE_DATA_INFO {
+			if meta != core.CORE_PAYLOAD_INFO && meta != core.CORE_CONTRACT_INFO && meta != core.CORE_META_INFO && meta != core.CORE_TOKEN_INFO && meta != core.CORE_DATA_INFO && meta != core.CORE_PEER_INFO && meta != core.CORE_PAGE_INFO {
 				return false, core.ErrorOfInvalid("format", "info")
 			}
 		}
