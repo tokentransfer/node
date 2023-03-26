@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/mitchellh/cli"
-	"github.com/tokentransfer/node/conf"
+	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/consensus"
 )
 
@@ -39,7 +39,7 @@ func (i *GenesisCommand) Run(args []string) int {
 		return 1
 	}
 
-	config, err := conf.NewConfig(configFile)
+	config, err := config.NewConfig(configFile)
 	if err != nil {
 		panic(err)
 	}

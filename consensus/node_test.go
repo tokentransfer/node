@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/tokentransfer/node/block"
-	"github.com/tokentransfer/node/conf"
+	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/util"
 
 	. "github.com/tokentransfer/check"
@@ -22,7 +22,7 @@ func Test_Node(t *testing.T) {
 func (suite *NodeSuite) TestProcess(c *C) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	config, err := conf.NewConfig("./config.json")
+	config, err := config.NewConfig("./config.json")
 	c.Assert(err, IsNil)
 
 	n := NewNode()

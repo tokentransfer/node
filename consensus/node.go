@@ -18,7 +18,7 @@ import (
 	"github.com/caivega/glog"
 	"github.com/tokentransfer/node/account"
 	"github.com/tokentransfer/node/block"
-	"github.com/tokentransfer/node/conf"
+	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/crypto"
@@ -134,7 +134,7 @@ type Node struct {
 	ready *sync.WaitGroup
 	timer *time.Ticker
 
-	config *conf.Config
+	config *config.Config
 	key    libaccount.Key
 
 	self       *Peer
@@ -165,7 +165,7 @@ func NewNode() *Node {
 }
 
 func (n *Node) Init(c libcore.Config) error {
-	n.config = c.(*conf.Config)
+	n.config = c.(*config.Config)
 	core.Init(n.config)
 
 	_, key, err := n.accountService.NewKeyFromSecret(n.config.GetSecret())

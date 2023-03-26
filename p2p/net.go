@@ -10,7 +10,7 @@ import (
 	"chainmaker.org/chainmaker/common/v2/crypto/asym"
 	"chainmaker.org/chainmaker/common/v2/helper"
 	protocol "chainmaker.org/chainmaker/protocol/v2"
-	config "github.com/tokentransfer/node/conf"
+	"github.com/tokentransfer/node/config"
 
 	log "github.com/caivega/glog"
 )

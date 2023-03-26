@@ -16,7 +16,7 @@ import (
 	"time"
 
 	. "github.com/tokentransfer/check"
-	"github.com/tokentransfer/node/conf"
+	"github.com/tokentransfer/node/config"
 )
 
 const (
@@ -64,18 +64,18 @@ func (suite *ConfigSuite) TestNet(c *C) {
 	readyC := make(chan struct{})
 
 	// start node A
-	a, err := InitNet(&conf.Config{
-		NetConfig: conf.NetConfig{
+	a, err := InitNet(&config.Config{
+		NetConfig: config.NetConfig{
 			Provider:   "liquid", //libp2p,liquid
 			ListenAddr: "/ip4/127.0.0.1/tcp/6666",
-			TLSConfig: conf.TLSConfig{
+			TLSConfig: config.TLSConfig{
 				PrivKeyFile: key1Path,
 				CertFile:    cert1Path,
 			},
-			CustomChainTrustRoots: []conf.ChainTrustRoots{
+			CustomChainTrustRoots: []config.ChainTrustRoots{
 				{
 					ChainId: chainId1,
-					TrustRoots: []conf.TrustRoots{
+					TrustRoots: []config.TrustRoots{
 						{
 							Root: caFile6666,
 						},
@@ -86,7 +86,7 @@ func (suite *ConfigSuite) TestNet(c *C) {
 				},
 				{
 					ChainId: chainId2,
-					TrustRoots: []conf.TrustRoots{
+					TrustRoots: []config.TrustRoots{
 						{
 							Root: caFile6666,
 						},
@@ -109,18 +109,18 @@ func (suite *ConfigSuite) TestNet(c *C) {
 	fmt.Println("node A is running...")
 
 	// start node B
-	b, err := InitNet(&conf.Config{
-		NetConfig: conf.NetConfig{
+	b, err := InitNet(&config.Config{
+		NetConfig: config.NetConfig{
 			Provider:   "liquid", //libp2p,liquid
 			ListenAddr: "/ip4/127.0.0.1/tcp/7777",
-			TLSConfig: conf.TLSConfig{
+			TLSConfig: config.TLSConfig{
 				PrivKeyFile: key2Path,
 				CertFile:    cert2Path,
 			},
-			CustomChainTrustRoots: []conf.ChainTrustRoots{
+			CustomChainTrustRoots: []config.ChainTrustRoots{
 				{
 					ChainId: chainId1,
-					TrustRoots: []conf.TrustRoots{
+					TrustRoots: []config.TrustRoots{
 						{
 							Root: caFile6666,
 						},
@@ -131,7 +131,7 @@ func (suite *ConfigSuite) TestNet(c *C) {
 				},
 				{
 					ChainId: chainId2,
-					TrustRoots: []conf.TrustRoots{
+					TrustRoots: []config.TrustRoots{
 						{
 							Root: caFile6666,
 						},

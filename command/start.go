@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/cli"
-	"github.com/tokentransfer/node/conf"
+	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/consensus"
 	"github.com/tokentransfer/node/rpc"
 )
@@ -33,7 +33,7 @@ var _ cli.Command = &StartCommand{}
 
 // readConfig is responsible for setup of our configuration using
 // the command line and any file configs
-func (c *StartCommand) readConfig() *conf.Config {
+func (c *StartCommand) readConfig() *config.Config {
 	var configFile string
 
 	cmdFlags := flag.NewFlagSet("node", flag.ContinueOnError)
@@ -43,7 +43,7 @@ func (c *StartCommand) readConfig() *conf.Config {
 		return nil
 	}
 
-	config, err := conf.NewConfig(configFile)
+	config, err := config.NewConfig(configFile)
 	if err != nil {
 		panic(err)
 	}
@@ -51,12 +51,12 @@ func (c *StartCommand) readConfig() *conf.Config {
 }
 
 // setupLoggers is used to setup the logGate, logWriter, and our logOutput
-func (c *StartCommand) setupLoggers(config *conf.Config) {
+func (c *StartCommand) setupLoggers(config *config.Config) {
 
 }
 
 // startNode is used to start the Node and IPC
-func (c *StartCommand) startNode(config *conf.Config) *consensus.Node {
+func (c *StartCommand) startNode(config *config.Config) *consensus.Node {
 	c.Ui.Output("Starting node...")
 
 	n := consensus.NewNode()
@@ -109,7 +109,7 @@ func (c *StartCommand) Run(args []string) int {
 }
 
 // handleSignals blocks until we get an exit-causing signal
-func (c *StartCommand) handleSignals(config *conf.Config, n *consensus.Node) int {
+func (c *StartCommand) handleSignals(config *config.Config, n *consensus.Node) int {
 	signalCh := make(chan os.Signal, 4)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 

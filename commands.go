@@ -32,6 +32,11 @@ func init() {
 				Ui: ui,
 			}, nil
 		},
+		"dump": func() (cli.Command, error) {
+			return &cmd.DumpCommand{
+				Ui: ui,
+			}, nil
+		},
 	}
 }
 

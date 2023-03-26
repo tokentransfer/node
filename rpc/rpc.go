@@ -8,7 +8,7 @@ import (
 
 	"github.com/spkg/zipfs"
 
-	"github.com/tokentransfer/node/conf"
+	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/consensus"
 	"github.com/tokentransfer/node/util"
 
@@ -16,7 +16,7 @@ import (
 )
 
 type RPCService struct {
-	config *conf.Config
+	config *config.Config
 	node   *consensus.Node
 }
 
@@ -28,7 +28,7 @@ func NewRPCService(n *consensus.Node) *RPCService {
 }
 
 func (service *RPCService) Init(c libcore.Config) error {
-	service.config = c.(*conf.Config)
+	service.config = c.(*config.Config)
 	return nil
 }
 

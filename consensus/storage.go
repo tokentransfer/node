@@ -35,6 +35,13 @@ func NewStorageService(c libcore.Config) (*StorageService, error) {
 	return service, nil
 }
 
+func (s *StorageService) Dump(printer core.Printer) {
+	s.locker.Lock()
+	defer s.locker.Unlock()
+
+	s.storage.DumpLog(printer)
+}
+
 func (s *StorageService) CreateSandbox() error {
 	s.locker.Lock()
 
@@ -125,6 +132,7 @@ func (s *StorageService) CreateContract(account libcore.Address, code []byte) (l
 	}
 	d.Dispose()
 	t.Dispose()
+	fmt.Println("> create contract", address, d.Key().String(), len(code))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
@@ -162,6 +170,7 @@ func (s *StorageService) CreateData(account libcore.Address, data []byte) (libco
 	}
 	d.Dispose()
 	t.Dispose()
+	fmt.Println("> create data", address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
@@ -199,6 +208,7 @@ func (s *StorageService) CreatePage(account libcore.Address, data []byte) (libco
 	}
 	d.Dispose()
 	t.Dispose()
+	fmt.Println("> create page", address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
@@ -229,6 +239,7 @@ func (s *StorageService) ReadPage(account libcore.Address) ([]byte, error) {
 	}
 	pageData.Dispose()
 	pageReader.Close()
+	fmt.Println("> read page", address, pageKey.String(), pageData.Size())
 
 	return buf.Bytes(), nil
 }

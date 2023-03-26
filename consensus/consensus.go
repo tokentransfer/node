@@ -601,6 +601,7 @@ func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.
 					}
 				}
 			}
+
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)
 			if len(info.Data) > 0 {
