@@ -772,7 +772,7 @@ func (n *Node) PrepareConsensus() bool {
 			count++
 		}
 	}
-	if count > 0 && count == currentCount {
+	if count > 0 && (count+1) == currentCount {
 		for i := 0; i < len(list); i++ {
 			p := list[i]
 			p.Status = PeerConsensused
