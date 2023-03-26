@@ -1007,7 +1007,11 @@ func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 	if err != nil {
 		return err
 	} else {
-		index, err := core.GetIndex(publisher)
+		address, err := publicKey.GenerateAddress()
+		if err != nil {
+			return err
+		}
+		index, err := core.GetIndex(address.String())
 		if err != nil {
 			return err
 		}
@@ -1021,8 +1025,6 @@ func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 				PeerCount:   peerInfo.PeerCount,
 			}
 			n.AddPeer(p)
-
-			go n.discoveryPeer(p)
 		} else {
 			if p.Status < PeerKnown {
 				p.Status = PeerKnown
@@ -1248,7 +1250,11 @@ func (n *Node) AddPeer(p *Peer) error {
 	n.peerLocker.Lock()
 	defer n.peerLocker.Unlock()
 
-	n.peers[p.GetIndex()] = p
+	_, ok := n.peers[p.GetIndex()]
+	if !ok {
+		n.peers[p.GetIndex()] = p
+		go n.discoveryPeer(p)
+	}
 	return nil
 }
 
