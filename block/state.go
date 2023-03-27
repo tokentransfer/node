@@ -53,16 +53,44 @@ func (s *State) GetIndex() uint64 {
 	return s.Sequence
 }
 
+type DataInfo struct {
+	GroupHash libcore.Hash
+	DataHash  libcore.Hash
+	Content   []byte
+}
+
+func fromDataInfo(info *pb.DataInfo) *DataInfo {
+	if info != nil {
+		return &DataInfo{
+			GroupHash: libcore.Hash(info.GroupHash),
+			DataHash:  libcore.Hash(info.DataHash),
+			Content:   info.Content,
+		}
+	}
+	return nil
+}
+
+func toDataInfo(info *DataInfo) *pb.DataInfo {
+	if info != nil {
+		return &pb.DataInfo{
+			GroupHash: []byte(info.GroupHash),
+			DataHash:  []byte(info.DataHash),
+			Content:   info.Content,
+		}
+	}
+	return nil
+}
+
 type AccountState struct {
 	State
 
 	Amount core.Amount
 
-	Code    *pb.DataInfo
-	Page    *pb.DataInfo
-	Token   *pb.DataInfo
-	Data    *pb.DataInfo
-	Storage *pb.DataInfo
+	Code    *DataInfo
+	Page    *DataInfo
+	Token   *DataInfo
+	Data    *DataInfo
+	Storage *DataInfo
 }
 
 func (s *AccountState) GetStateKey() string {
@@ -97,11 +125,11 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.State.Previous = state.State.Previous
 	s.Amount = *a
 
-	s.Code = state.Code
-	s.Page = state.Page
-	s.Token = state.Token
-	s.Data = state.Data
-	s.Storage = state.Storage
+	s.Code = fromDataInfo(state.Code)
+	s.Page = fromDataInfo(state.Page)
+	s.Token = fromDataInfo(state.Token)
+	s.Data = fromDataInfo(state.Data)
+	s.Storage = fromDataInfo(state.Storage)
 	return nil
 }
 
@@ -121,11 +149,11 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 		},
 		Amount: s.Amount.String(),
 
-		Code:    s.Code,
-		Page:    s.Page,
-		Token:   s.Token,
-		Data:    s.Data,
-		Storage: s.Storage,
+		Code:    toDataInfo(s.Code),
+		Page:    toDataInfo(s.Page),
+		Token:   toDataInfo(s.Token),
+		Data:    toDataInfo(s.Data),
+		Storage: toDataInfo(s.Storage),
 	})
 }
 
@@ -144,11 +172,11 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 		},
 		Amount: s.Amount.String(),
 
-		Code:    s.Code,
-		Page:    s.Page,
-		Token:   s.Token,
-		Data:    s.Data,
-		Storage: s.Storage,
+		Code:    toDataInfo(s.Code),
+		Page:    toDataInfo(s.Page),
+		Token:   toDataInfo(s.Token),
+		Data:    toDataInfo(s.Data),
+		Storage: toDataInfo(s.Storage),
 	})
 }
 
