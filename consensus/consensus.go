@@ -587,7 +587,7 @@ func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.
 				}
 				accountInfo, ok := accountMap[tx.Destination.String()]
 				if ok {
-					accountInfo.Code = &pb.DataInfo{
+					accountInfo.Code = &block.DataInfo{
 						GroupHash: rootHash,
 						DataHash:  codeHash,
 					}
@@ -599,15 +599,16 @@ func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.
 				} else {
 					account = tx.Account
 				}
-				rootHash, codeHash, err := ss.RunContract(tx.Gas, tx.Destination, account, info.Method, info.Params)
+				rootHash, codeHash, result, err := ss.RunContract(tx.Gas, tx.Destination, account, info.Method, info.Params)
 				if err != nil {
 					return nil, err
 				}
 				accountInfo, ok := accountMap[account.String()]
 				if ok {
-					accountInfo.Data = &pb.DataInfo{
+					accountInfo.Data = &block.DataInfo{
 						GroupHash: rootHash,
 						DataHash:  codeHash,
+						Content:   result,
 					}
 				}
 			}
@@ -621,7 +622,7 @@ func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.
 				}
 				accountInfo, ok := accountMap[tx.Destination.String()]
 				if ok {
-					accountInfo.Page = &pb.DataInfo{
+					accountInfo.Page = &block.DataInfo{
 						GroupHash: rootHash,
 						DataHash:  pageHash,
 					}
