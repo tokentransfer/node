@@ -286,8 +286,8 @@ func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, da
 	if _, err := io.Copy(buf, codeReader); err != nil {
 		return nil, nil, err
 	}
-	codeData.Dispose()
 	codeReader.Close()
+	codeData.Dispose()
 
 	_, result, err := vm.RunWasm(cost, buf.Bytes(), method, params) // remainCost
 	if err != nil {
