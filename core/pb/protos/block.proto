@@ -50,6 +50,7 @@ message AccountState {
     State State       = 1;
 
     string Amount     = 2;
+
     DataInfo Code     = 3;
     DataInfo Page     = 4;
     DataInfo Token    = 5;
@@ -60,6 +61,7 @@ message AccountState {
 message DataInfo {
     bytes GroupHash   = 1;
     bytes DataHash    = 2;
+    bytes Content     = 3;
 }
 
 message MetaItem {
