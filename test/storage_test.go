@@ -57,11 +57,11 @@ func (suite *StorageSuite) TestStack(c *C) {
 	c.Assert(err, IsNil)
 	dump(s0, "s0")
 
-	err = stackdb.Commit()
+	_, err = stackdb.Commit()
 	c.Assert(err, IsNil)
 
 	remove(c, s)
-	err = stackdb.Commit()
+	_, err = stackdb.Commit()
 	c.Assert(err, IsNil)
 
 	s1, err := chunk.LoadStorageWith(db0, 2048*2048*8)
