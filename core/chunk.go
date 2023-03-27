@@ -48,6 +48,7 @@ type Group interface {
 
 type Data interface {
 	Dispose()
+	Remove()
 	Key() Key
 	Open() io.ReadCloser
 	Size() int64

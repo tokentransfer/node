@@ -216,13 +216,11 @@ func (s *StorageService) CreatePage(account libcore.Address, data []byte) (libco
 	if err != nil {
 		return nil, nil, err
 	}
-
 	d := t.Data()
 	_, err = pageGroup.AddData(address, d.Key())
 	if err != nil {
 		return nil, nil, err
 	}
-
 	err = pageGroup.Commit()
 	if err != nil {
 		return nil, nil, err
@@ -243,7 +241,6 @@ func (s *StorageService) ReadPage(account libcore.Address) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	address := account.String()
 	pageKey, err := pageGroup.GetKey(address)
 	if err != nil {
@@ -258,8 +255,8 @@ func (s *StorageService) ReadPage(account libcore.Address) ([]byte, error) {
 	if _, err := io.Copy(buf, pageReader); err != nil {
 		return nil, err
 	}
-	pageData.Dispose()
 	pageReader.Close()
+	pageData.Dispose()
 	fmt.Println("> read page", address, pageKey.String(), pageData.Size())
 
 	return buf.Bytes(), nil

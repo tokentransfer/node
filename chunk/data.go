@@ -47,9 +47,16 @@ func (f *chunkData) Size() int64 {
 func (f *chunkData) Dispose() {
 	if !f.disposed {
 		f.disposed = true
-
-		entry := f.Entry()
 		f.storage.releaseL(f.key)
+	}
+}
+
+func (f *chunkData) Remove() {
+	if !f.disposed {
+		f.disposed = true
+
+		f.storage.releaseL(f.key)
+		entry := f.Entry()
 		for _, chunk := range entry.chunks {
 			f.storage.releaseL(chunk.key)
 		}
