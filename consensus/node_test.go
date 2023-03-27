@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"testing"
 
+	libcrypto "github.com/tokentransfer/interfaces/crypto"
 	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/util"
 
 	. "github.com/tokentransfer/check"
 )
@@ -64,9 +66,21 @@ func (suite *NodeSuite) TestProcess(c *C) {
 	tx := &block.Transaction{}
 	err = tx.UnmarshalBinary(data)
 	c.Assert(err, IsNil)
-	_, _, err = n.processTransaction(tx)
+
+	h, _, err := n.cryptoService.Raw(tx, libcrypto.RawBinary)
+	c.Assert(err, IsNil)
+	ok, err := n.consensusService.VerifyTransaction(tx)
+	c.Assert(err, IsNil)
+	c.Assert(ok, Equals, true)
+
+	err = n.storageService.CreateSandbox()
+	c.Assert(err, IsNil)
+	_, err = n.consensusService.ProcessTransaction(tx)
+	c.Assert(err, IsNil)
+	err = n.storageService.CommitSandbox()
 	c.Assert(err, IsNil)
 
+	util.PrintJSON(">> hash", h)
 	// util.PrintJSON(">>> tx", tx)
 	// util.PrintJSON(">>> txWithData", txWithData)
 

@@ -128,13 +128,6 @@ func (service *LevelService) HasData(key []byte) bool {
 	if !ok {
 		return false
 	}
-	value, err := db.Get(key, nil)
-	if err != nil {
-		return false
-	}
-	if len(value) == 0 {
-		return false
-	}
 
 	return true
 }

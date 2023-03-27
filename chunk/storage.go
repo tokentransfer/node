@@ -505,11 +505,13 @@ func (s *chunkStorage) DumpLog(log core.Printer) {
 	err := s.entries.ListData(func(k []byte, v []byte) error {
 		key, err := core.ParseKey(string(k))
 		if err != nil {
+			glog.Error(err)
 			return err
 		}
 		var entry chunkEntry
 		err = entry.UnmarshalBinary(v)
 		if err != nil {
+			glog.Error(err)
 			return err
 		}
 		log.Printf("%v [%s] chunks=%d refs=%d size=%v (%v)", link(key, false), key.String(), len(entry.chunks), entry.refs, entry.storageSize(), entry.name)
@@ -529,7 +531,7 @@ func (s *chunkStorage) DumpLog(log core.Printer) {
 		return nil
 	})
 	if err != nil {
-		log.Printf("list data: %s", err.Error())
+		log.Printf(">>> list data: %s", err.Error())
 	}
 }
 

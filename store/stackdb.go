@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"sync"
 
+	"github.com/caivega/glog"
 	libcore "github.com/tokentransfer/interfaces/core"
 	libstore "github.com/tokentransfer/interfaces/store"
 	"github.com/tokentransfer/node/core"
@@ -15,7 +16,7 @@ type StackService struct {
 	m sync.Map
 }
 
-// VALIDATED -> CURRENT -> CURRENT
+// KV -> MEMORY -> MEMORY
 func CreateStackService(validatedService libstore.KvService) (*StackService, error) {
 	if validatedService == nil {
 		return nil, core.ErrorOfInvalid("service", "validated")
@@ -66,6 +67,10 @@ func (stack *StackService) Top() libstore.KvService {
 		return s
 	}
 	return nil
+}
+
+func (stack *StackService) Get(index int) libstore.KvService {
+	return stack.list[index]
 }
 
 func (stack *StackService) Len() int {
@@ -159,10 +164,7 @@ func (stack *StackService) HasData(key []byte) bool {
 func (stack *StackService) RemoveData(key []byte) error {
 	service := stack.Top()
 	if service != nil {
-		err := service.RemoveData(key)
-		if err != nil {
-			return err
-		}
+		_ = service.RemoveData(key)
 	}
 	stack.m.Store(hex.EncodeToString(key), struct{}{})
 	return nil
@@ -185,7 +187,7 @@ func (stack *StackService) ListData(each func(key []byte, value []byte) error) e
 		s.ListData(func(key []byte, value []byte) error {
 			_, ok := stack.m.Load(hex.EncodeToString(key))
 			if !ok {
-				m.Store(hex.EncodeToString(key), value)
+				m.Store(hex.EncodeToString(key), hex.EncodeToString(value))
 			}
 			return nil
 		})
@@ -197,6 +199,7 @@ func (stack *StackService) ListData(each func(key []byte, value []byte) error) e
 		if k != nil {
 			data, err := hex.DecodeString(k.(string))
 			if err != nil {
+				glog.Error(err)
 				key = nil
 			} else {
 				key = data
@@ -206,18 +209,27 @@ func (stack *StackService) ListData(each func(key []byte, value []byte) error) e
 		}
 
 		if v != nil {
-			value = v.([]byte)
+			data, err := hex.DecodeString(v.(string))
+			if err != nil {
+				glog.Error(err)
+				value = nil
+			} else {
+				value = data
+			}
 		} else {
 			value = nil
 		}
 
 		err := each(key, value)
+		if err != nil {
+			glog.Error(err)
+		}
 		return err == nil
 	})
 	return nil
 }
 
-func (stack *StackService) Commit() error {
+func (stack *StackService) Commit() (libstore.KvService, error) {
 	l := len(stack.list)
 	if l > 1 {
 		top := stack.list[l-1]
@@ -225,12 +237,14 @@ func (stack *StackService) Commit() error {
 		err := top.ListData(func(key []byte, value []byte) error {
 			err := bottom.PutData(key, value)
 			if err != nil {
+				glog.Error(err)
 				return err
 			}
 			return nil
 		})
 		if err != nil {
-			return err
+			glog.Error(err)
+			return nil, err
 		}
 
 		stack.m.Range(func(k, v interface{}) bool {
@@ -239,6 +253,7 @@ func (stack *StackService) Commit() error {
 			if k != nil {
 				data, err := hex.DecodeString(k.(string))
 				if err != nil {
+					glog.Error(err)
 					key = nil
 				} else {
 					key = data
@@ -249,22 +264,27 @@ func (stack *StackService) Commit() error {
 
 			if key != nil {
 				err := bottom.RemoveData(key)
+				if err != nil {
+					glog.Error(err)
+				}
 				return err == nil
 			}
 			return true
 		})
 
-		stack.Pop()
+		popKv := stack.Pop()
 		stack.m = sync.Map{}
+		return popKv, nil
 	}
-	return nil
+	return nil, nil
 }
 
-func (stack *StackService) Cancel() error {
+func (stack *StackService) Cancel() (libstore.KvService, error) {
 	l := len(stack.list)
 	if l > 1 {
-		stack.Pop()
+		popKv := stack.Pop()
 		stack.m = sync.Map{}
+		return popKv, nil
 	}
-	return nil
+	return nil, nil
 }

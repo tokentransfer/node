@@ -59,7 +59,7 @@ func TestEntry(t *testing.T) {
 		name: "test",
 		data: []byte("test"),
 		chunks: []chunkRef{
-			chunkRef{
+			{
 				key:     core.MustParseKey("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"),
 				nextPos: 0,
 			},
@@ -80,6 +80,22 @@ func TestEntry(t *testing.T) {
 	if !reflect.DeepEqual(entry, &newEntry) {
 		t.FailNow()
 	}
+
+	c0 := chunkEntry{}
+	v0 := []byte{164, 100, 100, 97, 116, 97, 64, 100, 110, 97, 109, 101, 100, 99, 111, 100, 101, 100, 114, 101, 102, 115, 1, 102, 99, 104, 117, 110, 107, 115, 128}
+	err = c0.UnmarshalBinary(v0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(c0)
+
+	c1 := chunkEntry{}
+	v1 := []byte{164, 100, 100, 97, 116, 97, 88, 56, 163, 99, 107, 101, 121, 88, 32, 176, 75, 143, 241, 17, 136, 219, 246, 44, 162, 83, 167, 142, 38, 230, 164}
+	err = c1.UnmarshalBinary(v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(c1)
 }
 
 func TestDirectory(t *testing.T) {

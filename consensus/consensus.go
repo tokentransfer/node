@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/caivega/glog"
 	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
@@ -226,10 +227,22 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 			return
 		}
 
+		err = ss.CreateSandbox()
+		if err != nil {
+			return
+		}
 		newWithData, e := service.ProcessTransaction(tx)
 		if e != nil {
+			err = ss.CancelSandbox()
+			if err != nil {
+				glog.Error(err)
+			}
 			ok = false
 			err = e
+			return
+		}
+		err = ss.CommitSandbox()
+		if err != nil {
 			return
 		}
 

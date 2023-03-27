@@ -6,7 +6,9 @@ import (
 	"io"
 	"sync"
 
+	"github.com/caivega/glog"
 	libcore "github.com/tokentransfer/interfaces/core"
+	libstore "github.com/tokentransfer/interfaces/store"
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/store"
@@ -46,6 +48,7 @@ func (s *StorageService) CreateSandbox() error {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
+	// s.dump("before create")
 	memdb := &store.MemoryService{
 		Name: "memory",
 	}
@@ -61,6 +64,7 @@ func (s *StorageService) CreateSandbox() error {
 	if err != nil {
 		return err
 	}
+	// s.dump("after create")
 	return nil
 }
 
@@ -68,7 +72,9 @@ func (s *StorageService) CommitSandbox() error {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
-	if err := s.stackdb.Commit(); err != nil {
+	// s.dump("before commit")
+	_, err := s.stackdb.Commit()
+	if err != nil {
 		return err
 	}
 	if err := s.stackdb.Flush(); err != nil {
@@ -77,6 +83,7 @@ func (s *StorageService) CommitSandbox() error {
 	if err := s.storage.Update(); err != nil {
 		return err
 	}
+	// s.dumpWith("after commit", popKv)
 	return nil
 }
 
@@ -84,13 +91,15 @@ func (s *StorageService) CancelSandbox() error {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
-	err := s.stackdb.Cancel()
+	// s.dump("before cancel")
+	_, err := s.stackdb.Cancel()
 	if err != nil {
 		return err
 	}
 	if err := s.storage.Update(); err != nil {
 		return err
 	}
+	// s.dumpWith("after cancel", popKv)
 	return nil
 }
 
@@ -119,6 +128,7 @@ func (s *StorageService) CreateContract(account libcore.Address, code []byte) (l
 	if err != nil {
 		return nil, nil, err
 	}
+	// s.dump("create code group")
 
 	address := account.String()
 	t := s.storage.Create(address)
@@ -136,12 +146,11 @@ func (s *StorageService) CreateContract(account libcore.Address, code []byte) (l
 	if err != nil {
 		return nil, nil, err
 	}
-
 	err = codeGroup.Commit()
 	if err != nil {
 		return nil, nil, err
 	}
-	codeGroup.Dispose()
+	// s.dump("create code account")
 	d.Dispose()
 	t.Dispose()
 	fmt.Println("> create contract", address, d.Key().String(), len(code))
@@ -182,7 +191,6 @@ func (s *StorageService) CreateData(account libcore.Address, data []byte) (libco
 	}
 	d.Dispose()
 	t.Dispose()
-	dataGroup.Dispose()
 	fmt.Println("> create data", address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
@@ -221,7 +229,6 @@ func (s *StorageService) CreatePage(account libcore.Address, data []byte) (libco
 	}
 	d.Dispose()
 	t.Dispose()
-	pageGroup.Dispose()
 	fmt.Println("> create page", address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
@@ -253,7 +260,6 @@ func (s *StorageService) ReadPage(account libcore.Address) ([]byte, error) {
 	}
 	pageData.Dispose()
 	pageReader.Close()
-	pageGroup.Dispose()
 	fmt.Println("> read page", address, pageKey.String(), pageData.Size())
 
 	return buf.Bytes(), nil
@@ -285,7 +291,6 @@ func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, da
 	}
 	codeData.Dispose()
 	codeReader.Close()
-	codeGroup.Dispose()
 
 	_, result, err := vm.RunWasm(cost, buf.Bytes(), method, params) // remainCost
 	if err != nil {
@@ -332,4 +337,58 @@ func (s *StorageService) Close() error {
 		return err
 	}
 	return nil
+}
+
+// test
+func (s *StorageService) dump(name string) {
+	name = fmt.Sprintf("%s(%d)", name, s.stackdb.Len())
+
+	dumpStorage(s.storage, name+": current storage")
+	reloadStorage, err := chunk.LoadStorageWith(s.stackdb, 2048*2048*8)
+	if err != nil {
+		glog.Error(err)
+	} else {
+		dumpStorage(reloadStorage, name+": reload storage")
+	}
+	for i := (s.stackdb.Len() - 1); i >= 0; i-- {
+		db := s.stackdb.Get(i)
+		s, err := chunk.LoadStorageWith(db, 2048*2048*8)
+		if err != nil {
+			glog.Error(err)
+		} else {
+			dumpStorage(s, fmt.Sprintf(name+": s%d", i))
+		}
+	}
+	dumpKv(s.stackdb, name+":stackdb")
+	for i := (s.stackdb.Len() - 1); i >= 0; i-- {
+		db := s.stackdb.Get(i)
+		dumpKv(db, fmt.Sprintf(name+":db%d", i))
+	}
+}
+
+func (s *StorageService) dumpWith(name string, popKv libstore.KvService) {
+	s.dump(name)
+
+	if popKv != nil {
+		name = fmt.Sprintf("%s(%d)", name, s.stackdb.Len())
+		s, err := chunk.LoadStorageWith(popKv, 2048*2048*8)
+		if err != nil {
+			glog.Error(err)
+		} else {
+			dumpStorage(s, name+":pop storage")
+		}
+		dumpKv(popKv, name+":pop db")
+	}
+}
+
+func dumpKv(s libstore.KvService, name string) {
+	fmt.Println("~~~~~~~~~~~~~~~~~~~" + name + "~~~~~~~~~~~~~~~~~~~")
+	s.ListData(func(key []byte, value []byte) error {
+		fmt.Println(string(key), key, value)
+		return nil
+	})
+}
+func dumpStorage(s core.Storage, name string) {
+	fmt.Println("=================" + name + "=================")
+	s.DumpLog(chunk.LogPrinter{})
 }
