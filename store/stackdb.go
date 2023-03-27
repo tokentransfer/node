@@ -84,10 +84,10 @@ func (stack *StackService) GetData(key []byte) ([]byte, error) {
 
 	for i := len(stack.list) - 1; i >= 0; i-- {
 		service := stack.list[i]
-		if data, err := service.GetData(key); err != nil {
-			return nil, err
-		} else {
-			if len(data) > 0 {
+		if service.HasData(key) {
+			if data, err := service.GetData(key); err != nil {
+				return nil, err
+			} else {
 				return data, nil
 			}
 		}

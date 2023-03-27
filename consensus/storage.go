@@ -44,6 +44,7 @@ func (s *StorageService) Dump(printer core.Printer) {
 
 func (s *StorageService) CreateSandbox() error {
 	s.locker.Lock()
+	defer s.locker.Unlock()
 
 	memdb := &store.MemoryService{
 		Name: "memory",
@@ -64,6 +65,7 @@ func (s *StorageService) CreateSandbox() error {
 }
 
 func (s *StorageService) CommitSandbox() error {
+	s.locker.Lock()
 	defer s.locker.Unlock()
 
 	if err := s.stackdb.Commit(); err != nil {
@@ -79,6 +81,7 @@ func (s *StorageService) CommitSandbox() error {
 }
 
 func (s *StorageService) CancelSandbox() error {
+	s.locker.Lock()
 	defer s.locker.Unlock()
 
 	err := s.stackdb.Cancel()
@@ -138,6 +141,7 @@ func (s *StorageService) CreateContract(account libcore.Address, code []byte) (l
 	if err != nil {
 		return nil, nil, err
 	}
+	codeGroup.Dispose()
 	d.Dispose()
 	t.Dispose()
 	fmt.Println("> create contract", address, d.Key().String(), len(code))
@@ -178,6 +182,7 @@ func (s *StorageService) CreateData(account libcore.Address, data []byte) (libco
 	}
 	d.Dispose()
 	t.Dispose()
+	dataGroup.Dispose()
 	fmt.Println("> create data", address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
@@ -216,6 +221,7 @@ func (s *StorageService) CreatePage(account libcore.Address, data []byte) (libco
 	}
 	d.Dispose()
 	t.Dispose()
+	pageGroup.Dispose()
 	fmt.Println("> create page", address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
@@ -247,6 +253,7 @@ func (s *StorageService) ReadPage(account libcore.Address) ([]byte, error) {
 	}
 	pageData.Dispose()
 	pageReader.Close()
+	pageGroup.Dispose()
 	fmt.Println("> read page", address, pageKey.String(), pageData.Size())
 
 	return buf.Bytes(), nil
@@ -278,6 +285,7 @@ func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, da
 	}
 	codeData.Dispose()
 	codeReader.Close()
+	codeGroup.Dispose()
 
 	_, result, err := vm.RunWasm(cost, buf.Bytes(), method, params) // remainCost
 	if err != nil {

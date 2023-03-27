@@ -86,15 +86,8 @@ func (service *MemoryService) HasData(key []byte) bool {
 	db := service.db
 
 	s := hex.EncodeToString(key)
-	value, ok := db.Load(s)
-	if !ok {
-		return false
-	}
-	if value == nil {
-		return false
-	}
-	data := value.([]byte)
-	return len(data) != 0
+	_, ok := db.Load(s)
+	return ok
 }
 
 func (service *MemoryService) RemoveData(key []byte) error {

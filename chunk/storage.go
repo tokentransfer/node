@@ -189,7 +189,7 @@ func (s *chunkStorage) load() error {
 				break
 			}
 		}
-		s.version = (version - 1)
+		s.version = version
 		err := s.flush()
 		if err != nil {
 			return err
@@ -502,7 +502,7 @@ func (s *chunkStorage) DumpLog(log core.Printer) {
 		}
 	}
 	log.Printf("Bytes used: %d, max %d", s.bytesUsed, s.bytesMax)
-	s.entries.ListData(func(k []byte, v []byte) error {
+	err := s.entries.ListData(func(k []byte, v []byte) error {
 		key, err := core.ParseKey(string(k))
 		if err != nil {
 			return err
@@ -528,6 +528,9 @@ func (s *chunkStorage) DumpLog(log core.Printer) {
 		}
 		return nil
 	})
+	if err != nil {
+		log.Printf("list data: %s", err.Error())
+	}
 }
 
 func (s *chunkStorage) reserveBytes(info string, numBytes int64) error {

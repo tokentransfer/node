@@ -9,7 +9,6 @@ import (
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/core"
-	"github.com/tokentransfer/node/util"
 
 	. "github.com/tokentransfer/check"
 )
@@ -65,11 +64,11 @@ func (suite *NodeSuite) TestProcess(c *C) {
 	tx := &block.Transaction{}
 	err = tx.UnmarshalBinary(data)
 	c.Assert(err, IsNil)
-	txWithData, _, err := n.processTransaction(tx)
+	_, _, err = n.processTransaction(tx)
 	c.Assert(err, IsNil)
 
-	util.PrintJSON(">>> tx", tx)
-	util.PrintJSON(">>> txWithData", txWithData)
+	// util.PrintJSON(">>> tx", tx)
+	// util.PrintJSON(">>> txWithData", txWithData)
 
 	dump(n.storageService.storage, "after")
 }
