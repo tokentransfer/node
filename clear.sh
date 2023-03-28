@@ -1,1 +1,1 @@
-rm -rf ./default.*
+rm -rf ./data
