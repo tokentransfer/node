@@ -10,10 +10,6 @@ import (
 	"github.com/tokentransfer/node/core"
 )
 
-func CreateWasm(wasmCode []byte, method string, params ...uint64) ([]uint64, error) {
-	return nil, nil
-}
-
 func RunWasm(cost int64, wasmCode []byte, method string, params [][]byte) (int64, []byte, error) {
 	apiCost := api.NewCost()
 	ctx := context.WithValue(context.Background(), "cost", apiCost)
