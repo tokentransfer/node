@@ -884,11 +884,11 @@ func (n *Node) Load() error {
 	for {
 		b, err := n.merkleService.GetBlockByIndex(current)
 		if err != nil {
-			return err
+			break
 		}
 		_, err = n.HashBlock(b)
 		if err != nil {
-			return err
+			break
 		}
 
 		if n.consensusService.ValidatedBlock != nil {
