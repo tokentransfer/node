@@ -549,7 +549,7 @@ func (s *chunkStorage) reserveBytes(info string, numBytes int64) error {
 
 func (s *chunkStorage) storeEntry(key core.Key, data []byte, chunks []chunkRef, name string) error {
 	if len(data) > 0 && len(chunks) > 0 {
-		panic("Illegal entry")
+		return util.ErrorOf("illegal", "entry", name)
 	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -557,7 +557,7 @@ func (s *chunkStorage) storeEntry(key core.Key, data []byte, chunks []chunkRef, 
 	var newEntry *chunkEntry
 	if oldEntry, _ := s.getEntry(key); oldEntry != nil {
 		if len(oldEntry.data) != len(data) || len(oldEntry.chunks) != len(chunks) {
-			panic(fmt.Sprintf("[%v] key collision: %v [%v]", name, key, oldEntry.name))
+			return util.ErrorOf("key collision", "entry", fmt.Sprintf("[%v]: %v[%v]", name, key, oldEntry.name))
 		}
 		// glog.Infof("[%v] Recycling key: %v [%v] (data: %d bytes, chunks: %d)", info, key, oldEntry.info, len(data), len(chunks))
 

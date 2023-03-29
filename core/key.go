@@ -73,14 +73,6 @@ func ParseKey(s string) (Key, error) {
 	}
 }
 
-func MustParseKey(s string) Key {
-	if k, err := ParseKey(s); err != nil {
-		panic(err)
-	} else {
-		return k
-	}
-}
-
 func GetKey(s string) Key {
 	b := []byte(s)
 	return Key(b[:])

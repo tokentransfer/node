@@ -35,10 +35,18 @@ func (service *LevelService) open() error {
 	if service.config != nil {
 		dataDir := service.config.GetDataDir()
 		dbPath := path.Join(dataDir, service.Name)
-		service.db = serviceForLevelDB(dbPath)
+		db, err := serviceForLevelDB(dbPath)
+		if err != nil {
+			return err
+		}
+		service.db = db
 	} else {
 		if len(service.Path) > 0 {
-			service.db = serviceForLevelDB(service.Path)
+			db, err := serviceForLevelDB(service.Path)
+			if err != nil {
+				return err
+			}
+			service.db = db
 		} else {
 			return errors.New("no config or path for leveldb")
 		}
@@ -159,10 +167,10 @@ func (service *LevelService) ListData(each func(key []byte, value []byte) error)
 	return iter.Error()
 }
 
-func serviceForLevelDB(dbPath string) *leveldb.DB {
+func serviceForLevelDB(dbPath string) (*leveldb.DB, error) {
 	db, err := leveldb.OpenFile(dbPath, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return db
+	return db, nil
 }

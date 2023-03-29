@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/util"
 )
 
 type chunkData struct {
@@ -63,26 +64,31 @@ func (f *chunkData) Remove() {
 	}
 }
 
-func (f *chunkData) checkValid() {
+func (f *chunkData) checkValid() error {
 	if f.disposed {
-		panic("Already disposed")
+		return util.ErrorOfInvalid("chunk", "already disposed")
 	}
+	return nil
 }
 
-func (f *chunkData) Duplicate() core.Data {
-	f.checkValid()
+func (f *chunkData) Duplicate() (core.Data, error) {
+	if err := f.checkValid(); err != nil {
+		return nil, err
+	}
 	file, err := f.storage.Get(f.key)
 	if err != nil {
-		panic("Couldn't duplicate file")
+		return nil, err
 	}
-	return file
+	return file, nil
 }
 
-func (f *chunkData) IsChunked() bool {
-	f.checkValid()
+func (f *chunkData) IsChunked() (bool, error) {
+	if err := f.checkValid(); err != nil {
+		return false, err
+	}
 
 	entry := f.Entry()
-	return len(entry.chunks) > 0
+	return len(entry.chunks) > 0, nil
 }
 
 func (f *chunkData) Chunks() core.DataIterator {

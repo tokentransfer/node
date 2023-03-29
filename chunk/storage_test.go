@@ -58,12 +58,16 @@ func TestFile(t *testing.T) {
 }
 
 func TestEntry(t *testing.T) {
+	key, err := core.ParseKey("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855")
+	if err != nil {
+		panic(err)
+	}
 	entry := &chunkEntry{
 		name: "test",
 		data: []byte("test"),
 		chunks: []chunkRef{
 			{
-				key:     core.MustParseKey("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"),
+				key:     key,
 				nextPos: 0,
 			},
 		},

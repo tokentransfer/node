@@ -186,11 +186,11 @@ func (n *Node) Init(c libcore.Config) error {
 
 	merkleService, err := merkle.NewMerkleService(n.config, n.cryptoService)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	storageService, err := NewStorageService(n.config)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	consensusService := &ConsensusService{
 		CryptoService:  n.cryptoService,
@@ -733,28 +733,32 @@ func (n *Node) generate() {
 		if len(n.transactions) > 0 {
 			block, err := n.GenerateBlock()
 			if err != nil {
-				panic(err)
-			}
-			_, err = n.HashBlock(block)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Printf("=== generate block %d, %s, %d\n", block.GetIndex(), t.String(), len(block.GetTransactions()))
+				glog.Error(err)
+			} else {
+				_, err = n.HashBlock(block)
+				if err != nil {
+					glog.Error(err)
+				} else {
+					glog.Info("=== generate block %d, %s, %d\n", block.GetIndex(), t.String(), len(block.GetTransactions()))
 
-			_, err = n.consensusService.VerifyBlock(block)
-			if err != nil {
-				panic(err)
+					_, err = n.consensusService.VerifyBlock(block)
+					if err != nil {
+						glog.Error(err)
+					} else {
+						err = n.consensusService.AddBlock(block)
+						if err != nil {
+							glog.Error(err)
+						} else {
+							data, err := block.MarshalBinary()
+							if err != nil {
+								glog.Error(err)
+							} else {
+								n.broadcast(data)
+							}
+						}
+					}
+				}
 			}
-			err = n.consensusService.AddBlock(block)
-			if err != nil {
-				panic(err)
-			}
-
-			data, err := block.MarshalBinary()
-			if err != nil {
-				panic(err)
-			}
-			n.broadcast(data)
 		} else {
 			fmt.Printf("=== prepare block %d, %s, %d\n", n.GetBlockNumber(), n.GetBlockHash(), len(n.transactions))
 		}
@@ -875,16 +879,16 @@ func (n *Node) discoveryPeer(p *Peer) {
 	}
 }
 
-func (n *Node) Load() {
+func (n *Node) Load() error {
 	current := uint64(0)
 	for {
 		b, err := n.merkleService.GetBlockByIndex(current)
 		if err != nil {
-			break
+			return err
 		}
 		_, err = n.HashBlock(b)
 		if err != nil {
-			break
+			return err
 		}
 
 		if n.consensusService.ValidatedBlock != nil {
@@ -908,6 +912,7 @@ func (n *Node) Load() {
 
 		current++
 	}
+	return nil
 }
 
 func (n *Node) GetBlockNumber() int64 {
@@ -1188,43 +1193,48 @@ func (n *Node) LoadPage(name string) (*zipfs.FileSystem, error) {
 	return fs, nil
 }
 
-func (n *Node) start() {
+func (n *Node) start() error {
 	readyC := make(chan struct{})
 
 	var err error
 	n.net, err = p2p.InitNet(n.config, readyC)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	err = n.net.Start()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	err = n.net.InitPubSub(n.config.GetChainId(), 0)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	err = n.net.SubscribeWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY, n.discoveryHandler)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	err = n.net.DirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_MESSAGE, n.messageHandler)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	err = n.net.DirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_DATA, n.dataHandler)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	close(readyC)
 
 	n.self.Id = n.config.GetNodeId()
+	return nil
 }
 
 func (n *Node) Start() error {
-	n.Load()
-	n.start()
+	if err := n.Load(); err != nil {
+		return err
+	}
+	if err := n.start(); err != nil {
+		return err
+	}
 
 	go n.send()
 	go n.receive()

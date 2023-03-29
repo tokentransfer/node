@@ -52,8 +52,8 @@ type Data interface {
 	Key() Key
 	Open() io.ReadCloser
 	Size() int64
-	Duplicate() Data
-	IsChunked() bool
+	Duplicate() (Data, error)
+	IsChunked() (bool, error)
 	Chunks() DataIterator
 	NumChunks() int64
 }

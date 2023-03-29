@@ -18,6 +18,7 @@ type State struct {
 	Sequence   uint64
 	BlockIndex uint64
 	Previous   libcore.Hash
+	Version    uint64
 
 	StateType libblock.StateType
 }
@@ -46,12 +47,20 @@ func (s *State) GetPrevious() libcore.Hash {
 	return s.Previous
 }
 
+func (s *State) GetName() string {
+	return s.Name
+}
+
 func (s *State) GetAccount() libcore.Address {
 	return s.Account
 }
 
 func (s *State) GetIndex() uint64 {
 	return s.Sequence
+}
+
+func (s *State) GetVersion() uint64 {
+	return s.Version
 }
 
 type DataInfo struct {
@@ -87,6 +96,7 @@ type AccountState struct {
 
 	Amount core.Amount
 
+	User    *DataInfo
 	Code    *DataInfo
 	Page    *DataInfo
 	Token   *DataInfo
@@ -124,11 +134,14 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 
 	s.State.StateType = libblock.StateType(core.CORE_ACCOUNT_STATE)
 	s.State.BlockIndex = state.State.BlockIndex
+	s.State.Name = state.State.Name
 	s.State.Account = account
 	s.State.Sequence = state.State.Sequence
 	s.State.Previous = state.State.Previous
+	s.State.Version = state.State.Version
 	s.Amount = *a
 
+	s.User = fromDataInfo(state.User)
 	s.Code = fromDataInfo(state.Code)
 	s.Page = fromDataInfo(state.Page)
 	s.Token = fromDataInfo(state.Token)
@@ -147,12 +160,15 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 		State: &pb.State{
 			StateType:  uint32(core.CORE_ACCOUNT_STATE),
 			BlockIndex: s.BlockIndex,
+			Name:       s.Name,
 			Account:    a,
 			Sequence:   s.Sequence,
 			Previous:   []byte(s.Previous),
+			Version:    s.Version,
 		},
 		Amount: s.Amount.String(),
 
+		User:    toDataInfo(s.User),
 		Code:    toDataInfo(s.Code),
 		Page:    toDataInfo(s.Page),
 		Token:   toDataInfo(s.Token),
@@ -170,12 +186,15 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 	return core.Marshal(&pb.AccountState{
 		State: &pb.State{
 			StateType: uint32(core.CORE_ACCOUNT_STATE),
+			Name:      s.Name,
 			Account:   a,
 			Sequence:  s.Sequence,
 			Previous:  []byte(s.Previous),
+			Version:   s.Version,
 		},
 		Amount: s.Amount.String(),
 
+		User:    toDataInfo(s.User),
 		Code:    toDataInfo(s.Code),
 		Page:    toDataInfo(s.Page),
 		Token:   toDataInfo(s.Token),
