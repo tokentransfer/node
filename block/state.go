@@ -13,6 +13,7 @@ import (
 type State struct {
 	Hash libcore.Hash
 
+	Name       string
 	Account    libcore.Address
 	Sequence   uint64
 	BlockIndex uint64
@@ -93,8 +94,11 @@ type AccountState struct {
 	Storage *DataInfo
 }
 
-func (s *AccountState) GetStateKey() string {
-	return core.GetAccountKey(s.Account, s.Amount.Currency, s.Amount.Issuer, "-")
+func (s *AccountState) GetStateKey() []string {
+	return []string{
+		s.Name,
+		core.GetAccountKey(s.Account, s.Amount.Currency, s.Amount.Issuer, "-"),
+	}
 }
 
 func (s *AccountState) UnmarshalBinary(data []byte) error {

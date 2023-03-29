@@ -20,7 +20,7 @@ require (
 	github.com/tetratelabs/wazero v0.0.0-00010101000000-000000000000
 	github.com/tokentransfer/check v0.0.0-20220325011756-9433b88b4878
 	github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20230322010733-91ec8f899a24
-	github.com/tokentransfer/interfaces v0.0.0-20210511064306-7a259547c68f
+	github.com/tokentransfer/interfaces v0.0.0-20230329103702-48046ea5f208
 	google.golang.org/protobuf v1.28.1
 )
 

@@ -12,7 +12,10 @@ import (
 
 func NewMemKVStore() libstore.KvService {
 	kv := store.MemoryService{}
-	kv.Init(nil)
+	err := kv.Init(nil)
+	if err != nil {
+		panic(err)
+	}
 	return &kv
 }
 
@@ -268,7 +271,7 @@ func TestPutAbort(t *testing.T) {
 	if string(data) != "A" {
 		t.Error("key 123467 wrong (after abort)")
 	}
-	data, err = trie.Get([]byte("12345678"))
+	_, err = trie.Get([]byte("12345678"))
 	if err == nil {
 		t.Error("Abort failed")
 	}

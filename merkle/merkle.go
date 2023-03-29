@@ -240,14 +240,17 @@ func (service *MerkleService) PutState(state libblock.State, s ...interface{}) e
 	}
 
 	stateHash := state.GetHash()
-	stateTypeAndKey := getStateKeyWithType(state.GetStateKey(), state.GetStateType())
 	stateTypeTypeAndAddress := getStateKeyWithType(state.GetAccount().String(), state.GetStateType())
 	stateAddressAndIndexKey := getStateKey(fmt.Sprintf("%s:%d", state.GetAccount().String(), state.GetIndex()))
 	stateAddressKey := getStateKey(state.GetAccount().String())
 
-	err = service.im.PutData([]byte(stateTypeAndKey), stateHash)
-	if err != nil {
-		return err
+	keys := state.GetStateKey()
+	for _, key := range keys {
+		stateTypeAndKey := getStateKeyWithType(key, state.GetStateType())
+		err = service.im.PutData([]byte(stateTypeAndKey), stateHash)
+		if err != nil {
+			return err
+		}
 	}
 	err = service.im.PutData([]byte(stateTypeTypeAndAddress), stateHash)
 	if err != nil {
