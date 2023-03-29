@@ -1,13 +1,12 @@
 package util
 
 import (
+	"crypto/sha512"
 	"encoding/json"
 	"fmt"
 	"math/big"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
-
-	"github.com/tokentransfer/node/core"
 )
 
 func ToArray(m *map[string]interface{}, key string) []interface{} {
@@ -98,19 +97,6 @@ func PrintJSON(name string, o interface{}) {
 	fmt.Println(name, string(jsonBytes))
 }
 
-func GetKeyFromNode(n datamodel.Node, p string) (core.Key, error) {
-	n, err := n.LookupByString(p)
-	if err != nil {
-		return nil, err
-	}
-	bs, err := n.AsBytes()
-	if err != nil {
-		return nil, err
-	}
-	k := core.Key(bs)
-	return k, nil
-}
-
 func GetStringFromNode(n datamodel.Node, p string) string {
 	n, err := n.LookupByString(p)
 	if err != nil {
@@ -147,16 +133,16 @@ func GetBooleanFromNode(n datamodel.Node, p string) bool {
 	return b
 }
 
-func GetBytesFromNode(n datamodel.Node, p string) []byte {
+func GetBytesFromNode(n datamodel.Node, p string) ([]byte, error) {
 	n, err := n.LookupByString(p)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	data, err := n.AsBytes()
 	if err != nil {
-		return nil
+		return nil, nil
 	}
-	return data
+	return data, nil
 }
 
 func GetListFromNode(n datamodel.Node, p string) datamodel.ListIterator {
@@ -165,4 +151,10 @@ func GetListFromNode(n datamodel.Node, p string) datamodel.ListIterator {
 		return nil
 	}
 	return n.ListIterator()
+}
+
+func Sha512Half(b []byte) []byte {
+	h := sha512.New()
+	h.Write(b)
+	return h.Sum(nil)[:32]
 }

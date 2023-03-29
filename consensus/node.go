@@ -1040,7 +1040,7 @@ func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 		return err
 	}
 	if meta != core.CORE_PEER_INFO {
-		return core.ErrorOfInvalid("format", "peer info")
+		return util.ErrorOfInvalid("format", "peer info")
 	}
 	peerInfo := msg.(*pb.PeerInfo)
 	_, publicKey, err := n.accountService.NewPublicFromBytes(peerInfo.PublicKey)
@@ -1452,7 +1452,7 @@ func (n *Node) GetMessage(data []byte) (*pb.Message, error) {
 		return nil, err
 	}
 	if meta != core.CORE_MESSAGE {
-		return nil, core.ErrorOfInvalid("format", "message")
+		return nil, util.ErrorOfInvalid("format", "message")
 	}
 	return m.(*pb.Message), nil
 }

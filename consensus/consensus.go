@@ -9,6 +9,7 @@ import (
 	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
+	"github.com/tokentransfer/node/util"
 
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libblock "github.com/tokentransfer/interfaces/block"
@@ -59,7 +60,7 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 	var b *block.Block
 	if service.ValidatedBlock == nil { //genesis
 		if len(list) > 0 {
-			return nil, errors.New("error genesis block")
+			return nil, util.ErrorOfInvalid("transactions", "genesis block")
 		}
 		_, rootKey, err := as.GenerateFamilySeed("masterpassphrase")
 		if err != nil {
@@ -223,7 +224,7 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 			return
 		}
 		if !ok {
-			err = errors.New("verify transaction failed")
+			err = util.ErrorOfInvalid("transaction", tx.GetHash().String())
 			return
 		}
 
@@ -260,7 +261,7 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 		}
 		if !arh.Equals(brh) {
 			ok = false
-			err = errors.New("process transaction receipt failed")
+			err = util.ErrorOf("unmatched", "transaction receipt", fmt.Sprintf("%s != %s", txWithData.GetHash().String(), newWithData.GetHash().String()))
 			return
 		}
 
@@ -368,7 +369,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 		return false, errors.New("error transaction")
 	}
 	if !tx.Amount.IsNative() {
-		return false, core.ErrorOfInvalid("amount", tx.Amount.String())
+		return false, util.ErrorOfInvalid("amount", tx.Amount.String())
 	}
 
 	account := tx.Account
@@ -379,7 +380,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 
 	info, err := service.GetAccountInfo(account, nil, nil)
 	if err != nil || info == nil {
-		return false, core.ErrorOfNonexists("account", account.String())
+		return false, util.ErrorOfNonexists("account", account.String())
 	}
 
 	gasAmount, err := core.NewAmount(int64(tx.Gas))
@@ -395,7 +396,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 		return false, err
 	}
 	if remain.Less(*gasAmount.ZeroClone()) {
-		return false, core.ErrorOf("insuffient", "amount", remain.String())
+		return false, util.ErrorOf("insuffient", "amount", remain.String())
 	}
 
 	if tx.Payload != nil && len(tx.Payload) > 0 {
@@ -404,7 +405,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 			return false, err
 		}
 		if meta != core.CORE_PAYLOAD_INFO {
-			return false, core.ErrorOfInvalid("format", "payload")
+			return false, util.ErrorOfInvalid("format", "payload")
 		}
 		info := msg.(*pb.PayloadInfo)
 		for _, payload := range info.Payload {
@@ -413,7 +414,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 				return false, err
 			}
 			if meta != core.CORE_PAYLOAD_INFO && meta != core.CORE_CONTRACT_INFO && meta != core.CORE_META_INFO && meta != core.CORE_TOKEN_INFO && meta != core.CORE_DATA_INFO && meta != core.CORE_PEER_INFO && meta != core.CORE_PAGE_INFO {
-				return false, core.ErrorOfInvalid("format", "info")
+				return false, util.ErrorOfInvalid("format", "info")
 			}
 		}
 	}
@@ -480,7 +481,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		return nil, errors.New("error transaction")
 	}
 	if !tx.Amount.IsNative() {
-		return nil, core.ErrorOfInvalid("amount", tx.Amount.String())
+		return nil, util.ErrorOfInvalid("amount", tx.Amount.String())
 	}
 
 	sequenceMap := map[string]uint64{}
@@ -489,7 +490,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	account := tx.GetAccount()
 	sequence := libstore.GetSequence(ms, account) + 1 // sequence of from account, +1
 	if tx.Sequence != sequence {
-		return nil, core.ErrorOf("error", "sequence", fmt.Sprintf("%d != %d", tx.Sequence, sequence))
+		return nil, util.ErrorOf("error", "sequence", fmt.Sprintf("%d != %d", tx.Sequence, sequence))
 	}
 	sequenceMap[account.String()] = sequence
 
@@ -537,7 +538,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 			return nil, err
 		}
 		if meta != core.CORE_PAYLOAD_INFO {
-			return nil, core.ErrorOfInvalid("format", "payload")
+			return nil, util.ErrorOfInvalid("format", "payload")
 		}
 		info := msg.(*pb.PayloadInfo)
 		payloadStates, err := service.ProcessPayload(tx, info, accountMap)
@@ -633,7 +634,7 @@ func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.
 		case core.CORE_TOKEN_INFO:
 		case core.CORE_DATA_INFO:
 		default:
-			return nil, core.ErrorOfUnknown("format", "info")
+			return nil, util.ErrorOfUnknown("format", "info")
 		}
 	}
 

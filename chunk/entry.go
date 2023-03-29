@@ -6,6 +6,7 @@ import (
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/ipld/go-ipld-prime/fluent/qp"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
+	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/util"
 )
 
@@ -57,7 +58,11 @@ func (e *chunkEntry) UnmarshalBinary(data []byte) error {
 		return err
 	}
 	e.name = util.GetStringFromNode(node, "name")
-	e.data = util.GetBytesFromNode(node, "data")
+	if data, err := util.GetBytesFromNode(node, "data"); err != nil {
+		return err
+	} else {
+		e.data = data
+	}
 	list := util.GetListFromNode(node, "chunks")
 	if list != nil {
 		chunks := make([]chunkRef, 0)
@@ -67,11 +72,11 @@ func (e *chunkEntry) UnmarshalBinary(data []byte) error {
 			if err != nil {
 				return err
 			}
-			k, err := util.GetKeyFromNode(item, "key")
+			k, err := util.GetBytesFromNode(item, "key")
 			if err != nil {
 				return err
 			}
-			c.key = k
+			c.key = core.Key(k)
 			c.nextPos = util.GetIntFromNode(item, "nextPos")
 
 			chunks = append(chunks, c)

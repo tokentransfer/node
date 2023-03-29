@@ -59,17 +59,17 @@ type Data interface {
 }
 
 type DataIterator interface {
-	Dispose()
-	Duplicate() DataIterator
-	Next() bool
-	Key() Key
-	Size() int64
-	Data() Data
+	Dispose() error
+	Duplicate() (DataIterator, error)
+	Next() (bool, error)
+	Key() (Key, error)
+	Size() (int64, error)
+	Data() (Data, error)
 }
 
 type Temporary interface {
 	io.WriteCloser
-	Data() Data
+	Data() (Data, error)
 	Dispose()
 }
 

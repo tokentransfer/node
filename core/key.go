@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/tokentransfer/node/util"
+
 	libcore "github.com/tokentransfer/interfaces/core"
 )
 
@@ -61,7 +63,7 @@ func IsKey(s string) bool {
 
 func ParseKey(s string) (Key, error) {
 	if len(s)%2 != 0 {
-		return nil, ErrorOfInvalid("key length", fmt.Sprintf("%d", len(s)))
+		return nil, util.ErrorOfInvalid("key length", fmt.Sprintf("%d", len(s)))
 	}
 
 	if b, err := hex.DecodeString(s); err != nil {

@@ -47,11 +47,11 @@ func (e *chunkItem) UnmarshalBinary(data []byte) error {
 	}
 	e.name = util.GetStringFromNode(node, "name")
 
-	k, err := util.GetKeyFromNode(node, "key")
-	if err != nil {
+	if k, err := util.GetBytesFromNode(node, "key"); err != nil {
 		return err
+	} else {
+		e.key = core.Key(k)
 	}
-	e.key = k
 
 	e.group = util.GetBooleanFromNode(node, "group")
 
@@ -99,7 +99,7 @@ func (f *chunkGroup) Group(name string) (core.Group, error) {
 	defer f.locker.Unlock()
 
 	if !f.Exists(name) {
-		return nil, core.ErrorOfNonexists("group", name)
+		return nil, util.ErrorOfNonexists("group", name)
 	}
 
 	item, err := f.get(name)
@@ -107,7 +107,7 @@ func (f *chunkGroup) Group(name string) (core.Group, error) {
 		return nil, err
 	}
 	if !item.group {
-		return nil, core.ErrorOfInvalid("group", name)
+		return nil, util.ErrorOfInvalid("group", name)
 	}
 	g := &chunkGroup{
 		storage: f.storage,
@@ -131,7 +131,7 @@ func (f *chunkGroup) AddGroup(name string) (core.Group, error) {
 	defer f.locker.Unlock()
 
 	if f.Exists(name) {
-		return nil, core.ErrorOf("Already exists", "group", name)
+		return nil, util.ErrorOf("Already exists", "group", name)
 	}
 	g := &chunkGroup{
 		storage: f.storage,
@@ -258,18 +258,18 @@ func (f *chunkGroup) Load(key core.Key) error {
 		}
 		return nil
 	} else {
-		return core.ErrorOfNonexists("key", key.String())
+		return util.ErrorOfNonexists("key", key.String())
 	}
 }
 
 func (f *chunkGroup) get(name string) (*chunkItem, error) {
 	index, ok := f.itemMap[name]
 	if !ok {
-		return nil, core.ErrorOfNonexists("dir", name)
+		return nil, util.ErrorOfNonexists("dir", name)
 	}
 	item := f.itemArray[index]
 	if item == nil {
-		return nil, core.ErrorOfInvalid("state", fmt.Sprintf("%d", index))
+		return nil, util.ErrorOfInvalid("state", fmt.Sprintf("%d", index))
 	}
 	return item, nil
 }
@@ -301,7 +301,7 @@ func (f *chunkGroup) load(name string) error {
 				return err
 			}
 		} else {
-			return core.ErrorOfNonexists("dir", name)
+			return util.ErrorOfNonexists("dir", name)
 		}
 	}
 
@@ -470,10 +470,10 @@ func (f *chunkGroup) GetKey(name string) (core.Key, error) {
 		if item != nil {
 			return item.key, nil
 		} else {
-			return nil, core.ErrorOfInvalid("state", fmt.Sprintf("%d", index))
+			return nil, util.ErrorOfInvalid("state", fmt.Sprintf("%d", index))
 		}
 	}
-	return nil, core.ErrorOfNonexists("key", name)
+	return nil, util.ErrorOfNonexists("key", name)
 }
 
 func (f *chunkGroup) IsGroup(name string) (bool, error) {
@@ -486,10 +486,10 @@ func (f *chunkGroup) IsGroup(name string) (bool, error) {
 		if item != nil {
 			return item.group, nil
 		} else {
-			return false, core.ErrorOfInvalid("state", fmt.Sprintf("%d", index))
+			return false, util.ErrorOfInvalid("state", fmt.Sprintf("%d", index))
 		}
 	}
-	return false, core.ErrorOfNonexists("dir", name)
+	return false, util.ErrorOfNonexists("dir", name)
 }
 
 func (f *chunkGroup) List() []string {

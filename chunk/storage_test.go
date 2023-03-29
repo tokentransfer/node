@@ -48,7 +48,10 @@ func TestFile(t *testing.T) {
 		panic(err)
 	}
 	// dump(s, "temp.close")
-	f := temp.Data()
+	f, err := temp.Data()
+	if err != nil {
+		panic(err)
+	}
 	// dump(s, "file.create")
 	f.Dispose()
 	// dump(s, "file.dispose")
@@ -348,13 +351,21 @@ func TestEmptyFile(t *testing.T) {
 		t.FailNow()
 	}
 	iter := f.Chunks()
-	if !iter.Next() {
+	if ok, err := iter.Next(); err != nil {
+		t.Fatal(err)
+	} else if !ok {
 		t.Fatal("Expected empty file to have at least one chunk")
 	}
-	if iter.Key().String() != "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855" {
-		t.Fatalf("Unexpected key of empty chunk: %v", iter.Key())
+	if k, err := iter.Key(); err != nil {
+		t.Fatal(err)
+	} else {
+		if k.String() != "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855" {
+			t.Fatalf("Unexpected key of empty chunk: %v", k)
+		}
 	}
-	if iter.Next() {
+	if _, err := iter.Next(); err != nil {
+		t.Fatal(err)
+	} else {
 		t.Fatal("Expected empty file to not have any further chunks")
 	}
 }
@@ -492,7 +503,10 @@ func TestCompression2(t *testing.T) {
 		t.Errorf("Error on Close: %v", err)
 	}
 
-	f := temp.Data()
+	f, err := temp.Data()
+	if err != nil {
+		t.Errorf("Error on Close: %v", err)
+	}
 	defer f.Dispose()
 	w := f.Open()
 	data2 := make([]byte, 1)
@@ -603,7 +617,11 @@ func addData(t *testing.T, s core.Storage, size int) core.Data {
 	if err := temp.Close(); err != nil {
 		panic(err)
 	}
-	return temp.Data()
+	if d, err := temp.Data(); err != nil {
+		panic(err)
+	} else {
+		return d
+	}
 }
 
 func addRandomData(t *testing.T, s core.Storage, size int) core.Data {
@@ -619,5 +637,9 @@ func addRandomData(t *testing.T, s core.Storage, size int) core.Data {
 	if err := temp.Close(); err != nil {
 		panic(err)
 	}
-	return temp.Data()
+	if d, err := temp.Data(); err != nil {
+		panic(err)
+	} else {
+		return d
+	}
 }

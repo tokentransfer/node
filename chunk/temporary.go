@@ -6,6 +6,7 @@ import (
 	"hash"
 
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/util"
 )
 
 type chunkTemporary struct {
@@ -50,7 +51,7 @@ func (t *chunkTemporary) flushBufferIntoChunk() error {
 
 func (t *chunkTemporary) Write(b []byte) (int, error) {
 	if !t.valid || !t.open {
-		return 0, core.ErrorOfInvalid("state", t.info)
+		return 0, util.ErrorOfInvalid("state", t.info)
 	}
 	t.valid = false
 
@@ -79,7 +80,7 @@ func (t *chunkTemporary) Write(b []byte) (int, error) {
 
 func (t *chunkTemporary) Close() error {
 	if !t.valid || !t.open {
-		return core.ErrorOfInvalid("state", t.info)
+		return util.ErrorOfInvalid("state", t.info)
 	}
 	t.open = false
 	t.valid = false
@@ -105,21 +106,21 @@ func (t *chunkTemporary) Close() error {
 	return nil
 }
 
-func (t *chunkTemporary) Data() core.Data {
+func (t *chunkTemporary) Data() (core.Data, error) {
 	if !t.valid {
-		panic("invalid state")
+		return nil, util.ErrorOfInvalid("temporary state", t.info)
 	}
 	if t.open {
-		panic("still open")
+		return nil, util.ErrorOf("still open", "temporary", t.info)
 	}
 
 	key := core.Key(t.fileHash.Sum(nil))
 
 	file, err := t.storage.Get(key)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return file
+	return file, nil
 }
 
 func (t *chunkTemporary) Dispose() {

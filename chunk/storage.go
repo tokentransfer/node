@@ -12,6 +12,7 @@ import (
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/crypto"
 	"github.com/tokentransfer/node/store"
+	"github.com/tokentransfer/node/util"
 )
 
 var cs = &crypto.CryptoService{}
@@ -85,7 +86,7 @@ func (s *chunkStorage) GetVersion(n int64) (core.Key, error) {
 	link := core.GetKey(indexString)
 	linkEntry, ok := s.getEntry(link)
 	if !ok {
-		return nil, core.ErrorOfNonexists("link", indexString)
+		return nil, util.ErrorOfNonexists("link", indexString)
 	}
 	k, err := core.ParseKey(linkEntry.name)
 	if err != nil {
@@ -101,7 +102,7 @@ func (s *chunkStorage) addIndex(key core.Key) error {
 	indexString := fmt.Sprintf("%d", s.version)
 	link := core.GetKey(indexString)
 	if s.Exists(link) {
-		return core.ErrorOf("already exists", "index", indexString)
+		return util.ErrorOf("already exists", "index", indexString)
 	}
 	err := s.addLink(indexString, key)
 	if err != nil {
@@ -342,7 +343,7 @@ func (s *chunkStorage) Get(key core.Key) (core.Data, error) {
 		}
 		return &chunkData{s, key, false}, nil
 	}
-	return nil, core.ErrorOfNonexists("file", key.String())
+	return nil, util.ErrorOfNonexists("file", key.String())
 }
 
 func (s *chunkStorage) Chunk(key core.Key) ([]byte, error) {
@@ -350,7 +351,7 @@ func (s *chunkStorage) Chunk(key core.Key) ([]byte, error) {
 	if ok {
 		return entry.data, nil
 	}
-	return nil, core.ErrorOfNonexists("chunk", key.String())
+	return nil, util.ErrorOfNonexists("chunk", key.String())
 }
 
 func (s *chunkStorage) Size(key core.Key) (int64, error) {
@@ -361,7 +362,7 @@ func (s *chunkStorage) Size(key core.Key) (int64, error) {
 		}
 		return int64(len(entry.data)), nil
 	}
-	return 0, core.ErrorOfNonexists("entry", key.String())
+	return 0, util.ErrorOfNonexists("entry", key.String())
 }
 
 func (s *chunkStorage) Reference(key core.Key) (int64, error) {
@@ -369,7 +370,7 @@ func (s *chunkStorage) Reference(key core.Key) (int64, error) {
 	if ok {
 		return int64(entry.refs), nil
 	}
-	return 0, core.ErrorOfNonexists("entry", key.String())
+	return 0, util.ErrorOfNonexists("entry", key.String())
 }
 
 func (s *chunkStorage) Commit(storage core.Storage, key core.Key) error {
@@ -537,11 +538,11 @@ func (s *chunkStorage) DumpLog(log core.Printer) {
 
 func (s *chunkStorage) reserveBytes(info string, numBytes int64) error {
 	if numBytes > s.bytesMax {
-		return core.ErrorOf("not enough", "space", fmt.Sprintf("%d", numBytes))
+		return util.ErrorOf("not enough", "space", fmt.Sprintf("%d", numBytes))
 	}
 	bytesFree := s.bytesMax - s.bytesUsed
 	if bytesFree < numBytes {
-		return core.ErrorOf("not enough", "space", fmt.Sprintf("%d", numBytes))
+		return util.ErrorOf("not enough", "space", fmt.Sprintf("%d", numBytes))
 	}
 	return nil
 }
@@ -591,7 +592,7 @@ func (s *chunkStorage) lockL(key core.Key) error {
 func (s *chunkStorage) lock(key core.Key) error {
 	entry, ok := s.getEntry(key)
 	if !ok {
-		return core.ErrorOfNonexists("entry", key.String())
+		return util.ErrorOfNonexists("entry", key.String())
 	}
 	entry.refs++
 	_, _, err := s.putEntry(key, entry)
@@ -611,10 +612,10 @@ func (s *chunkStorage) releaseL(key core.Key) error {
 func (s *chunkStorage) release(key core.Key) error {
 	entry, ok := s.getEntry(key)
 	if !ok {
-		return core.ErrorOfNonexists("entry", key.String())
+		return util.ErrorOfNonexists("entry", key.String())
 	}
 	if entry.refs == 0 {
-		return core.ErrorOfInvalid("state", key.String())
+		return util.ErrorOfInvalid("state", key.String())
 	}
 	entry.refs--
 	if entry.refs == 0 {

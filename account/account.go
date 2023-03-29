@@ -1,16 +1,16 @@
 package account
 
 import (
+	"github.com/tokentransfer/node/account/btc"
 	"github.com/tokentransfer/node/account/eth"
-	"github.com/tokentransfer/node/account/jingtum"
 
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libcore "github.com/tokentransfer/interfaces/core"
 )
 
 const (
-	ETH     libaccount.KeyType = 0
-	JINGTUM libaccount.KeyType = 1
+	BTC libaccount.KeyType = 1
+	ETH libaccount.KeyType = 2
 )
 
 func init() {
@@ -19,8 +19,8 @@ func init() {
 		key, _ := eth.GenerateFamilySeed("masterpassphrase")
 		return key
 	})
-	JINGTUM.Register("Jingtum", func(t libaccount.KeyType) libaccount.Key {
-		key, _ := jingtum.GenerateFamilySeed("masterpassphrase")
+	BTC.Register("BTC", func(t libaccount.KeyType) libaccount.Key {
+		key, _ := btc.GenerateFamilySeed("masterpassphrase")
 		return key
 	})
 }

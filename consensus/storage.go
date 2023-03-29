@@ -141,7 +141,10 @@ func (s *StorageService) CreateContract(account libcore.Address, code []byte) (l
 		return nil, nil, err
 	}
 
-	d := t.Data()
+	d, err := t.Data()
+	if err != nil {
+		return nil, nil, err
+	}
 	_, err = codeGroup.AddData(address, d.Key())
 	if err != nil {
 		return nil, nil, err
@@ -179,7 +182,10 @@ func (s *StorageService) CreateData(account libcore.Address, data []byte) (libco
 		return nil, nil, err
 	}
 
-	d := t.Data()
+	d, err := t.Data()
+	if err != nil {
+		return nil, nil, err
+	}
 	_, err = dataGroup.AddData(address, d.Key())
 	if err != nil {
 		return nil, nil, err
@@ -216,7 +222,10 @@ func (s *StorageService) CreatePage(account libcore.Address, data []byte) (libco
 	if err != nil {
 		return nil, nil, err
 	}
-	d := t.Data()
+	d, err := t.Data()
+	if err != nil {
+		return nil, nil, err
+	}
 	_, err = pageGroup.AddData(address, d.Key())
 	if err != nil {
 		return nil, nil, err

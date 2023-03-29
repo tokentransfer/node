@@ -7,7 +7,7 @@ import (
 	"github.com/caivega/glog"
 	libcore "github.com/tokentransfer/interfaces/core"
 	libstore "github.com/tokentransfer/interfaces/store"
-	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/util"
 )
 
 type StackService struct {
@@ -19,7 +19,7 @@ type StackService struct {
 // KV -> MEMORY -> MEMORY
 func CreateStackService(validatedService libstore.KvService) (*StackService, error) {
 	if validatedService == nil {
-		return nil, core.ErrorOfInvalid("service", "validated")
+		return nil, util.ErrorOfInvalid("service", "validated")
 	}
 	return &StackService{
 		list: []libstore.KvService{validatedService},

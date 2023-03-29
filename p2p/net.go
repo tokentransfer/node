@@ -12,7 +12,7 @@ import (
 	protocol "chainmaker.org/chainmaker/protocol/v2"
 	"github.com/tokentransfer/node/config"
 
-	log "github.com/caivega/glog"
+	"github.com/caivega/glog"
 )
 
 func loadFile(filePath string) ([]byte, error) {
@@ -43,7 +43,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 	// load net type
 	provider := c.NetConfig.Provider
 	emptyProvider := ""
-	log.Infof("load net provider: %s", provider)
+	glog.Infof("load net provider: %s", provider)
 	switch strings.ToLower(provider) {
 	case "libp2p":
 		netType = protocol.Libp2p
@@ -65,7 +65,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 				return nil, err
 			}
 		}
-		log.Infof("load net tls key file path: %s", keyPath)
+		glog.Infof("load net tls key file path: %s", keyPath)
 	}
 
 	var certPath string
@@ -83,7 +83,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 					return nil, err
 				}
 			}
-			log.Infof("load net tls cert file path: %s", certPath)
+			glog.Infof("load net tls cert file path: %s", certPath)
 		}
 	default:
 		return nil, errors.New("wrong auth")
@@ -138,7 +138,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 	)
 	if err != nil {
 		errMsg := fmt.Sprintf("new net failed: %s", err.Error())
-		log.Error(errMsg)
+		glog.Error(errMsg)
 		return nil, errors.New(errMsg)
 	}
 
@@ -158,13 +158,13 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 		for _, r := range chainTrustRoots.TrustRoots {
 			rootBytes, err2 := ioutil.ReadFile(r.Root)
 			if err2 != nil {
-				log.Errorf("load custom chain trust roots failed: %s", err2.Error())
+				glog.Errorf("load custom chain trust roots failed: %s", err2.Error())
 				return nil, err2
 			}
 			roots = append(roots, rootBytes)
 		}
 		n.SetChainCustomTrustRoots(chainTrustRoots.ChainId, roots)
-		log.Infof("set custom trust roots for chain[%s] success.", chainTrustRoots.ChainId)
+		glog.Infof("set custom trust roots for chain[%s] success.", chainTrustRoots.ChainId)
 	}
 	return n, nil
 }

@@ -133,7 +133,8 @@ func test(c *C, s core.Storage) {
 	err = t.Close()
 	c.Assert(err, IsNil)
 
-	d := t.Data()
+	d, err := t.Data()
+	c.Assert(err, IsNil)
 	ok, err := codeGroup.AddData("0xc287B1266732495Fe8c93CE3Ba631597153fdd91", d.Key())
 	c.Assert(err, IsNil)
 	c.Assert(ok, Equals, false)
@@ -159,7 +160,8 @@ func test(c *C, s core.Storage) {
 	err = t.Close()
 	c.Assert(err, IsNil)
 
-	d = t.Data()
+	d, err = t.Data()
+	c.Assert(err, IsNil)
 	ok, err = codeGroup.AddData("demo.wasm", d.Key())
 	c.Assert(err, IsNil)
 	c.Assert(ok, Equals, false)

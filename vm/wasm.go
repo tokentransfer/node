@@ -7,7 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/util"
 )
 
 func RunWasm(cost int64, wasmCode []byte, method string, params [][]byte) (int64, []byte, error) {
@@ -24,13 +24,13 @@ func RunWasm(cost int64, wasmCode []byte, method string, params [][]byte) (int64
 	}
 	f := mod.ExportedFunction(method)
 	if f == nil {
-		return -1, nil, core.ErrorOfNonexists("method in wasm module", method)
+		return -1, nil, util.ErrorOfNonexists("method in wasm module", method)
 	}
 	types := f.Definition().ParamTypes()
 	tLen := len(types)
 	pLen := len(params)
 	if tLen != pLen {
-		return -1, nil, core.ErrorOfInvalid("parameter", fmt.Sprintf("%d != %d", tLen, pLen))
+		return -1, nil, util.ErrorOfInvalid("parameter", fmt.Sprintf("%d != %d", tLen, pLen))
 	}
 	list := make([]uint64, 0)
 	for i := 0; i < len(types); i++ {
@@ -73,11 +73,11 @@ func RunWasm(cost int64, wasmCode []byte, method string, params [][]byte) (int64
 	types = f.Definition().ResultTypes()
 	tLen = len(types)
 	if tLen > 1 {
-		return -1, nil, core.ErrorOfInvalid("return", "> 1")
+		return -1, nil, util.ErrorOfInvalid("return", "> 1")
 	}
 	rLen := len(results)
 	if tLen != rLen {
-		return -1, nil, core.ErrorOfInvalid("return", fmt.Sprintf("%d != %d", tLen, rLen))
+		return -1, nil, util.ErrorOfInvalid("return", fmt.Sprintf("%d != %d", tLen, rLen))
 	}
 
 	remainCost := apiCost.GetCost()
