@@ -41,9 +41,11 @@ message State {
     uint32 StateType  = 1;
     uint64 BlockIndex = 2;
 
-    bytes Account     = 3;
-    uint64 Sequence   = 4;
-    bytes Previous    = 5;
+    string Name	      = 3;
+    bytes Account     = 4;
+    uint64 Sequence   = 5;
+    bytes Previous    = 6;
+    uint64 Version    = 7;
 }
 
 message AccountState {
@@ -51,11 +53,12 @@ message AccountState {
 
     string Amount     = 2;
 
-    DataInfo Code     = 3;
-    DataInfo Page     = 4;
-    DataInfo Token    = 5;
-    DataInfo Data     = 6;
-    DataInfo Storage  = 7;
+    DataInfo User     = 3;
+    DataInfo Code     = 4;
+    DataInfo Page     = 5;
+    DataInfo Token    = 6;
+    DataInfo Data     = 7;
+    DataInfo Storage  = 8;
 }
 
 message DataInfo {
