@@ -15,12 +15,12 @@ const (
 
 func init() {
 	// KeyType
-	ETH.Register("ETH", func(t libaccount.KeyType) libaccount.Key {
-		key, _ := eth.GenerateFamilySeed("masterpassphrase")
-		return key
-	})
 	BTC.Register("BTC", func(t libaccount.KeyType) libaccount.Key {
 		key, _ := btc.GenerateFamilySeed("masterpassphrase")
+		return key
+	})
+	ETH.Register("ETH", func(t libaccount.KeyType) libaccount.Key {
+		key, _ := eth.GenerateFamilySeed("masterpassphrase")
 		return key
 	})
 }
