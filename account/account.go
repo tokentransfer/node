@@ -15,77 +15,86 @@ const (
 
 func init() {
 	// KeyType
-	BTC.Register("BTC", func(t libaccount.KeyType) libaccount.Key {
-		key, _ := btc.GenerateFamilySeed("masterpassphrase")
+	BTC.Register("BTC", func(t libaccount.KeyType, seed []byte) libaccount.Key {
+		key, _ := btc.GenerateFamilySeed(string(seed))
 		return key
 	})
-	ETH.Register("ETH", func(t libaccount.KeyType) libaccount.Key {
-		key, _ := eth.GenerateFamilySeed("masterpassphrase")
+	ETH.Register("ETH", func(t libaccount.KeyType, seed []byte) libaccount.Key {
+		key, _ := eth.GenerateFamilySeed(string(seed))
 		return key
 	})
 }
 
-type AccountService struct {
+type accountService struct {
+	defaultType libaccount.KeyType
 }
 
-func (service *AccountService) GenerateFamilySeed(password string) (libaccount.KeyType, libaccount.Key, error) {
-	key, err := eth.GenerateFamilySeed(password)
+func NewAccountService() *accountService {
+	return &accountService{defaultType: ETH}
+}
+
+func NewAccountServiceWith(defaultType libaccount.KeyType) *accountService {
+	return &accountService{defaultType: defaultType}
+}
+
+func (service *accountService) GenerateFamilySeed(password string) (libaccount.KeyType, libaccount.Key, error) {
+	k, err := GenerateFamilySeed(service.defaultType, password)
 	if err != nil {
-		return 0, nil, err
+		return libaccount.KeyType(0), nil, err
 	}
-	return ETH, key, nil
+	return service.defaultType, k, nil
 }
 
-func (service *AccountService) NewKeyFromSecret(secret string) (libaccount.KeyType, libaccount.Key, error) {
-	key := &eth.Key{}
+func (service *accountService) NewKeyFromSecret(secret string) (libaccount.KeyType, libaccount.Key, error) {
+	key := &Key{}
 	err := key.UnmarshalText([]byte(secret))
 	if err != nil {
 		return 0, nil, err
 	}
-	return ETH, key, nil
+	return key.GetKeyType(), key, nil
 }
 
-func (service *AccountService) NewKeyFromBytes(data []byte) (libaccount.KeyType, libaccount.Key, error) {
-	key := &eth.Key{}
+func (service *accountService) NewKeyFromBytes(data []byte) (libaccount.KeyType, libaccount.Key, error) {
+	key := &Key{}
 	err := key.UnmarshalBinary(data)
 	if err != nil {
 		return 0, nil, err
 	}
-	return ETH, key, nil
+	return key.GetKeyType(), key, nil
 }
 
-func (service *AccountService) NewPublicFromHex(s string) (libaccount.KeyType, libaccount.PublicKey, error) {
-	key := &eth.Public{}
+func (service *accountService) NewPublicFromHex(s string) (libaccount.KeyType, libaccount.PublicKey, error) {
+	key := &Public{}
 	err := key.UnmarshalText([]byte(s))
 	if err != nil {
 		return 0, nil, err
 	}
-	return ETH, key, nil
+	return key.GetKeyType(), key, nil
 }
 
-func (service *AccountService) NewPublicFromBytes(data []byte) (libaccount.KeyType, libaccount.PublicKey, error) {
-	key := &eth.Public{}
+func (service *accountService) NewPublicFromBytes(data []byte) (libaccount.KeyType, libaccount.PublicKey, error) {
+	key := &Public{}
 	err := key.UnmarshalBinary(data)
 	if err != nil {
 		return 0, nil, err
 	}
-	return ETH, key, nil
+	return key.GetKeyType(), key, nil
 }
 
-func (service *AccountService) NewAccountFromAddress(address string) (libaccount.KeyType, libcore.Address, error) {
-	a := &eth.Address{}
+func (service *accountService) NewAccountFromAddress(address string) (libaccount.KeyType, libcore.Address, error) {
+	a := &Address{}
 	err := a.UnmarshalText([]byte(address))
 	if err != nil {
 		return 0, nil, err
 	}
-	return ETH, a, nil
+	return a.GetKeyType(), a, nil
 }
 
-func (service *AccountService) NewAccountFromBytes(data []byte) (libaccount.KeyType, libcore.Address, error) {
-	a := &eth.Address{}
+func (service *accountService) NewAccountFromBytes(data []byte) (libaccount.KeyType, libcore.Address, error) {
+	a := &Address{}
 	err := a.UnmarshalBinary(data)
 	if err != nil {
 		return 0, nil, err
 	}
-	return ETH, a, nil
+	return a.GetKeyType(), a, nil
 }

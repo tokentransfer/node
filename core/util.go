@@ -25,7 +25,7 @@ const (
 )
 
 var config libcore.Config
-var as = &account.AccountService{}
+var as = account.NewAccountService()
 
 func Init(c libcore.Config) {
 	config = c
@@ -454,6 +454,10 @@ func GetAccountKey(account libcore.Address, currency *libcore.Symbol, issuer lib
 		list = append(list, issuer.String())
 	}
 	return strings.Join(list, seperator)
+}
+
+func GetVersionKey(name string, version uint64, seperator string) string {
+	return fmt.Sprintf("%s%s%d", name, seperator, version)
 }
 
 func GetCurrencyKey(currency *libcore.Symbol, issuer libcore.Address, seperator string) string {

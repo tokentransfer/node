@@ -1160,10 +1160,10 @@ github.com/tokentransfer/check v0.0.0-20220325011756-9433b88b4878 h1:yebE3Rmc/NJ
 github.com/tokentransfer/check v0.0.0-20220325011756-9433b88b4878/go.mod h1:yuC9Oy38bIUYzVyoWoCUDYsPKUhJLbh4+/92vGMegQA=
 github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20230322010733-91ec8f899a24 h1:ztJjNMk4pSNxKDz10jzFeYbVzXPKnwKID9nWrbYlxtc=
 github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20230322010733-91ec8f899a24/go.mod h1:1IF/xMM5DHQrU6bvDvQTTbPU++myFiW/5zti2s2BPMc=
-github.com/tokentransfer/interfaces v0.0.0-20210511064306-7a259547c68f h1:KRm3QTkI4RjP6KtojLHAvBpDbWhlipiBAetE7GXP3Ow=
-github.com/tokentransfer/interfaces v0.0.0-20210511064306-7a259547c68f/go.mod h1:Vjvw/upC0ADBMjQiJLsFF4wJGrgWHZO7/A9FmyXeIeQ=
 github.com/tokentransfer/interfaces v0.0.0-20230329103702-48046ea5f208 h1:8p+26BpNmFSmIYvjZolmXT/YqpjIuwM2/ykxxvwp6xI=
 github.com/tokentransfer/interfaces v0.0.0-20230329103702-48046ea5f208/go.mod h1:Vjvw/upC0ADBMjQiJLsFF4wJGrgWHZO7/A9FmyXeIeQ=
+github.com/tokentransfer/interfaces v0.0.0-20230330031826-d848667f9bb2 h1:Wpr5o8MTx3MR0dTvbUY58A4KUQue4d49K+3FDNf0uyM=
+github.com/tokentransfer/interfaces v0.0.0-20230330031826-d848667f9bb2/go.mod h1:E/JAH4p8SIoy6ftNWWeBQQPZkVBErnXHfKp/cjRHiOA=
 github.com/twitchyliquid64/golang-asm v0.0.0-20190126203739-365674df15fc/go.mod h1:NoCfSFWosfqMqmmD7hApkirIK9ozpHjxRnRxs1l413A=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=

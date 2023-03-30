@@ -148,14 +148,14 @@ func (s *chunkStorage) load() error {
 	if ok {
 		var bytesUsed int64
 		buf := bytes.NewBuffer(entry.data)
-		err := binary.Read(buf, binary.BigEndian, &bytesUsed)
+		err := binary.Read(buf, util.BYTE_ORDER, &bytesUsed)
 		if err != nil {
 			return err
 		}
 		s.bytesUsed = bytesUsed
 
 		var version int64
-		err = binary.Read(buf, binary.BigEndian, &version)
+		err = binary.Read(buf, util.BYTE_ORDER, &version)
 		if err != nil {
 			return err
 		}
@@ -201,11 +201,11 @@ func (s *chunkStorage) load() error {
 
 func (s *chunkStorage) flush() error {
 	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, s.bytesUsed)
+	err := binary.Write(buf, util.BYTE_ORDER, s.bytesUsed)
 	if err != nil {
 		return err
 	}
-	err = binary.Write(buf, binary.BigEndian, s.version)
+	err = binary.Write(buf, util.BYTE_ORDER, s.version)
 	if err != nil {
 		return err
 	}

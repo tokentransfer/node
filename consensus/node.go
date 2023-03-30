@@ -160,7 +160,7 @@ func NewNode() *Node {
 
 		transactionLocker: &sync.Mutex{},
 
-		accountService: &account.AccountService{},
+		accountService: account.NewAccountService(),
 		cryptoService:  &crypto.CryptoService{},
 	}
 }

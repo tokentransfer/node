@@ -105,9 +105,14 @@ type AccountState struct {
 }
 
 func (s *AccountState) GetStateKey() []string {
+	name := s.GetName()
+	if len(name) == 0 {
+		name = s.Account.String()
+	}
 	return []string{
-		s.Name,
+		name,
 		core.GetAccountKey(s.Account, s.Amount.Currency, s.Amount.Issuer, "-"),
+		core.GetVersionKey(name, s.Version, "-"),
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/tokentransfer/node/core/pb"
+	"github.com/tokentransfer/node/util"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -194,7 +195,7 @@ func Unmarshal(data []byte) (byte, proto.Message, error) {
 
 func WriteBytes(w io.Writer, b []byte) error {
 	l := len(b)
-	err := binary.Write(w, binary.LittleEndian, uint32(l))
+	err := binary.Write(w, util.BYTE_ORDER, uint32(l))
 	if err != nil {
 		return err
 	}
@@ -212,7 +213,7 @@ func WriteBytes(w io.Writer, b []byte) error {
 
 func ReadBytes(r io.Reader, maxSize uint32) ([]byte, error) {
 	l := uint32(0)
-	err := binary.Read(r, binary.LittleEndian, &l)
+	err := binary.Read(r, util.BYTE_ORDER, &l)
 	if err != nil {
 		return nil, err
 	}

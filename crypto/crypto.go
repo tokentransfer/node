@@ -13,7 +13,7 @@ import (
 	libcrypto "github.com/tokentransfer/interfaces/crypto"
 )
 
-var as = &account.AccountService{}
+var as = account.NewAccountService()
 
 type CryptoService struct {
 }

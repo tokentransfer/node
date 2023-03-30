@@ -7,7 +7,7 @@ import (
 	libblock "github.com/tokentransfer/interfaces/block"
 )
 
-var as = &account.AccountService{}
+var as = account.NewAccountService()
 
 // TransactionType
 const (

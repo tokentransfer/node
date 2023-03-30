@@ -2,11 +2,16 @@ package util
 
 import (
 	"crypto/sha512"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math/big"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
+)
+
+var (
+	BYTE_ORDER = binary.LittleEndian
 )
 
 func ToArray(m *map[string]interface{}, key string) []interface{} {

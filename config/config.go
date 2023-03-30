@@ -8,7 +8,7 @@ import (
 	"github.com/tokentransfer/node/account"
 )
 
-var as = &account.AccountService{}
+var as = account.NewAccountService()
 
 type Config struct {
 	// address 0xc287B1266732495Fe8c93CE3Ba631597153fdd91
