@@ -133,7 +133,6 @@ type Node struct {
 	ins  chan *pb.Message
 
 	ready *sync.WaitGroup
-	timer *time.Ticker
 
 	config *config.Config
 	key    libaccount.Key
