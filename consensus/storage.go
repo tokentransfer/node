@@ -156,7 +156,7 @@ func (s *StorageService) CreateContract(account libcore.Address, code []byte) (l
 	// s.dump("create code account")
 	d.Dispose()
 	t.Dispose()
-	fmt.Println("> create contract", address, d.Key().String(), len(code))
+	glog.Infoln("> create contract", address, d.Key().String(), len(code))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
@@ -197,7 +197,7 @@ func (s *StorageService) CreateData(account libcore.Address, data []byte) (libco
 	}
 	d.Dispose()
 	t.Dispose()
-	fmt.Println("> create data", address, d.Key().String(), len(data))
+	glog.Infoln("> create data", address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
@@ -236,7 +236,7 @@ func (s *StorageService) CreatePage(account libcore.Address, data []byte) (libco
 	}
 	d.Dispose()
 	t.Dispose()
-	fmt.Println("> create page", address, d.Key().String(), len(data))
+	glog.Infoln("> create page", address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
@@ -266,7 +266,7 @@ func (s *StorageService) ReadPage(account libcore.Address) ([]byte, error) {
 	}
 	pageReader.Close()
 	pageData.Dispose()
-	fmt.Println("> read page", address, pageKey.String(), pageData.Size())
+	glog.Infoln("> read page", address, pageKey.String(), pageData.Size())
 
 	return buf.Bytes(), nil
 }
@@ -306,7 +306,7 @@ func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, da
 	// if err != nil {
 	// 	return nil, nil, nil, err
 	// }
-	fmt.Println("> run contract", codeAccount.String(), dataAccount.String(), method, string(result))
+	glog.Infoln("> run contract", codeAccount.String(), dataAccount.String(), method, string(result))
 	return libcore.Hash(s.storage.Root()), libcore.Hash(codeKey), result, nil
 }
 

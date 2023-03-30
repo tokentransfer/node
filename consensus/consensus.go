@@ -112,7 +112,7 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 			return nil, err
 		}
 	} else {
-		fmt.Printf("=== package %d transactions in block %d\n", len(list), v.GetIndex()+1)
+		glog.Infof("=== package %d transactions in block %d\n", len(list), v.GetIndex()+1)
 
 		stateMap := map[string][]uint64{}
 		for i := 0; i < len(list); i++ {
@@ -136,7 +136,7 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 				return nil, err
 			}
 
-			fmt.Printf("=== %d %s\n", i, txWithData.GetTransaction().GetHash().String())
+			glog.Infof("=== %d %s\n", i, txWithData.GetTransaction().GetHash().String())
 		}
 
 		states := make([]libblock.State, 0)

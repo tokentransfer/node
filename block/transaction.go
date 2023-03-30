@@ -1,9 +1,7 @@
 package block
 
 import (
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"log"
 
 	"github.com/tokentransfer/node/core"
@@ -43,7 +41,6 @@ func (tx *Transaction) SetHash(h libcore.Hash) {
 func byteToAddress(b []byte) (libcore.Address, error) {
 	_, a, err := as.NewAccountFromBytes(b)
 	if err != nil {
-		fmt.Println("bytes", len(b), hex.EncodeToString(b))
 		return nil, err
 	}
 	return a, nil

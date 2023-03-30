@@ -372,11 +372,11 @@ func (n *Node) sendTransaction(tx libblock.Transaction) (libblock.TransactionWit
 		return nil, err
 	}
 	hash := tx.GetHash()
-	fmt.Println("verify transaction", hash.String())
+	glog.Infof("verify transaction", hash.String())
 
 	txWithData, _, err := n.processTransaction(tx)
 	if err != nil {
-		fmt.Println("error", err) // ignore the error after verified transaction
+		glog.Error(err) // ignore the error after verified transaction
 	}
 	return txWithData, nil
 }
@@ -413,9 +413,9 @@ func (n *Node) processTransaction(tx libblock.Transaction) (libblock.Transaction
 	// util.PrintJSON("txWithData", txWithData)
 	_, ok = n.AddTransaction(txWithData)
 	if ok {
-		fmt.Println(">>> receive transaction", h.String())
+		glog.Infof(">>> receive transaction", h.String())
 	} else {
-		fmt.Println(">>> drop transaction", h.String())
+		glog.Infof(">>> drop transaction", h.String())
 	}
 
 	return txWithData, tx, nil
@@ -540,7 +540,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			}
 			hash := tx.GetHash()
 			list[i] = blob
-			fmt.Println("sign transaction", hash.String(), blob)
+			glog.Infof("sign transaction", hash.String(), blob)
 		}
 		return list, nil
 	case "sendTransaction":
@@ -689,7 +689,7 @@ func (n *Node) ClearTransaction(b libblock.Block) {
 		h := txWithData.GetTransaction().GetHash()
 		exists, ok := m[h.String()]
 		if ok && exists {
-			fmt.Println(">>> drop block transaction", h.String())
+			glog.Infof(">>> drop block transaction", h.String())
 		} else {
 			transactions = append(transactions, txWithData)
 		}
@@ -728,7 +728,7 @@ func (n *Node) generate() {
 				if err != nil {
 					glog.Error(err)
 				} else {
-					glog.Info("=== generate block %d, %s, %d\n", block.GetIndex(), h.String(), len(block.GetTransactions()))
+					glog.Infof("=== generate block %d, %s, %d\n", block.GetIndex(), h.String(), len(block.GetTransactions()))
 
 					_, err = n.consensusService.VerifyBlock(block)
 					if err != nil {
@@ -749,7 +749,7 @@ func (n *Node) generate() {
 				}
 			}
 		} else {
-			fmt.Printf("=== block %d, %s, prepare %d, %d\n", n.GetBlockNumber(), n.GetBlockHash(), n.GetBlockNumber()+1, len(n.transactions))
+			glog.Infof("=== block %d, %s, prepare %d, %d\n", n.GetBlockNumber(), n.GetBlockHash(), n.GetBlockNumber()+1, len(n.transactions))
 			for i := 0; i < int(n.config.GetBlockDuration()*5); i++ {
 				if len(n.transactions) == 0 {
 					time.Sleep(200 * time.Millisecond)
@@ -780,10 +780,10 @@ func (n *Node) connect() {
 	for {
 		list := n.ListPeer()
 
-		fmt.Println("===", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Id, n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
+		glog.Infof("===", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Id, n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			fmt.Println(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount)
+			glog.Infof(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount)
 		}
 
 		if !lastConsensused && n.Consensused {
@@ -796,11 +796,11 @@ func (n *Node) connect() {
 }
 
 func (n *Node) ConnectTo(p *Peer) {
-	fmt.Println("connected to", p.GetAddress())
+	glog.Infoln("connected to", p.GetAddress())
 }
 
 func (n *Node) SendRequestInfo(p *Peer) {
-	fmt.Println("request to", p.GetAddress())
+	glog.Infoln("request to", p.GetAddress())
 }
 
 func (n *Node) PrepareConsensus() bool {
@@ -859,7 +859,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 								if err != nil {
 									glog.Error(err)
 								} else {
-									fmt.Printf(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(blockData), p.GetAddress(), p.Id)
+									glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(blockData), p.GetAddress(), p.Id)
 								}
 							}
 						}
@@ -904,7 +904,7 @@ func (n *Node) Load() error {
 		}
 
 		n.consensusService.ValidatedBlock = b
-		fmt.Println("load block", current, b.GetHash().String())
+		glog.Infoln("load block", current, b.GetHash().String())
 
 		current++
 	}
@@ -947,7 +947,7 @@ func (n *Node) send() {
 				if err != nil {
 					glog.Error(err)
 				} else {
-					fmt.Printf(">>> send message %d(%s) to %s(%s)\n", m.Id, core.GetInfo(data), p.GetAddress(), p.Id)
+					glog.Infof(">>> send message %d(%s) to %s(%s)\n", m.Id, core.GetInfo(data), p.GetAddress(), p.Id)
 				}
 			}
 		}
@@ -959,9 +959,9 @@ func (n *Node) receive() {
 		m := <-n.ins
 		meta, fromPeer, data := n.ReceiveMessage("message", m)
 		fromIndex := m.GetNode()
-		fmt.Printf("<<< receive message from node %d, length: %d\n", fromIndex, len(data))
+		glog.Infof("<<< receive message from node %d, length: %d\n", fromIndex, len(data))
 		if fromPeer != nil {
-			fmt.Printf("<<< receive peer message %d(%s) from %s(%s)\n", m.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
+			glog.Infof("<<< receive peer message %d(%s) from %s(%s)\n", m.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
 			switch meta {
 			case core.CORE_BLOCK:
 				b := &block.Block{}
@@ -974,14 +974,14 @@ func (n *Node) receive() {
 						glog.Error(err)
 					} else {
 						if int64(b.GetIndex()) <= n.consensusService.GetBlockNumber() {
-							fmt.Println("<<< drop block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+							glog.Infoln("<<< drop block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 						} else {
-							fmt.Println("<<< receive block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+							glog.Infoln("<<< receive block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 							_, err = n.consensusService.VerifyBlock(b)
 							if err != nil {
 								glog.Error(err)
 							} else {
-								fmt.Println("<<< verify block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+								glog.Infoln("<<< verify block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 								err = n.consensusService.AddBlock(b)
 								if err != nil {
 									glog.Error(err)
@@ -1006,24 +1006,24 @@ func (n *Node) receive() {
 						// util.PrintJSON("txWithData", txWithData)
 						_, ok := n.AddTransaction(txWithData)
 						if ok {
-							fmt.Println(">>> transaction", hash)
+							glog.Infoln(">>> transaction", hash)
 						} else {
-							fmt.Println(">>> drop transaction", hash)
+							glog.Infoln(">>> drop transaction", hash)
 						}
-						fmt.Println("<<< receive transaction", hash)
+						glog.Infoln("<<< receive transaction", hash)
 					}
 				}
 
 			default:
-				fmt.Println("<<< error message")
+				glog.Errorln("<<< error message")
 			}
 		} else {
-			fmt.Printf("<<< receive unknown message %d(%s)\n", m.Id, core.GetInfo(data))
+			glog.Infof("<<< receive unknown message %d(%s)\n", m.Id, core.GetInfo(data))
 			if len(data) > 0 {
 				meta := data[0]
 				switch meta {
 				default:
-					fmt.Println("<<< unknown peer", fromIndex)
+					glog.Warningln("<<< unknown peer", fromIndex)
 				}
 			}
 		}
@@ -1095,9 +1095,9 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 	}
 	meta, fromPeer, data := n.ReceiveMessage("message", m)
 	fromIndex := m.GetNode()
-	fmt.Printf("<<< receive data from node %d, length: %d\n", fromIndex, len(data))
+	glog.Infof("<<< receive data from node %d, length: %d\n", fromIndex, len(data))
 	if fromPeer != nil {
-		fmt.Printf("<<< receive peer data %d(%s) from %s(%s)\n", m.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
+		glog.Infof("<<< receive peer data %d(%s) from %s(%s)\n", m.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
 		switch meta {
 		case core.CORE_PEER_INFO:
 			_, msg, err := core.Unmarshal(data)
@@ -1119,15 +1119,15 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 					glog.Error(err)
 				} else {
 					if int64(b.GetIndex()) <= n.consensusService.GetBlockNumber() {
-						fmt.Println("<<< drop block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+						glog.Infoln("<<< drop block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 					} else {
-						fmt.Println("<<< receive block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+						glog.Infoln("<<< receive block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 
 						_, err = n.consensusService.VerifyBlock(b)
 						if err != nil {
 							glog.Error(err)
 						} else {
-							fmt.Println("<<< verify block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+							glog.Infoln("<<< verify block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 							err = n.consensusService.AddBlock(b)
 							if err != nil {
 								glog.Error(err)
@@ -1159,7 +1159,7 @@ func (n *Node) SendPeerInfo(toPeer *Peer) {
 			if err != nil {
 				glog.Error(err)
 			} else {
-				fmt.Printf(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(peerData), toPeer.GetAddress(), toPeer.Id)
+				glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(peerData), toPeer.GetAddress(), toPeer.Id)
 			}
 		}
 	}
@@ -1459,10 +1459,10 @@ func (n *Node) GetMessage(data []byte) (*pb.Message, error) {
 func (n *Node) ReceiveMessage(t string, msg *pb.Message) (byte, *Peer, []byte) {
 	fromIndex := msg.GetNode()
 	data := msg.GetData()
-	fmt.Printf("<<< receive %s from node %d, length: %d\n", t, fromIndex, len(data))
+	glog.Infof("<<< receive %s from node %d, length: %d\n", t, fromIndex, len(data))
 	fromPeer := n.GetPeer(fromIndex)
 	if fromPeer != nil {
-		fmt.Printf("<<< receive peer %s %d(%s) from %s(%s)\n", t, msg.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
+		glog.Infof("<<< receive peer %s %d(%s) from %s(%s)\n", t, msg.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
 		if len(data) > 0 {
 			meta := data[0]
 			return meta, fromPeer, data
