@@ -718,28 +718,17 @@ func (n *Node) AddBlock(b libblock.Block) error {
 func (n *Node) generate() {
 	n.ready.Wait()
 
-	now := time.Now()
-	nowTime := now.UnixNano()
-	nextTime := (nowTime - nowTime%int64(BLOCK_DURATION*time.Second)) + int64(BLOCK_DURATION*time.Second)
-	duration := (nextTime - nowTime)
-	if duration > 0 {
-		time.Sleep(time.Duration(nextTime - nowTime))
-	}
-
-	n.timer = time.NewTicker(BLOCK_DURATION * time.Second)
 	for {
-		t := <-n.timer.C
-
 		if len(n.transactions) > 0 {
 			block, err := n.GenerateBlock()
 			if err != nil {
 				glog.Error(err)
 			} else {
-				_, err = n.HashBlock(block)
+				h, err := n.HashBlock(block)
 				if err != nil {
 					glog.Error(err)
 				} else {
-					glog.Info("=== generate block %d, %s, %d\n", block.GetIndex(), t.String(), len(block.GetTransactions()))
+					glog.Info("=== generate block %d, %s, %d\n", block.GetIndex(), h.String(), len(block.GetTransactions()))
 
 					_, err = n.consensusService.VerifyBlock(block)
 					if err != nil {
@@ -760,7 +749,14 @@ func (n *Node) generate() {
 				}
 			}
 		} else {
-			fmt.Printf("=== prepare block %d, %s, %d\n", n.GetBlockNumber(), n.GetBlockHash(), len(n.transactions))
+			fmt.Printf("=== block %d, %s, prepare %d, %d\n", n.GetBlockNumber(), n.GetBlockHash(), n.GetBlockNumber()+1, len(n.transactions))
+			for i := 0; i < int(n.config.GetBlockDuration()*5); i++ {
+				if len(n.transactions) == 0 {
+					time.Sleep(200 * time.Millisecond)
+				} else {
+					break
+				}
+			}
 		}
 	}
 }
@@ -1109,15 +1105,8 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 				return err
 			}
 			peerInfo := msg.(*pb.PeerInfo)
-			index, err := core.GetIndex(id)
-			if err != nil {
-				return err
-			}
-			p := n.GetPeer(index)
-			if p != nil {
-				p.BlockNumber = peerInfo.BlockNumber
-				p.PeerCount = peerInfo.PeerCount
-			}
+			fromPeer.BlockNumber = peerInfo.BlockNumber
+			fromPeer.PeerCount = peerInfo.PeerCount
 
 		case core.CORE_BLOCK:
 			b := &block.Block{}
