@@ -780,10 +780,10 @@ func (n *Node) connect() {
 	for {
 		list := n.ListPeer()
 
-		glog.Infof("===", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Id, n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
+		glog.Infoln("===", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Id, n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			glog.Infof(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount)
+			glog.Infoln(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount)
 		}
 
 		if !lastConsensused && n.Consensused {
