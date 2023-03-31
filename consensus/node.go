@@ -371,7 +371,7 @@ func (n *Node) sendTransaction(tx libblock.Transaction) (libblock.TransactionWit
 		return nil, err
 	}
 	hash := tx.GetHash()
-	glog.Infof("verify transaction", hash.String())
+	glog.Infoln("verify transaction", hash.String())
 
 	txWithData, _, err := n.processTransaction(tx)
 	if err != nil {
@@ -412,9 +412,9 @@ func (n *Node) processTransaction(tx libblock.Transaction) (libblock.Transaction
 	// util.PrintJSON("txWithData", txWithData)
 	_, ok = n.AddTransaction(txWithData)
 	if ok {
-		glog.Infof(">>> receive transaction", h.String())
+		glog.Infoln(">>> receive transaction", h.String())
 	} else {
-		glog.Infof(">>> drop transaction", h.String())
+		glog.Infoln(">>> drop transaction", h.String())
 	}
 
 	return txWithData, tx, nil
@@ -539,7 +539,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			}
 			hash := tx.GetHash()
 			list[i] = blob
-			glog.Infof("sign transaction", hash.String(), blob)
+			glog.Infoln("sign transaction", hash.String(), blob)
 		}
 		return list, nil
 	case "sendTransaction":
@@ -688,7 +688,7 @@ func (n *Node) ClearTransaction(b libblock.Block) {
 		h := txWithData.GetTransaction().GetHash()
 		exists, ok := m[h.String()]
 		if ok && exists {
-			glog.Infof(">>> drop block transaction", h.String())
+			glog.Infoln(">>> drop block transaction", h.String())
 		} else {
 			transactions = append(transactions, txWithData)
 		}
