@@ -90,17 +90,10 @@ func (p *Key) GetAddress() (libcore.Address, error) {
 }
 
 type Private struct {
-	seed []byte
 	*ecdsa.PrivateKey
 }
 
 func (p *Private) UnmarshalBinary(data []byte) error {
-	l := len(data)
-	if l != 32 {
-		return errors.New("32 bytes required")
-	}
-	p.seed = data
-
 	privateKey, err := crypto.ToECDSA(data)
 	if err != nil {
 		return err
