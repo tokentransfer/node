@@ -14,10 +14,12 @@ require (
 	github.com/ethereum/go-ethereum v1.11.4
 	github.com/ipld/go-ipld-prime v0.16.0
 	github.com/mitchellh/cli v1.1.0
+	github.com/piligo/gmsm v0.0.0-20211029152537-caf9e9eacebc
 	github.com/shopspring/decimal v1.3.1
 	github.com/spkg/zipfs v0.0.0-00010101000000-000000000000
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tetratelabs/wazero v0.0.0-00010101000000-000000000000
+	github.com/tjfoc/gmsm v1.4.1
 	github.com/tokentransfer/check v0.0.0-20220325011756-9433b88b4878
 	github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20230322010733-91ec8f899a24
 	github.com/tokentransfer/interfaces v0.0.0-20230330031826-d848667f9bb2
@@ -164,7 +166,6 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/tidwall/tinylru v1.1.0 // indirect
-	github.com/tjfoc/gmsm v1.4.1 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect

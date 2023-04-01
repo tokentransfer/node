@@ -3,6 +3,7 @@ package account
 import (
 	"github.com/tokentransfer/node/account/btc"
 	"github.com/tokentransfer/node/account/eth"
+	"github.com/tokentransfer/node/account/gmt"
 
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libcore "github.com/tokentransfer/interfaces/core"
@@ -11,6 +12,7 @@ import (
 const (
 	BTC libaccount.KeyType = 1
 	ETH libaccount.KeyType = 2
+	GMT libaccount.KeyType = 3
 )
 
 func init() {
@@ -21,6 +23,10 @@ func init() {
 	})
 	ETH.Register("ETH", func(t libaccount.KeyType, seed []byte) libaccount.Key {
 		key, _ := eth.GenerateFamilySeed(string(seed))
+		return key
+	})
+	GMT.Register("GMT", func(t libaccount.KeyType, seed []byte) libaccount.Key {
+		key, _ := gmt.GenerateFamilySeed(string(seed))
 		return key
 	})
 }

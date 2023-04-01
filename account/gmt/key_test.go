@@ -1,4 +1,4 @@
-package account
+package gmt
 
 import (
 	"fmt"
@@ -16,12 +16,10 @@ func Test_Key(t *testing.T) {
 }
 
 func (suite *KeySuite) TestAccount(c *C) {
-	// s := "btc.FzxtNfYryNN11BnoRGsmfpT1JfeNVwC62vYi5RbCsTZj" //btc.1CeCLCBm3isypgFCh3GgV8v2yyvP8t1XuS
-	// s := "eth.beec9ec61c17b04cb9e4a9b7017e749f92835e2743e95f94cde218d667b14109" //eth.0x6da68a0c5dAAE0715AE6b62F00f548A2C6981c2f
-	s := "gmt.sc1zvylljq2kjv6wgctf5zrrgw2dz7chcemec3rse4jq4285qw4xxe8svqkuqy" //gmt.bc1qszykvnt4s3das7dex456m5euxff5eexetnxkrj
+	s := "sc1zvylljq2kjv6wgctf5zrrgw2dz7chcemec3rse4jq4285qw4xxe8svqkuqy" //bc1qszykvnt4s3das7dex456m5euxff5eexetnxkrj
 	k := &Key{}
 	err := k.UnmarshalText([]byte(s))
-	// k, err := GenerateFamilySeed(BTC, "masterpassphrase")
+	// k, err := GenerateFamilySeed("masterpassphrase")
 	if err != nil {
 		panic(err)
 	}

@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
+	"github.com/tjfoc/gmsm/sm3"
 )
 
 var (
@@ -160,6 +161,12 @@ func GetListFromNode(n datamodel.Node, p string) datamodel.ListIterator {
 
 func Sha512Half(b []byte) []byte {
 	h := sha512.New()
+	h.Write(b)
+	return h.Sum(nil)[:32]
+}
+
+func Sm3Half(b []byte) []byte {
+	h := sm3.New()
 	h.Write(b)
 	return h.Sum(nil)[:32]
 }
