@@ -16,7 +16,7 @@ func Test_Key(t *testing.T) {
 }
 
 func (suite *KeySuite) TestAccount(c *C) {
-	s := "sc1zvylljq2kjv6wgctf5zrrgw2dz7chcemec3rse4jq4285qw4xxe8svqkuqy" //bc1qszykvnt4s3das7dex456m5euxff5eexetnxkrj
+	s := "sc1zvylljq2kjv6wgctf5zrrgw2dz7chcemec3rse4jq4285qw4xxe8svqkuqy" //bc1qalaatfynh443qhg7h84j5p5a23tkaj6wqccpu6
 	k := &Key{}
 	err := k.UnmarshalText([]byte(s))
 	// k, err := GenerateFamilySeed("masterpassphrase")

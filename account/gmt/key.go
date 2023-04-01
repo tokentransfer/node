@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bech32"
 
 	"github.com/piligo/gmsm/sm2"
@@ -202,7 +201,7 @@ func (p *Public) GenerateAddress() (libcore.Address, error) {
 	if err != nil {
 		return nil, err
 	}
-	h := btcutil.Hash160(data)
+	h := util.Sm3Half(data)[:20]
 	a := Address{}
 	err = a.UnmarshalBinary(h[:])
 	if err != nil {
