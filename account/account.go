@@ -1,6 +1,8 @@
 package account
 
 import (
+	"strings"
+
 	"github.com/tokentransfer/node/account/btc"
 	"github.com/tokentransfer/node/account/eth"
 	"github.com/tokentransfer/node/account/gmt"
@@ -44,11 +46,27 @@ func NewAccountServiceWith(defaultType libaccount.KeyType) *accountService {
 }
 
 func (service *accountService) GenerateFamilySeed(password string) (libaccount.KeyType, libaccount.Key, error) {
-	k, err := GenerateFamilySeed(service.defaultType, password)
+	list := strings.Split(password, ".")
+	var t libaccount.KeyType
+	var e error
+	var p string
+	if len(list) != 2 {
+		t = service.defaultType
+		e = nil
+		p = password
+	} else {
+		keyTypeName := list[0]
+		p = list[1]
+		t, e = libaccount.GetKeyTypeByName(keyTypeName)
+	}
+	if e != nil {
+		return libaccount.KeyType(0), nil, e
+	}
+	k, err := GenerateFamilySeed(t, p)
 	if err != nil {
 		return libaccount.KeyType(0), nil, err
 	}
-	return service.defaultType, k, nil
+	return t, k, nil
 }
 
 func (service *accountService) NewKeyFromSecret(secret string) (libaccount.KeyType, libaccount.Key, error) {

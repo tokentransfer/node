@@ -435,8 +435,46 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 	case "blockNumber":
 		result := n.consensusService.GetBlockNumber()
 		return result, nil
+
+	case "createWallet":
+		item := params[0].(map[string]interface{})
+		t := util.ToString(&item, "type")
+		p := util.ToString(&item, "password")
+		tt, k, err := n.accountService.GenerateFamilySeed(t + "." + p)
+		if err != nil {
+			return nil, err
+		}
+		a, err := k.GetAddress()
+		if err != nil {
+			return nil, err
+		}
+		address := a.String()
+		pub, err := k.GetPublic()
+		if err != nil {
+			return nil, err
+		}
+		publicString, err := pub.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		priv, err := k.GetPrivate()
+		if err != nil {
+			return nil, err
+		}
+		privateString, err := priv.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		return &map[string]interface{}{
+			"type":    tt.String(),
+			"address": address,
+			"private": string(privateString),
+			"public":  string(publicString),
+		}, nil
+
 	case "getBalance":
-		address := params[0].(string)
+		item := params[0].(map[string]interface{})
+		address := util.ToString(&item, "address")
 		_, a, err := as.NewAccountFromAddress(address)
 		if err != nil {
 			return nil, err
@@ -446,16 +484,20 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		return accountEntry.Amount, nil
+
 	case "getTransactionCount":
-		address := params[0].(string)
+		item := params[0].(map[string]interface{})
+		address := util.ToString(&item, "address")
 		_, a, err := as.NewAccountFromAddress(address)
 		if err != nil {
 			return nil, err
 		}
 		seq := n.getNextSequence(a)
 		return seq, nil
+
 	case "getTransactionReceipt":
-		hashString := params[0].(string)
+		item := params[0].(map[string]interface{})
+		hashString := util.ToString(&item, "hash")
 		h, err := hex.DecodeString(hashString)
 		if err != nil {
 			return nil, err
@@ -470,8 +512,10 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		return receipt, nil
+
 	case "getTransactionByHash":
-		hashString := params[0].(string)
+		item := params[0].(map[string]interface{})
+		hashString := util.ToString(&item, "hash")
 		h, err := hex.DecodeString(hashString)
 		if err != nil {
 			return nil, err
@@ -485,8 +529,10 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		return txWithData, nil
+
 	case "getTransactionByIndex":
-		address := params[0].(string)
+		item := params[0].(map[string]interface{})
+		address := util.ToString(&item, "address")
 		_, a, err := as.NewAccountFromAddress(address)
 		if err != nil {
 			return nil, err
@@ -502,8 +548,10 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		return txWithData, nil
+
 	case "getBlockByHash":
-		hashString := params[0].(string)
+		item := params[0].(map[string]interface{})
+		hashString := util.ToString(&item, "hash")
 		h, err := hex.DecodeString(hashString)
 		if err != nil {
 			return nil, err
@@ -517,8 +565,10 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		return block, nil
+
 	case "getBlockByNumber":
-		index := uint64(params[0].(float64))
+		item := params[0].(map[string]interface{})
+		index := util.AsUint64(&item, "index")
 		block, err := n.merkleService.GetBlockByIndex(index)
 		if err != nil {
 			return nil, err
@@ -528,6 +578,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		return block, nil
+
 	case "signTransaction":
 		l := len(params)
 		list := make([]string, l)
@@ -542,6 +593,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			glog.Infoln("sign transaction", hash.String(), blob)
 		}
 		return list, nil
+
 	case "sendTransaction":
 		l := len(params)
 		list := make([]string, l)
@@ -560,6 +612,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			list[i] = hash.String()
 		}
 		return list, nil
+
 	case "sendRawTransaction":
 		l := len(params)
 		list := make([]string, l)
@@ -584,6 +637,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			list[i] = hash.String()
 		}
 		return list, nil
+
 	case "getStateByHash":
 		data, err := hex.DecodeString(params[0].(string))
 		if err != nil {
@@ -598,6 +652,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		return s, nil
+
 	case "getStateByName":
 		stateType := libblock.GetStateTypeByName(params[0].(string))
 		switch stateType {
@@ -618,6 +673,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return s, nil
 		}
 		return nil, errors.New("error")
+
 	case "receiveStateByName":
 		stateType := libblock.GetStateTypeByName(params[0].(string))
 		switch stateType {
