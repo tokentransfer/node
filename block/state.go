@@ -13,7 +13,6 @@ import (
 type State struct {
 	Hash libcore.Hash
 
-	Name       string
 	Account    libcore.Address
 	Sequence   uint64
 	BlockIndex uint64
@@ -45,10 +44,6 @@ func (s *State) SetBlockIndex(index uint64) {
 
 func (s *State) GetPrevious() libcore.Hash {
 	return s.Previous
-}
-
-func (s *State) GetName() string {
-	return s.Name
 }
 
 func (s *State) GetAccount() libcore.Address {
@@ -96,12 +91,17 @@ type AccountState struct {
 
 	Amount core.Amount
 
+	Name    string
 	User    *DataInfo
 	Code    *DataInfo
 	Page    *DataInfo
 	Token   *DataInfo
 	Data    *DataInfo
 	Storage *DataInfo
+}
+
+func (s *AccountState) GetName() string {
+	return s.Name
 }
 
 func (s *AccountState) GetStateKey() []string {
@@ -139,13 +139,13 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 
 	s.State.StateType = libblock.StateType(core.CORE_ACCOUNT_STATE)
 	s.State.BlockIndex = state.State.BlockIndex
-	s.State.Name = state.State.Name
 	s.State.Account = account
 	s.State.Sequence = state.State.Sequence
 	s.State.Previous = state.State.Previous
 	s.State.Version = state.State.Version
 	s.Amount = *a
 
+	s.Name = state.Name
 	s.User = fromDataInfo(state.User)
 	s.Code = fromDataInfo(state.Code)
 	s.Page = fromDataInfo(state.Page)
@@ -165,7 +165,6 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 		State: &pb.State{
 			StateType:  uint32(core.CORE_ACCOUNT_STATE),
 			BlockIndex: s.BlockIndex,
-			Name:       s.Name,
 			Account:    a,
 			Sequence:   s.Sequence,
 			Previous:   []byte(s.Previous),
@@ -173,6 +172,7 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 		},
 		Amount: s.Amount.String(),
 
+		Name:    s.Name,
 		User:    toDataInfo(s.User),
 		Code:    toDataInfo(s.Code),
 		Page:    toDataInfo(s.Page),
@@ -191,7 +191,6 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 	return core.Marshal(&pb.AccountState{
 		State: &pb.State{
 			StateType: uint32(core.CORE_ACCOUNT_STATE),
-			Name:      s.Name,
 			Account:   a,
 			Sequence:  s.Sequence,
 			Previous:  []byte(s.Previous),
@@ -199,6 +198,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 		},
 		Amount: s.Amount.String(),
 
+		Name:    s.Name,
 		User:    toDataInfo(s.User),
 		Code:    toDataInfo(s.Code),
 		Page:    toDataInfo(s.Page),
