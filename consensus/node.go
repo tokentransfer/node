@@ -639,11 +639,13 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		return list, nil
 
 	case "getStateByHash":
-		data, err := hex.DecodeString(params[0].(string))
+		item := params[0].(map[string]interface{})
+		hashString := util.ToString(&item, "hash")
+		h, err := hex.DecodeString(hashString)
 		if err != nil {
 			return nil, err
 		}
-		s, err := n.merkleService.GetStateByHash(libcore.Hash(data))
+		s, err := n.merkleService.GetStateByHash(libcore.Hash(h))
 		if err != nil {
 			return nil, err
 		}
@@ -653,11 +655,13 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		}
 		return s, nil
 
-	case "getStateByName":
-		stateType := libblock.GetStateTypeByName(params[0].(string))
+	case "getStateByAddress":
+		item := params[0].(map[string]interface{})
+		stateTypeName := util.ToString(&item, "type")
+		address := util.ToString(&item, "address")
+		stateType := libblock.GetStateTypeByName(stateTypeName)
 		switch stateType {
 		case block.ACCOUNT_STATE:
-			address := params[1].(string)
 			_, a, err := as.NewAccountFromAddress(address)
 			if err != nil {
 				return nil, err
@@ -671,31 +675,6 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 				return nil, err
 			}
 			return s, nil
-		}
-		return nil, errors.New("error")
-
-	case "receiveStateByName":
-		stateType := libblock.GetStateTypeByName(params[0].(string))
-		switch stateType {
-		case block.ACCOUNT_STATE:
-			address := params[1].(string)
-			_, a, err := as.NewAccountFromAddress(address)
-			if err != nil {
-				return nil, err
-			}
-			s, err := n.consensusService.GetAccountInfo(a, nil, nil)
-			if err != nil {
-				return nil, err
-			}
-			_, err = n.HashState(s)
-			if err != nil {
-				return nil, err
-			}
-			data, err := s.MarshalBinary()
-			if err != nil {
-				return nil, err
-			}
-			return hex.EncodeToString(data), nil
 		}
 		return nil, errors.New("error")
 
