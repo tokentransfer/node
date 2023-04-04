@@ -245,93 +245,96 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	}
 
 	payloadInfo := &pb.PayloadInfo{}
-	if util.Has(&txm, "contract") {
-		contractInfo := &pb.ContractInfo{}
+	if util.Has(&txm, "payload") {
+		pxm := util.ToMap(&txm, "payload")
+		if util.Has(&pxm, "contract") {
+			contractInfo := &pb.ContractInfo{}
 
-		cm := util.ToMap(&txm, "contract")
-		if util.Has(&cm, "account") {
-			accountString := util.ToString(&cm, "account")
-			_, account, err := as.NewAccountFromAddress(accountString)
-			if err != nil {
-				return "", nil, err
+			cm := util.ToMap(&pxm, "contract")
+			if util.Has(&cm, "account") {
+				accountString := util.ToString(&cm, "account")
+				_, account, err := as.NewAccountFromAddress(accountString)
+				if err != nil {
+					return "", nil, err
+				}
+				accountData, err := account.MarshalBinary()
+				if err != nil {
+					return "", nil, err
+				}
+				contractInfo.Account = accountData
 			}
-			accountData, err := account.MarshalBinary()
-			if err != nil {
-				return "", nil, err
+			if util.Has(&cm, "method") {
+				contractInfo.Method = util.ToString(&cm, "method")
 			}
-			contractInfo.Account = accountData
-		}
-		if util.Has(&cm, "method") {
-			contractInfo.Method = util.ToString(&cm, "method")
-		}
-		if util.Has(&cm, "params") {
-			params := util.ToArray(&cm, "params")
-			list := make([][]byte, 0)
-			for i := 0; i < len(params); i++ {
-				s := params[i].(string)
-				list = append(list, []byte(s))
+			if util.Has(&cm, "params") {
+				params := util.ToArray(&cm, "params")
+				list := make([][]byte, 0)
+				for i := 0; i < len(params); i++ {
+					s := params[i].(string)
+					list = append(list, []byte(s))
+				}
+				contractInfo.Params = list
 			}
-			contractInfo.Params = list
-		}
-		if util.Has(&cm, "code") {
-			codeString := util.ToString(&cm, "code")
-			codeData, err := hex.DecodeString(codeString)
-			if err != nil {
-				return "", nil, err
+			if util.Has(&cm, "code") {
+				codeString := util.ToString(&cm, "code")
+				codeData, err := hex.DecodeString(codeString)
+				if err != nil {
+					return "", nil, err
+				}
+				contractInfo.Code = codeData
+			} else if util.Has(&cm, "file") {
+				filePath := util.ToString(&cm, "file")
+				f, err := os.Open(filePath)
+				if err != nil {
+					return "", nil, err
+				}
+				defer f.Close()
+				fileData, err := io.ReadAll(f)
+				if err != nil {
+					return "", nil, err
+				}
+				contractInfo.Code = fileData
 			}
-			contractInfo.Code = codeData
-		} else if util.Has(&cm, "file") {
-			filePath := util.ToString(&cm, "file")
-			f, err := os.Open(filePath)
-			if err != nil {
-				return "", nil, err
-			}
-			defer f.Close()
-			fileData, err := io.ReadAll(f)
-			if err != nil {
-				return "", nil, err
-			}
-			contractInfo.Code = fileData
-		}
 
-		contractData, err := core.Marshal(contractInfo)
-		if err != nil {
-			return "", nil, err
-		}
-
-		payloadInfo.Payload = append(payloadInfo.Payload, contractData)
-	}
-	if util.Has(&txm, "page") {
-		pageInfo := &pb.PageInfo{}
-
-		pm := util.ToMap(&txm, "page")
-		if util.Has(&pm, "data") {
-			pageString := util.ToString(&pm, "data")
-			pageData, err := hex.DecodeString(pageString)
+			contractData, err := core.Marshal(contractInfo)
 			if err != nil {
 				return "", nil, err
 			}
-			pageInfo.Data = pageData
-		} else if util.Has(&pm, "file") {
-			filePath := util.ToString(&pm, "file")
-			f, err := os.Open(filePath)
+
+			payloadInfo.Payload = append(payloadInfo.Payload, contractData)
+		}
+		if util.Has(&pxm, "page") {
+			pageInfo := &pb.PageInfo{}
+
+			pm := util.ToMap(&pxm, "page")
+			if util.Has(&pm, "data") {
+				pageString := util.ToString(&pm, "data")
+				pageData, err := hex.DecodeString(pageString)
+				if err != nil {
+					return "", nil, err
+				}
+				pageInfo.Data = pageData
+			} else if util.Has(&pm, "file") {
+				filePath := util.ToString(&pm, "file")
+				f, err := os.Open(filePath)
+				if err != nil {
+					return "", nil, err
+				}
+				defer f.Close()
+				fileData, err := io.ReadAll(f)
+				if err != nil {
+					return "", nil, err
+				}
+				pageInfo.Data = fileData
+			}
+
+			pageData, err := core.Marshal(pageInfo)
 			if err != nil {
 				return "", nil, err
 			}
-			defer f.Close()
-			fileData, err := io.ReadAll(f)
-			if err != nil {
-				return "", nil, err
-			}
-			pageInfo.Data = fileData
-		}
 
-		pageData, err := core.Marshal(pageInfo)
-		if err != nil {
-			return "", nil, err
+			payloadInfo.Payload = append(payloadInfo.Payload, pageData)
 		}
-
-		payloadInfo.Payload = append(payloadInfo.Payload, pageData)
 	}
 	if len(payloadInfo.Payload) > 0 {
 		payloadData, err := core.Marshal(payloadInfo)
