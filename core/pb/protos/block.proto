@@ -101,7 +101,8 @@ message ContractInfo {
 }
 
 message PageInfo {
-    bytes Data		    = 1;
+    string Name		    = 1;
+    bytes Data		    = 2;
 }
 
 message PayloadInfo {
