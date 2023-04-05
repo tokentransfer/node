@@ -617,7 +617,7 @@ func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)
 			if len(info.Data) > 0 {
-				rootHash, pageHash, err := ss.CreatePage(tx.Destination, info.Data)
+				rootHash, pageHash, err := ss.CreatePage(info.Name, tx.Destination, info.Data)
 				if err != nil {
 					return nil, err
 				}

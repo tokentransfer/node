@@ -3,7 +3,6 @@ package rpc
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/caivega/glog"
@@ -65,7 +64,7 @@ func (service *RPCService) writeResult(w http.ResponseWriter, id interface{}, re
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(wrapResult(id, result, err)); err != nil {
-		log.Println(err)
+		glog.Error(err)
 	}
 }
 
@@ -80,14 +79,14 @@ func (service *RPCService) rpcService(w http.ResponseWriter, r *http.Request) {
 		id := util.AsUint64(m, "id")
 		method := util.ToString(m, "method")
 
-		log.Println("rpc", id, r.RequestURI, method, len(params))
+		glog.Infoln("rpc", id, r.RequestURI, method, len(params))
 		result, err := service.node.Call(method, params)
 		if err != nil {
 			service.writeResult(w, id, nil, err)
 		} else {
 			service.writeResult(w, id, result, nil)
 		}
-		log.Println("response", id, err)
+		glog.Infoln("response", id, err)
 	}
 }
 
@@ -104,9 +103,13 @@ func (service *RPCService) Start() error {
 	rpcPort := service.config.GetRPCPort()
 	address := fmt.Sprintf("%s:%d", rpcAddress, rpcPort)
 
-	http.HandleFunc("/", IndexHandler)
+	// http.HandleFunc("/", IndexHandler)
 	http.HandleFunc("/v1/jsonrpc", service.rpcService)
-	http.Handle("/page", zipfs.FileServerWith(service.node.LoadPage))
+
+	loadMap := make(map[string]func(name string) (*zipfs.FileSystem, error))
+	loadMap["page"] = service.node.LoadPageByAddress
+	loadMap["lib"] = service.node.LoadPageByName
+	http.Handle("/", zipfs.FileServerWith(loadMap))
 	if service.testMode {
 		glog.Infof("rpc server started on %s, in %s mode\n", address, service.config.GetMode())
 	} else {

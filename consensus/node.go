@@ -941,7 +941,12 @@ func (n *Node) Load() error {
 		}
 
 		n.consensusService.ValidatedBlock = b
-		glog.Infoln("load block", current, b.GetHash().String())
+
+		data, _ := b.MarshalBinary()
+		if err != nil {
+			break
+		}
+		glog.Infoln("load block", current, b.GetHash().String(), len(data))
 
 		current++
 	}
@@ -1202,12 +1207,28 @@ func (n *Node) SendPeerInfo(toPeer *Peer) {
 	}
 }
 
-func (n *Node) LoadPage(name string) (*zipfs.FileSystem, error) {
-	_, account, err := n.accountService.NewAccountFromAddress(name)
+func (n *Node) LoadPageByName(name string) (*zipfs.FileSystem, error) {
+	if len(name) == 0 {
+		return nil, util.ErrorOfInvalid("name", name)
+	}
+	data, err := n.storageService.ReadPageByName(name)
 	if err != nil {
 		return nil, err
 	}
-	data, err := n.storageService.ReadPage(account)
+	reader := bytes.NewReader(data)
+	fs, err := zipfs.NewFromReaderAt(reader, int64(len(data)), nil)
+	if err != nil {
+		return nil, err
+	}
+	return fs, nil
+}
+
+func (n *Node) LoadPageByAddress(address string) (*zipfs.FileSystem, error) {
+	_, account, err := n.accountService.NewAccountFromAddress(address)
+	if err != nil {
+		return nil, err
+	}
+	data, err := n.storageService.ReadPageByAddress(account)
 	if err != nil {
 		return nil, err
 	}

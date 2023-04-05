@@ -202,7 +202,7 @@ func (s *StorageService) CreateData(account libcore.Address, data []byte) (libco
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
 
-func (s *StorageService) CreatePage(account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) CreatePage(name string, account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
 		return nil, nil, err
@@ -230,6 +230,12 @@ func (s *StorageService) CreatePage(account libcore.Address, data []byte) (libco
 	if err != nil {
 		return nil, nil, err
 	}
+	if len(name) > 0 {
+		_, err = pageGroup.AddData(name, d.Key())
+		if err != nil {
+			return nil, nil, err
+		}
+	}
 	err = pageGroup.Commit()
 	if err != nil {
 		return nil, nil, err
@@ -241,7 +247,36 @@ func (s *StorageService) CreatePage(account libcore.Address, data []byte) (libco
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
 
-func (s *StorageService) ReadPage(account libcore.Address) ([]byte, error) {
+func (s *StorageService) ReadPageByName(name string) ([]byte, error) {
+	rootGroup, err := s.storage.Group("/")
+	if err != nil {
+		return nil, err
+	}
+	pageGroup, err := getGroup(rootGroup, "page")
+	if err != nil {
+		return nil, err
+	}
+	pageKey, err := pageGroup.GetKey(name)
+	if err != nil {
+		return nil, err
+	}
+	pageData, err := s.storage.Get(pageKey)
+	if err != nil {
+		return nil, err
+	}
+	pageReader := pageData.Open()
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, pageReader); err != nil {
+		return nil, err
+	}
+	pageReader.Close()
+	pageData.Dispose()
+	glog.Infoln("> read page", name, pageKey.String(), pageData.Size())
+
+	return buf.Bytes(), nil
+}
+
+func (s *StorageService) ReadPageByAddress(account libcore.Address) ([]byte, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
 		return nil, err
