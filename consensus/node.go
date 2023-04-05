@@ -307,6 +307,10 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 			pageInfo := &pb.PageInfo{}
 
 			pm := util.ToMap(&pxm, "page")
+			if util.Has(&pm, "name") {
+				name := util.ToString(&pm, "name")
+				pageInfo.Name = name
+			}
 			if util.Has(&pm, "data") {
 				pageString := util.ToString(&pm, "data")
 				pageData, err := hex.DecodeString(pageString)
