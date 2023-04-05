@@ -242,7 +242,7 @@ func (s *StorageService) CreatePage(name string, account libcore.Address, data [
 	}
 	d.Dispose()
 	t.Dispose()
-	glog.Infoln("> create page", address, d.Key().String(), len(data))
+	glog.Infoln("> create page", name, address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
