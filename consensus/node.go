@@ -540,7 +540,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		index := uint64(params[1].(float64))
+		index := util.AsUint64(&item, "index")
 
 		txWithData, err := n.merkleService.GetTransactionByIndex(a, index)
 		if err != nil {
@@ -571,7 +571,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 
 	case "getBlockByNumber":
 		item := params[0].(map[string]interface{})
-		index := util.AsUint64(&item, "index")
+		index := util.AsUint64(&item, "num")
 		block, err := n.merkleService.GetBlockByIndex(index)
 		if err != nil {
 			return nil, err

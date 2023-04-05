@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/caivega/glog"
 	"github.com/spkg/zipfs"
 
 	"github.com/tokentransfer/node/config"
@@ -18,6 +19,8 @@ import (
 type RPCService struct {
 	config *config.Config
 	node   *consensus.Node
+
+	testMode bool
 }
 
 func NewRPCService(n *consensus.Node) *RPCService {
@@ -29,6 +32,7 @@ func NewRPCService(n *consensus.Node) *RPCService {
 
 func (service *RPCService) Init(c libcore.Config) error {
 	service.config = c.(*config.Config)
+	service.testMode = (service.config.GetMode() == "test")
 	return nil
 }
 
@@ -49,8 +53,15 @@ func wrapResult(id interface{}, result interface{}, err error) interface{} {
 	return ret
 }
 
-func writeResult(w http.ResponseWriter, id interface{}, result interface{}, err error) {
+func (service *RPCService) writeResult(w http.ResponseWriter, id interface{}, result interface{}, err error) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if service.testMode {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,AccessToken,X-CSRF-Token,Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "POST,GET,OPTIONS")
+		w.Header().Set("Access-Control-Expose-Headers", "Content-Length,Access-Control-Allow-Origin,Access-Control-Allow-Headers")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(wrapResult(id, result, err)); err != nil {
@@ -63,7 +74,7 @@ func (service *RPCService) rpcService(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 
 	if err := decoder.Decode(m); err != nil {
-		writeResult(w, 0, nil, err)
+		service.writeResult(w, 0, nil, err)
 	} else {
 		params := util.ToArray(m, "params")
 		id := util.AsUint64(m, "id")
@@ -72,9 +83,9 @@ func (service *RPCService) rpcService(w http.ResponseWriter, r *http.Request) {
 		log.Println("rpc", id, r.RequestURI, method, len(params))
 		result, err := service.node.Call(method, params)
 		if err != nil {
-			writeResult(w, id, nil, err)
+			service.writeResult(w, id, nil, err)
 		} else {
-			writeResult(w, id, result, nil)
+			service.writeResult(w, id, result, nil)
 		}
 		log.Println("response", id, err)
 	}
@@ -91,13 +102,16 @@ func (service *RPCService) getRPCAddress() string {
 func (service *RPCService) Start() error {
 	rpcAddress := service.getRPCAddress()
 	rpcPort := service.config.GetRPCPort()
-
 	address := fmt.Sprintf("%s:%d", rpcAddress, rpcPort)
 
-	// http.HandleFunc("/", IndexHandler)
-	http.HandleFunc("/", zipfs.FileServerWith(service.node.LoadPage).ServeHTTP)
+	http.HandleFunc("/", IndexHandler)
 	http.HandleFunc("/v1/jsonrpc", service.rpcService)
-	log.Println("rpc server started on", address)
+	http.Handle("/page", zipfs.FileServerWith(service.node.LoadPage))
+	if service.testMode {
+		glog.Infof("rpc server started on %s, in %s mode\n", address, service.config.GetMode())
+	} else {
+		glog.Infoln("rpc server started on", address)
+	}
 	http.ListenAndServe(address, nil)
 	return nil
 }

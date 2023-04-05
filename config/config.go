@@ -23,6 +23,8 @@ type Config struct {
 	RPCAddress string `json:"rpc_address"`
 	RPCPort    int64  `json:"rpc_port"`
 
+	Mode string `json:"mode"`
+
 	// address 0x768e56BCcb18a8622cc5BB5F6bfA6D82a255ab87
 	// secret abb33a8c2bb48d3b1c2ce365685ac3b96563e6a17ebc4367cd637e33149f94ea
 	Secret string `json:"secret"`
@@ -142,6 +144,10 @@ func (c *Config) GetChainId() string {
 
 func (c *Config) GetType() int {
 	return 0
+}
+
+func (c *Config) GetMode() string {
+	return c.Mode
 }
 
 func (c *Config) GetGasAccount() libcore.Address {
