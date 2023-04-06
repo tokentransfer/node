@@ -202,6 +202,36 @@ func (s *StorageService) CreateData(account libcore.Address, data []byte) (libco
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
 
+func (s *StorageService) ReadData(account libcore.Address) ([]byte, error) {
+	root, err := s.storage.Group("/")
+	if err != nil {
+		return nil, err
+	}
+	group, err := getGroup(root, "data")
+	if err != nil {
+		return nil, err
+	}
+	address := account.String()
+	key, err := group.GetKey(address)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.storage.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	reader := data.Open()
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, reader); err != nil {
+		return nil, err
+	}
+	reader.Close()
+	data.Dispose()
+	glog.Infoln("> read data", address, key.String(), data.Size())
+
+	return buf.Bytes(), nil
+}
+
 func (s *StorageService) CreatePage(name string, account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
@@ -306,43 +336,47 @@ func (s *StorageService) ReadPageByAddress(account libcore.Address) ([]byte, err
 	return buf.Bytes(), nil
 }
 
-func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, dataAccount libcore.Address, method string, params [][]byte) (libcore.Hash, libcore.Hash, []byte, error) {
+func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, dataAccount libcore.Address, method string, params [][]byte) (int64, libcore.Hash, libcore.Hash, []byte, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
-		return nil, nil, nil, err
+		return 0, nil, nil, nil, err
 	}
 	codeGroup, err := getGroup(rootGroup, "code")
 	if err != nil {
-		return nil, nil, nil, err
+		return 0, nil, nil, nil, err
 	}
 
 	address := codeAccount.String()
 	codeKey, err := codeGroup.GetKey(address)
 	if err != nil {
-		return nil, nil, nil, err
+		return 0, nil, nil, nil, err
 	}
 	codeData, err := s.storage.Get(codeKey)
 	if err != nil {
-		return nil, nil, nil, err
+		return 0, nil, nil, nil, err
 	}
 	codeReader := codeData.Open()
 	buf := new(bytes.Buffer)
 	if _, err := io.Copy(buf, codeReader); err != nil {
-		return nil, nil, nil, err
+		return 0, nil, nil, nil, err
 	}
 	codeReader.Close()
 	codeData.Dispose()
 
-	_, result, err := vm.RunWasm(cost, buf.Bytes(), method, params) // remainCost
+	wasmData, err := s.ReadData(dataAccount)
 	if err != nil {
-		return nil, nil, nil, err
+		return 0, nil, nil, nil, err
 	}
-	// rootHash, dataHash, err := s.CreateData(dataAccount, result)
-	// if err != nil {
-	// 	return nil, nil, nil, err
-	// }
+	usedCost, newWasmData, result, err := vm.RunWasm(cost, buf.Bytes(), wasmData, method, params) // remainCost
+	if err != nil {
+		return 0, nil, nil, nil, err
+	}
+	rootHash, dataHash, err := s.CreateData(dataAccount, newWasmData)
+	if err != nil {
+		return 0, nil, nil, nil, err
+	}
 	glog.Infoln("> run contract", codeAccount.String(), dataAccount.String(), method, string(result))
-	return libcore.Hash(s.storage.Root()), libcore.Hash(codeKey), result, nil
+	return usedCost, rootHash, dataHash, result, nil
 }
 
 func (s *StorageService) Init(c libcore.Config) error {

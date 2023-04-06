@@ -1,6 +1,7 @@
 package test
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 	. "github.com/tokentransfer/check"
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/store"
 
 	libstore "github.com/tokentransfer/interfaces/store"
@@ -21,13 +23,51 @@ func Test_Config(t *testing.T) {
 	TestingRun(t, s)
 }
 
-// func (suite *StorageSuite) testCode(c *C) {
-// 	s, err := kv.NewKvStorage(2048)
-// 	c.Assert(err, IsNil)
-// 	test(c, s)
-// }
+func (suite *StorageSuite) TestProto(c *C) {
+	v0 := int32(1234)
+	v1 := int32(5679)
+	data1, err := core.MarshalData(v0)
+	c.Assert(err, IsNil)
+	data2, err := core.MarshalData(v1)
+	c.Assert(err, IsNil)
 
-func (suite *StorageSuite) TestStack(c *C) {
+	list := &pb.DataList{
+		List: []*pb.Data{
+			{
+				Bytes: data1,
+			},
+			{
+				Bytes: data2,
+			},
+		},
+	}
+	listData, err := core.Marshal(list)
+	c.Assert(err, IsNil)
+	m := &pb.DataMap{
+		Map: map[string]*pb.Data{
+			"v0": {
+				Bytes: data1,
+			},
+			"v2": {
+				Bytes: data2,
+			},
+			"list": {
+				Bytes: listData,
+			},
+		},
+	}
+	mapData, err := core.Marshal(m)
+	c.Assert(err, IsNil)
+	fmt.Println(hex.EncodeToString(mapData))
+}
+
+func (suite *StorageSuite) testCode(c *C) {
+	s, err := chunk.NewStorage(2048)
+	c.Assert(err, IsNil)
+	test(c, s)
+}
+
+func (suite *StorageSuite) testStack(c *C) {
 	db0 := &store.MemoryService{
 		Name: "memory",
 	}

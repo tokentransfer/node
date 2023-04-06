@@ -10,7 +10,7 @@ import (
 	"github.com/tokentransfer/node/util"
 )
 
-func RunWasm(cost int64, wasmCode []byte, method string, params [][]byte) (int64, []byte, error) {
+func RunWasm(cost int64, wasmCode []byte, wasmData []byte, method string, params [][]byte) (int64, []byte, []byte, error) {
 	apiCost := api.NewCost()
 	ctx := context.WithValue(context.Background(), "cost", apiCost)
 	config := wazero.NewRuntimeConfigInterpreter().WithCost(cost)
@@ -20,17 +20,17 @@ func RunWasm(cost int64, wasmCode []byte, method string, params [][]byte) (int64
 	mc := wazero.NewModuleConfig()
 	mod, err := runtime.InstantiateWithConfig(ctx, wasmCode, mc)
 	if err != nil {
-		return -1, nil, err
+		return -1, nil, nil, err
 	}
 	f := mod.ExportedFunction(method)
 	if f == nil {
-		return -1, nil, util.ErrorOfNonexists("method in wasm module", method)
+		return -1, nil, nil, util.ErrorOfNonexists("method in wasm module", method)
 	}
 	types := f.Definition().ParamTypes()
 	tLen := len(types)
 	pLen := len(params)
 	if tLen != pLen {
-		return -1, nil, util.ErrorOfInvalid("parameter", fmt.Sprintf("%d != %d", tLen, pLen))
+		return -1, nil, nil, util.ErrorOfInvalid("parameter", fmt.Sprintf("%d != %d", tLen, pLen))
 	}
 	list := make([]uint64, 0)
 	for i := 0; i < len(types); i++ {
@@ -41,25 +41,25 @@ func RunWasm(cost int64, wasmCode []byte, method string, params [][]byte) (int64
 		case api.ValueTypeI32:
 			i32, err := strconv.ParseInt(s, 10, 32)
 			if err != nil {
-				return -1, nil, err
+				return -1, nil, nil, err
 			}
 			list = append(list, api.EncodeI32(int32(i32)))
 		case api.ValueTypeI64:
 			i64, err := strconv.ParseInt(s, 10, 64)
 			if err != nil {
-				return -1, nil, err
+				return -1, nil, nil, err
 			}
 			list = append(list, api.EncodeI64(i64))
 		case api.ValueTypeF32:
 			f32, err := strconv.ParseFloat(s, 32)
 			if err != nil {
-				return -1, nil, err
+				return -1, nil, nil, err
 			}
 			list = append(list, api.EncodeF32(float32(f32)))
 		case api.ValueTypeF64:
 			f64, err := strconv.ParseFloat(s, 64)
 			if err != nil {
-				return -1, nil, err
+				return -1, nil, nil, err
 			}
 			list = append(list, api.EncodeF64(f64))
 		}
@@ -67,17 +67,17 @@ func RunWasm(cost int64, wasmCode []byte, method string, params [][]byte) (int64
 
 	results, err := f.Call(ctx, list...)
 	if err != nil {
-		return -1, nil, err
+		return -1, nil, nil, err
 	}
 
 	types = f.Definition().ResultTypes()
 	tLen = len(types)
 	if tLen > 1 {
-		return -1, nil, util.ErrorOfInvalid("return", "> 1")
+		return -1, nil, nil, util.ErrorOfInvalid("return", "> 1")
 	}
 	rLen := len(results)
 	if tLen != rLen {
-		return -1, nil, util.ErrorOfInvalid("return", fmt.Sprintf("%d != %d", tLen, rLen))
+		return -1, nil, nil, util.ErrorOfInvalid("return", fmt.Sprintf("%d != %d", tLen, rLen))
 	}
 
 	remainCost := apiCost.GetCost()
@@ -100,5 +100,5 @@ func RunWasm(cost int64, wasmCode []byte, method string, params [][]byte) (int64
 		}
 	}
 
-	return remainCost, result, nil
+	return (cost - remainCost), nil, result, nil
 }

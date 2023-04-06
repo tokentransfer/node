@@ -244,7 +244,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 		Destination: toAccount,
 	}
 
-	payloadInfo := &pb.PayloadInfo{}
+	payloadInfo := &block.PayloadInfo{}
 	if util.Has(&txm, "payload") {
 		pxm := util.ToMap(&txm, "payload")
 		if util.Has(&pxm, "contract") {
@@ -301,7 +301,14 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 				return "", nil, err
 			}
 
-			payloadInfo.Payload = append(payloadInfo.Payload, contractData)
+			dataHash, err := n.cryptoService.Hash(contractData)
+			if err != nil {
+				return "", nil, err
+			}
+			payloadInfo.Infos = append(payloadInfo.Infos, &block.DataInfo{
+				Hash:    dataHash,
+				Content: contractData,
+			})
 		}
 		if util.Has(&pxm, "page") {
 			pageInfo := &pb.PageInfo{}
@@ -337,15 +344,18 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 				return "", nil, err
 			}
 
-			payloadInfo.Payload = append(payloadInfo.Payload, pageData)
+			dataHash, err := n.cryptoService.Hash(pageData)
+			if err != nil {
+				return "", nil, err
+			}
+			payloadInfo.Infos = append(payloadInfo.Infos, &block.DataInfo{
+				Hash:    dataHash,
+				Content: pageData,
+			})
 		}
 	}
-	if len(payloadInfo.Payload) > 0 {
-		payloadData, err := core.Marshal(payloadInfo)
-		if err != nil {
-			return "", nil, err
-		}
-		tx.Payload = libcore.Bytes(payloadData)
+	if len(payloadInfo.Infos) > 0 {
+		tx.Payload = payloadInfo
 	}
 
 	err = n.cryptoService.Sign(fromKey, tx)
@@ -921,36 +931,53 @@ func (n *Node) Load() error {
 	for {
 		b, err := n.merkleService.GetBlockByIndex(current)
 		if err != nil {
+			glog.Error(err)
 			break
 		}
 		_, err = n.HashBlock(b)
 		if err != nil {
+			glog.Error(err)
 			break
 		}
 
 		if n.consensusService.ValidatedBlock != nil {
 			if b.GetIndex() != (n.consensusService.ValidatedBlock.GetIndex() + 1) {
+				glog.Error(util.ErrorOfInvalid("block index", fmt.Sprintf("%d != %d", b.GetIndex(), (n.consensusService.ValidatedBlock.GetIndex()+1))))
 				break
 			}
 			if !b.GetParentHash().Equals(n.consensusService.ValidatedBlock.GetHash()) {
+				glog.Error(util.ErrorOfInvalid("block hash", fmt.Sprintf("%s != %s", b.GetParentHash().String(), n.consensusService.ValidatedBlock.GetHash().String())))
 				break
 			}
 		} else {
 			if b.GetIndex() != 0 {
+				glog.Error(util.ErrorOfInvalid("genesis block", fmt.Sprintf("%d, %s", b.GetIndex(), b.GetHash().String())))
 				break
 			}
 			if !b.GetParentHash().IsZero() {
+				glog.Error(util.ErrorOfInvalid("the parent hash of the genesis block", b.GetParentHash().String()))
 				break
 			}
 		}
 
 		n.consensusService.ValidatedBlock = b
 
-		data, _ := b.MarshalBinary()
+		allData, err := b.MarshalBinary()
 		if err != nil {
+			glog.Error(err)
 			break
 		}
-		glog.Infoln("load block", current, b.GetHash().String(), len(data))
+		ignoreData, err := b.Raw(false)
+		if err != nil {
+			glog.Error(err)
+			break
+		}
+		signData, err := b.Raw(true)
+		if err != nil {
+			glog.Error(err)
+			break
+		}
+		glog.Infoln("load block", current, b.GetHash().String(), len(allData), len(ignoreData), len(signData))
 
 		current++
 	}

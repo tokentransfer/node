@@ -9,6 +9,7 @@ import (
 
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
+	libcrypto "github.com/tokentransfer/interfaces/crypto"
 )
 
 type Transaction struct {
@@ -21,7 +22,7 @@ type Transaction struct {
 	Amount      core.Amount
 	Gas         int64
 	Destination libcore.Address
-	Payload     libcore.Bytes
+	Payload     *PayloadInfo
 	PublicKey   libcore.PublicKey
 	Signature   libcore.Signature
 }
@@ -79,7 +80,7 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	tx.Payload = t.Payload
+	tx.Payload = fromPayloadInfo(t.Payload)
 	tx.PublicKey = libcore.PublicKey(t.PublicKey)
 	tx.Signature = libcore.Signature(t.Signature)
 
@@ -108,7 +109,7 @@ func (tx *Transaction) MarshalBinary() ([]byte, error) {
 		Amount:      tx.Amount.String(),
 		Gas:         tx.Gas,
 		Destination: toData,
-		Payload:     tx.Payload,
+		Payload:     toPayloadInfo(tx.Payload, libcrypto.RawBinary),
 		PublicKey:   []byte(tx.PublicKey),
 		Signature:   []byte(tx.Signature),
 	}
@@ -133,12 +134,34 @@ func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
 			Amount:      tx.Amount.String(),
 			Gas:         tx.Gas,
 			Destination: toAccount,
-			Payload:     tx.Payload,
+			Payload:     toPayloadInfo(tx.Payload, libcrypto.RawIgnoreSigningFields),
 			PublicKey:   []byte(tx.PublicKey),
 		}
 		return core.Marshal(t)
+	} else { //ignore variable fields
+		fromData, err := addressToByte(tx.Account)
+		if err != nil {
+			return nil, err
+		}
+		toData, err := addressToByte(tx.Destination)
+		if err != nil {
+			return nil, err
+		}
+
+		t := &pb.Transaction{
+			TransactionType: uint32(tx.TransactionType),
+
+			Account:     fromData,
+			Sequence:    tx.Sequence,
+			Amount:      tx.Amount.String(),
+			Gas:         tx.Gas,
+			Destination: toData,
+			Payload:     toPayloadInfo(tx.Payload, libcrypto.RawIgnoreVariableFields),
+			PublicKey:   []byte(tx.PublicKey),
+			Signature:   []byte(tx.Signature),
+		}
+		return core.Marshal(t)
 	}
-	return tx.MarshalBinary()
 }
 
 func (tx *Transaction) GetTransactionType() libblock.TransactionType {

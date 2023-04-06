@@ -60,7 +60,13 @@ func generateTransaction(seq uint64, value int64, gas int64) *Transaction {
 		Amount:      *v,
 		Gas:         gas,
 		Destination: to,
-		Payload:     []byte{1, 2, 3, 4},
+		Payload: &PayloadInfo{
+			Infos: []*DataInfo{
+				{
+					Content: []byte{1, 2, 3, 4},
+				},
+			},
+		},
 	}
 
 	service := &crypto.CryptoService{}

@@ -53,7 +53,7 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 	cs := service.CryptoService
 	as := service.AccountService
 	ms := service.MerkleService
-	// ss := service.StorageService
+	ss := service.StorageService
 
 	v := service.ValidatedBlock
 
@@ -103,6 +103,8 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 
 			States:    states,
 			StateHash: ms.GetStateRoot(),
+
+			RootHash: libcore.Hash(ss.storage.Root()),
 
 			Timestamp: time.Now().UnixNano(),
 		}
@@ -173,6 +175,8 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 
 			States:    states,
 			StateHash: ms.GetStateRoot(),
+
+			RootHash: libcore.Hash(ss.storage.Root()),
 
 			Timestamp: time.Now().UnixNano(),
 		}
@@ -399,17 +403,9 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 		return false, util.ErrorOf("insuffient", "amount", remain.String())
 	}
 
-	if tx.Payload != nil && len(tx.Payload) > 0 {
-		meta, msg, err := core.Unmarshal(tx.Payload)
-		if err != nil {
-			return false, err
-		}
-		if meta != core.CORE_PAYLOAD_INFO {
-			return false, util.ErrorOfInvalid("format", "payload")
-		}
-		info := msg.(*pb.PayloadInfo)
-		for _, payload := range info.Payload {
-			meta, _, err = core.Unmarshal(payload)
+	if tx.Payload != nil && len(tx.Payload.Infos) > 0 {
+		for _, payload := range tx.Payload.Infos {
+			meta, _, err := core.Unmarshal(payload.Content)
 			if err != nil {
 				return false, err
 			}
@@ -478,7 +474,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 
 	tx, ok := t.(*block.Transaction)
 	if !ok {
-		return nil, errors.New("error transaction")
+		return nil, util.ErrorOfInvalid("transaction", t.GetHash().String())
 	}
 	if !tx.Amount.IsNative() {
 		return nil, util.ErrorOfInvalid("amount", tx.Amount.String())
@@ -532,16 +528,8 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	states = append(states, s)
 	accountMap[destination.String()] = s
 
-	if tx.Payload != nil && len(tx.Payload) > 0 {
-		meta, msg, err := core.Unmarshal(tx.Payload)
-		if err != nil {
-			return nil, err
-		}
-		if meta != core.CORE_PAYLOAD_INFO {
-			return nil, util.ErrorOfInvalid("format", "payload")
-		}
-		info := msg.(*pb.PayloadInfo)
-		payloadStates, err := service.ProcessPayload(tx, info, accountMap)
+	if tx.Payload != nil && len(tx.Payload.Infos) > 0 {
+		/*TODO: usedCost*/ _, payloadStates, err := service.ProcessPayload(tx.Gas, tx, tx.Payload, accountMap)
 		if err != nil {
 			return nil, err
 		}
@@ -560,37 +548,47 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	}, nil
 }
 
-func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.PayloadInfo, accountMap map[string]*block.AccountState) ([]libblock.State, error) {
+func (service *ConsensusService) ProcessPayload(remainCost int64, tx *block.Transaction, info *block.PayloadInfo, accountMap map[string]*block.AccountState) (int64, []libblock.State, error) {
 	as := service.AccountService
 	ss := service.StorageService
 
 	states := make([]libblock.State, 0)
-	for _, payload := range info.Payload {
-		meta, msg, err := core.Unmarshal(payload)
+	cost := int64(0)
+	for _, payload := range info.Infos {
+		meta, msg, err := core.Unmarshal(payload.Content)
 		if err != nil {
-			return nil, err
+			return cost, nil, err
 		}
 		switch meta {
 		case core.CORE_PAYLOAD_INFO:
 			info := msg.(*pb.PayloadInfo)
-			payloadStates, err := service.ProcessPayload(tx, info, accountMap)
+			infoData, err := core.Marshal(info)
 			if err != nil {
-				return nil, err
+				return cost, nil, err
+			}
+			payloadInfo := &block.PayloadInfo{}
+			err = payloadInfo.UnmarshalBinary(infoData)
+			if err != nil {
+				return cost, nil, err
+			}
+			usedCost, payloadStates, err := service.ProcessPayload(remainCost-cost, tx, payloadInfo, accountMap)
+			if err != nil {
+				return 0, nil, err
 			}
 			states = append(states, payloadStates...)
+			cost += usedCost
 
 		case core.CORE_CONTRACT_INFO:
 			info := msg.(*pb.ContractInfo)
 			if len(info.Code) > 0 {
-				rootHash, codeHash, err := ss.CreateContract(tx.Destination, info.Code)
+				_, codeHash, err := ss.CreateContract(tx.Destination, info.Code)
 				if err != nil {
-					return nil, err
+					return cost, nil, err
 				}
 				accountInfo, ok := accountMap[tx.Destination.String()]
 				if ok {
 					accountInfo.Code = &block.DataInfo{
-						GroupHash: rootHash,
-						DataHash:  codeHash,
+						Hash: codeHash,
 					}
 				}
 			} else {
@@ -600,32 +598,31 @@ func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.
 				} else {
 					account = tx.Account
 				}
-				rootHash, codeHash, result, err := ss.RunContract(tx.Gas, tx.Destination, account, info.Method, info.Params)
+				usedCost, _, dataHash, dataContent, err := ss.RunContract(remainCost, tx.Destination, account, info.Method, info.Params)
 				if err != nil {
-					return nil, err
+					return cost, nil, err
 				}
 				accountInfo, ok := accountMap[account.String()]
 				if ok {
 					accountInfo.Data = &block.DataInfo{
-						GroupHash: rootHash,
-						DataHash:  codeHash,
-						Content:   result,
+						Hash:    dataHash,
+						Content: dataContent,
 					}
 				}
+				cost += usedCost
 			}
 
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)
 			if len(info.Data) > 0 {
-				rootHash, pageHash, err := ss.CreatePage(info.Name, tx.Destination, info.Data)
+				_, pageHash, err := ss.CreatePage(info.Name, tx.Destination, info.Data)
 				if err != nil {
-					return nil, err
+					return cost, nil, err
 				}
 				accountInfo, ok := accountMap[tx.Destination.String()]
 				if ok {
 					accountInfo.Page = &block.DataInfo{
-						GroupHash: rootHash,
-						DataHash:  pageHash,
+						Hash: pageHash,
 					}
 				}
 			}
@@ -634,9 +631,9 @@ func (service *ConsensusService) ProcessPayload(tx *block.Transaction, info *pb.
 		case core.CORE_TOKEN_INFO:
 		case core.CORE_DATA_INFO:
 		default:
-			return nil, util.ErrorOfUnknown("format", "info")
+			return cost, nil, util.ErrorOfUnknown("format", "info")
 		}
 	}
 
-	return states, nil
+	return cost, states, nil
 }

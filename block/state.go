@@ -5,9 +5,11 @@ import (
 
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
+	"github.com/tokentransfer/node/util"
 
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
+	libcrypto "github.com/tokentransfer/interfaces/crypto"
 )
 
 type State struct {
@@ -58,46 +60,18 @@ func (s *State) GetVersion() uint64 {
 	return s.Version
 }
 
-type DataInfo struct {
-	GroupHash libcore.Hash
-	DataHash  libcore.Hash
-	Content   []byte
-}
-
-func fromDataInfo(info *pb.DataInfo) *DataInfo {
-	if info != nil {
-		return &DataInfo{
-			GroupHash: libcore.Hash(info.GroupHash),
-			DataHash:  libcore.Hash(info.DataHash),
-			Content:   info.Content,
-		}
-	}
-	return nil
-}
-
-func toDataInfo(info *DataInfo) *pb.DataInfo {
-	if info != nil {
-		return &pb.DataInfo{
-			GroupHash: []byte(info.GroupHash),
-			DataHash:  []byte(info.DataHash),
-			Content:   info.Content,
-		}
-	}
-	return nil
-}
-
 type AccountState struct {
 	State
 
+	Name   string
 	Amount core.Amount
 
-	Name    string
-	User    *DataInfo
-	Code    *DataInfo
-	Page    *DataInfo
-	Token   *DataInfo
-	Data    *DataInfo
-	Storage *DataInfo
+	User  *DataInfo
+	Code  *DataInfo
+	Page  *DataInfo
+	Token *DataInfo
+	Data  *DataInfo
+	File  *DataInfo
 }
 
 func (s *AccountState) GetName() string {
@@ -122,7 +96,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 		return err
 	}
 	if meta != core.CORE_ACCOUNT_STATE {
-		return errors.New("error State data")
+		return util.ErrorOfInvalid("state", "data")
 	}
 
 	state := msg.(*pb.AccountState)
@@ -143,15 +117,16 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.State.Sequence = state.State.Sequence
 	s.State.Previous = state.State.Previous
 	s.State.Version = state.State.Version
-	s.Amount = *a
 
 	s.Name = state.Name
+	s.Amount = *a
+
 	s.User = fromDataInfo(state.User)
 	s.Code = fromDataInfo(state.Code)
 	s.Page = fromDataInfo(state.Page)
 	s.Token = fromDataInfo(state.Token)
 	s.Data = fromDataInfo(state.Data)
-	s.Storage = fromDataInfo(state.Storage)
+	s.File = fromDataInfo(state.File)
 	return nil
 }
 
@@ -172,13 +147,13 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 		},
 		Amount: s.Amount.String(),
 
-		Name:    s.Name,
-		User:    toDataInfo(s.User),
-		Code:    toDataInfo(s.Code),
-		Page:    toDataInfo(s.Page),
-		Token:   toDataInfo(s.Token),
-		Data:    toDataInfo(s.Data),
-		Storage: toDataInfo(s.Storage),
+		Name:  s.Name,
+		User:  toDataInfo(s.User, libcrypto.RawBinary),
+		Code:  toDataInfo(s.Code, libcrypto.RawBinary),
+		Page:  toDataInfo(s.Page, libcrypto.RawBinary),
+		Token: toDataInfo(s.Token, libcrypto.RawBinary),
+		Data:  toDataInfo(s.Data, libcrypto.RawBinary),
+		File:  toDataInfo(s.File, libcrypto.RawBinary),
 	})
 }
 
@@ -188,24 +163,46 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 		return nil, err
 	}
 
-	return core.Marshal(&pb.AccountState{
-		State: &pb.State{
-			StateType: uint32(core.CORE_ACCOUNT_STATE),
-			Account:   a,
-			Sequence:  s.Sequence,
-			Previous:  []byte(s.Previous),
-			Version:   s.Version,
-		},
-		Amount: s.Amount.String(),
+	if ignoreSigningFields {
+		return core.Marshal(&pb.AccountState{
+			State: &pb.State{
+				StateType: uint32(core.CORE_ACCOUNT_STATE),
+				Account:   a,
+				Sequence:  s.Sequence,
+				Previous:  []byte(s.Previous),
+				Version:   s.Version,
+			},
+			Amount: s.Amount.String(),
 
-		Name:    s.Name,
-		User:    toDataInfo(s.User),
-		Code:    toDataInfo(s.Code),
-		Page:    toDataInfo(s.Page),
-		Token:   toDataInfo(s.Token),
-		Data:    toDataInfo(s.Data),
-		Storage: toDataInfo(s.Storage),
-	})
+			Name:  s.Name,
+			User:  toDataInfo(s.User, libcrypto.RawIgnoreSigningFields),
+			Code:  toDataInfo(s.Code, libcrypto.RawIgnoreSigningFields),
+			Page:  toDataInfo(s.Page, libcrypto.RawIgnoreSigningFields),
+			Token: toDataInfo(s.Token, libcrypto.RawIgnoreSigningFields),
+			Data:  toDataInfo(s.Data, libcrypto.RawIgnoreSigningFields),
+			File:  toDataInfo(s.File, libcrypto.RawIgnoreSigningFields),
+		})
+	} else { // ignore variable fields
+		return core.Marshal(&pb.AccountState{
+			State: &pb.State{
+				StateType: uint32(core.CORE_ACCOUNT_STATE),
+				Account:   a,
+				Sequence:  s.Sequence,
+				Previous:  []byte(s.Previous),
+				Version:   s.Version,
+			},
+			Amount: s.Amount.String(),
+
+			Name:  s.Name,
+			User:  toDataInfo(s.User, libcrypto.RawIgnoreVariableFields),
+			Code:  toDataInfo(s.Code, libcrypto.RawIgnoreVariableFields),
+			Page:  toDataInfo(s.Page, libcrypto.RawIgnoreVariableFields),
+			Token: toDataInfo(s.Token, libcrypto.RawIgnoreVariableFields),
+			Data:  toDataInfo(s.Data, libcrypto.RawIgnoreVariableFields),
+			File:  toDataInfo(s.File, libcrypto.RawIgnoreVariableFields),
+		})
+	}
+
 }
 
 func ReadState(data []byte) (libblock.State, error) {
