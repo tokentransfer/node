@@ -1,0 +1,16 @@
+syntax = "proto3";
+package pb;
+
+option go_package = ".;pb";
+
+message Data {
+    bytes Bytes = 1;    //[0] as type
+}
+
+message DataList {
+    repeated Data List = 1;
+}
+
+message DataMap {
+    map<string, Data> Map  = 1;
+}

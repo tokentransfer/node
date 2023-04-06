@@ -23,7 +23,7 @@ message Transaction {
     string Amount       = 4;
     int64 Gas           = 5;
     bytes Destination   = 6;
-    bytes Payload       = 7;
+    PayloadInfo Payload     = 7;
 
     bytes PublicKey     = 8;
     bytes Signature     = 9;
@@ -48,23 +48,22 @@ message State {
 }
 
 message AccountState {
-    State State       = 1;
+    State State     = 1;
 
-    string Amount     = 2;
+    string Name	    = 2;
+    string Amount   = 3;
 
-    string Name	      = 3;
-    DataInfo User     = 4;
-    DataInfo Code     = 5;
-    DataInfo Page     = 6;
-    DataInfo Token    = 7;
-    DataInfo Data     = 8;
-    DataInfo Storage  = 9;
+    DataInfo User       = 4;
+    DataInfo Code       = 5;
+    DataInfo Page       = 6;
+    DataInfo Token      = 7;
+    DataInfo Data       = 8;
+    DataInfo File       = 9;
 }
 
 message DataInfo {
-    bytes GroupHash   = 1;
-    bytes DataHash    = 2;
-    bytes Content     = 3;
+    bytes Hash      = 1;
+    bytes Content   = 2;
 }
 
 message MetaItem {
@@ -106,7 +105,7 @@ message PageInfo {
 }
 
 message PayloadInfo {
-    repeated bytes Payload  = 1;
+    repeated DataInfo Infos = 1;
 }
 
 message TransactionWithData {
