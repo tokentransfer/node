@@ -100,5 +100,5 @@ func RunWasm(cost int64, wasmCode []byte, wasmData []byte, method string, params
 		}
 	}
 
-	return (cost - remainCost), nil, result, nil
+	return (cost - remainCost), wasmData, result, nil
 }

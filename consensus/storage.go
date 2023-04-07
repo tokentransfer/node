@@ -11,6 +11,7 @@ import (
 	libstore "github.com/tokentransfer/interfaces/store"
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/store"
 	"github.com/tokentransfer/node/vm"
 )
@@ -365,7 +366,11 @@ func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, da
 
 	wasmData, err := s.ReadData(dataAccount)
 	if err != nil {
-		return 0, nil, nil, nil, err
+		glog.Error(err)
+		wasmData, err = core.Marshal(&pb.DataMap{})
+		if err != nil {
+			return 0, nil, nil, nil, err
+		}
 	}
 	usedCost, newWasmData, result, err := vm.RunWasm(cost, buf.Bytes(), wasmData, method, params) // remainCost
 	if err != nil {
