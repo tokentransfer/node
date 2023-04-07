@@ -25,6 +25,28 @@ func getWasmData(c *C) []byte {
 	return data
 }
 
+func (suite *WasmSuite) TestVMMain(c *C) {
+	cost := int64(1000000)
+	f, err := os.Open("./testdata/main.wasm")
+	c.Assert(err, IsNil)
+	wasmCode, err := io.ReadAll(f)
+	c.Assert(err, IsNil)
+	wasmData := getWasmData(c)
+	usedCost, newWasmData, results, err := RunWasm(cost, wasmCode, wasmData, "add", [][]byte{
+		[]byte("5"),
+		[]byte("6"),
+	})
+	c.Assert(err, IsNil)
+	c.Assert(len(results), Equals, 2)
+	c.Assert(results, DeepEquals, []byte("11"))
+	meta, msg, err := core.Unmarshal(newWasmData)
+	c.Assert(err, IsNil)
+	c.Assert(meta, Equals, core.CORE_DATA_MAP)
+	m := msg.(*pb.DataMap)
+	c.Assert(m, NotNil)
+	fmt.Println(cost, usedCost, cost-usedCost)
+}
+
 func (suite *WasmSuite) TestVMLib(c *C) {
 	cost := int64(100)
 	f, err := os.Open("./testdata/lib.wasm")

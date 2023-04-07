@@ -7,6 +7,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tokentransfer/node/util"
 )
 
@@ -16,7 +17,7 @@ func RunWasm(cost int64, wasmCode []byte, wasmData []byte, method string, params
 	config := wazero.NewRuntimeConfigInterpreter().WithCost(cost)
 	runtime := wazero.NewRuntimeWithConfig(ctx, config)
 	defer runtime.Close(ctx)
-	// wasi_snapshot_preview1.MustInstantiate(ctx, r)
+	wasi_snapshot_preview1.MustInstantiate(ctx, runtime)
 	mc := wazero.NewModuleConfig()
 	mod, err := runtime.InstantiateWithConfig(ctx, wasmCode, mc)
 	if err != nil {
