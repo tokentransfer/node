@@ -14,56 +14,79 @@ import (
 )
 
 const (
-	CORE_MESSAGE = byte(10)
-	CORE_DATA    = byte(11)
+	CORE_MESSAGE = DataType(10)
+	CORE_DATA    = DataType(11)
 
-	CORE_DATA_NULL    = byte(50)
-	CORE_DATA_BOOLEAN = byte(51)
+	CORE_DATA_NULL    = DataType(50)
+	CORE_DATA_BOOLEAN = DataType(51)
 
-	CORE_DATA_INT8  = byte(52)
-	CORE_DATA_INT16 = byte(53)
-	CORE_DATA_INT32 = byte(54)
-	CORE_DATA_INT64 = byte(55)
+	CORE_DATA_INT8  = DataType(52)
+	CORE_DATA_INT16 = DataType(53)
+	CORE_DATA_INT32 = DataType(54)
+	CORE_DATA_INT64 = DataType(55)
 
-	CORE_DATA_UINT8  = byte(56)
-	CORE_DATA_UINT16 = byte(57)
-	CORE_DATA_UINT32 = byte(58)
-	CORE_DATA_UINT64 = byte(59)
+	CORE_DATA_UINT8  = DataType(56)
+	CORE_DATA_UINT16 = DataType(57)
+	CORE_DATA_UINT32 = DataType(58)
+	CORE_DATA_UINT64 = DataType(59)
 
-	CORE_DATA_FLOAT32 = byte(60)
-	CORE_DATA_FLOAT64 = byte(61)
+	CORE_DATA_FLOAT32 = DataType(60)
+	CORE_DATA_FLOAT64 = DataType(61)
 
-	CORE_DATA_STRING = byte(62)
-	CORE_DATA_BYTES  = byte(63)
+	CORE_DATA_STRING = DataType(62)
+	CORE_DATA_BYTES  = DataType(63)
 
-	CORE_DATA_LIST = byte(64)
-	CORE_DATA_MAP  = byte(65)
+	CORE_DATA_LIST = DataType(64)
+	CORE_DATA_MAP  = DataType(65)
 
-	CORE_BLOCK                 = byte(100)
-	CORE_TRANSACTION           = byte(101)
-	CORE_RECEIPT               = byte(102)
-	CORE_TRANSACTION_WITH_DATA = byte(103)
-	CORE_MESSAGE_KEY           = byte(104)
+	CORE_BLOCK                 = DataType(100)
+	CORE_TRANSACTION           = DataType(101)
+	CORE_RECEIPT               = DataType(102)
+	CORE_TRANSACTION_WITH_DATA = DataType(103)
+	CORE_MESSAGE_KEY           = DataType(104)
 
 	// CORE_STATE         = byte(120)
-	CORE_ACCOUNT_STATE = byte(121)
+	CORE_ACCOUNT_STATE = DataType(121)
 
 	// CORE_INFO
-	CORE_PAYLOAD_INFO  = byte(141)
-	CORE_CONTRACT_INFO = byte(142)
-	CORE_META_INFO     = byte(143)
-	CORE_TOKEN_INFO    = byte(144)
-	CORE_DATA_INFO     = byte(145)
-	CORE_PEER_INFO     = byte(146)
-	CORE_PAGE_INFO     = byte(147)
+	CORE_PAYLOAD_INFO  = DataType(141)
+	CORE_CONTRACT_INFO = DataType(142)
+	CORE_META_INFO     = DataType(143)
+	CORE_TOKEN_INFO    = DataType(144)
+	CORE_DATA_INFO     = DataType(145)
+	CORE_PEER_INFO     = DataType(146)
+	CORE_PAGE_INFO     = DataType(147)
 )
 
 var SYSTEM_CODE = "TEST"
 
+func init() {
+	DataType(CORE_DATA_BOOLEAN).Create("boolean", true)
+
+	DataType(CORE_DATA_INT8).Create("int8", true)
+	DataType(CORE_DATA_INT16).Create("int16", true)
+	DataType(CORE_DATA_INT32).Create("int32", true)
+	DataType(CORE_DATA_INT64).Create("int64", true)
+
+	DataType(CORE_DATA_UINT8).Create("uint8", true)
+	DataType(CORE_DATA_UINT16).Create("uint16", true)
+	DataType(CORE_DATA_UINT32).Create("uint32", true)
+	DataType(CORE_DATA_UINT64).Create("uint16", true)
+
+	DataType(CORE_DATA_FLOAT32).Create("float32", true)
+	DataType(CORE_DATA_FLOAT64).Create("float64", true)
+
+	DataType(CORE_DATA_STRING).Create("string", false)
+	DataType(CORE_DATA_BYTES).Create("bytes", false)
+
+	DataType(CORE_DATA_LIST).Create("list", false)
+	DataType(CORE_DATA_MAP).Create("map", false)
+}
+
 func GetInfo(data []byte) string {
 	if len(data) > 0 {
 		meta := data[0]
-		switch meta {
+		switch DataType(meta) {
 		case CORE_MESSAGE:
 			return "message"
 		case CORE_DATA:
@@ -155,10 +178,10 @@ func Clone(t proto.Message) (proto.Message, error) {
 
 func MarshalData(data interface{}) ([]byte, error) {
 	if data == nil {
-		return []byte{CORE_DATA_NULL}, nil
+		return []byte{byte(CORE_DATA_NULL)}, nil
 	}
 
-	var meta byte
+	var meta DataType
 	var bs []byte
 	switch data := data.(type) {
 	case bool:
@@ -276,13 +299,13 @@ func MarshalData(data interface{}) ([]byte, error) {
 		bs = make([]byte, len(*data))
 		copy(bs, *data)
 	default:
-		err := util.ErrorOfInvalid("type", "data")
+		err := util.ErrorOfInvalid("data type", fmt.Sprintf("%v", data))
 		return nil, err
 	}
-	return append([]byte{meta}, bs...), nil
+	return append([]byte{byte(meta)}, bs...), nil
 }
 
-func UnmarshalData(data []byte) (byte, interface{}, error) {
+func UnmarshalData(data []byte) (DataType, interface{}, error) {
 	if len(data) == 0 {
 		return 0, nil, util.ErrorOfInvalid("data", "empty")
 	}
@@ -291,7 +314,7 @@ func UnmarshalData(data []byte) (byte, interface{}, error) {
 	}
 	var o interface{}
 
-	meta := data[0]
+	meta := DataType(data[0])
 	bs := data[1:]
 	switch meta {
 	case CORE_DATA_BOOLEAN:
@@ -350,14 +373,13 @@ func UnmarshalData(data []byte) (byte, interface{}, error) {
 		}
 		o = math.Float64frombits(util.BYTE_ORDER.Uint64(bs))
 	case CORE_DATA_STRING:
-		bytes := []byte(data)
-		bs = make([]byte, len(bytes))
-		copy(bs, bytes)
-		o = string(bs)
+		d := make([]byte, len(bs))
+		copy(d, bs)
+		o = string(d)
 	case CORE_DATA_BYTES:
-		bs = make([]byte, len(data))
-		copy(bs, data)
-		o = bs
+		d := make([]byte, len(bs))
+		copy(d, bs)
+		o = d
 	default:
 		err := util.ErrorOfInvalid("type", "data")
 		return 0, nil, err
@@ -366,7 +388,7 @@ func UnmarshalData(data []byte) (byte, interface{}, error) {
 }
 
 func Marshal(message proto.Message) ([]byte, error) {
-	var meta byte
+	var meta DataType
 	switch message.(type) {
 	case *pb.Message:
 		meta = CORE_MESSAGE
@@ -415,19 +437,19 @@ func Marshal(message proto.Message) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append([]byte{meta}, data...), nil
+	return append([]byte{byte(meta)}, data...), nil
 }
 
-func GetMeta(data []byte) byte {
+func GetMeta(data []byte) DataType {
 	if len(data) > 0 {
-		return data[0]
+		return DataType(data[0])
 	}
 	return 0
 }
 
-func Unmarshal(data []byte) (byte, proto.Message, error) {
+func Unmarshal(data []byte) (DataType, proto.Message, error) {
 	if len(data) > 0 {
-		meta := data[0]
+		meta := DataType(data[0])
 		bs := data[1:]
 
 		var msg proto.Message
@@ -503,13 +525,17 @@ func WriteBytes(w io.Writer, b []byte) error {
 	return nil
 }
 
-func ReadBytes(r io.Reader, maxSize uint32) ([]byte, error) {
+func ReadBytes(r io.Reader) ([]byte, error) {
+	return ReadBytesWith(r, 0)
+}
+
+func ReadBytesWith(r io.Reader, maxSize uint32) ([]byte, error) {
 	l := uint32(0)
 	err := binary.Read(r, util.BYTE_ORDER, &l)
 	if err != nil {
 		return nil, err
 	}
-	if l > maxSize {
+	if maxSize > 0 && l > maxSize {
 		return nil, fmt.Errorf("[ERROR] read bytes limit: %d > %d", l, maxSize)
 	}
 	b := make([]byte, l)

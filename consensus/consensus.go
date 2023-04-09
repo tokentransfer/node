@@ -581,7 +581,7 @@ func (service *ConsensusService) ProcessPayload(remainCost int64, tx *block.Tran
 		case core.CORE_CONTRACT_INFO:
 			info := msg.(*pb.ContractInfo)
 			if len(info.Code) > 0 {
-				_, codeHash, err := ss.CreateContract(tx.Destination, info.Code)
+				_, codeHash, err := ss.CreateContract(tx.Destination, info.Code, info.Abi)
 				if err != nil {
 					return cost, nil, err
 				}

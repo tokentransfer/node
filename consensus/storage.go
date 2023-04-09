@@ -11,7 +11,6 @@ import (
 	libstore "github.com/tokentransfer/interfaces/store"
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/core"
-	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/store"
 	"github.com/tokentransfer/node/vm"
 )
@@ -118,48 +117,6 @@ func getGroup(parent core.Group, name string) (core.Group, error) {
 		g = group
 	}
 	return g, nil
-}
-
-func (s *StorageService) CreateContract(account libcore.Address, code []byte) (libcore.Hash, libcore.Hash, error) {
-	rootGroup, err := s.storage.Group("/")
-	if err != nil {
-		return nil, nil, err
-	}
-	codeGroup, err := getGroup(rootGroup, "code")
-	if err != nil {
-		return nil, nil, err
-	}
-	// s.dump("create code group")
-
-	address := account.String()
-	t := s.storage.Create(address)
-	_, err = t.Write(code)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = t.Close()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	d, err := t.Data()
-	if err != nil {
-		return nil, nil, err
-	}
-	_, err = codeGroup.AddData(address, d.Key())
-	if err != nil {
-		return nil, nil, err
-	}
-	err = codeGroup.Commit()
-	if err != nil {
-		return nil, nil, err
-	}
-	// s.dump("create code account")
-	d.Dispose()
-	t.Dispose()
-	glog.Infoln("> create contract", address, d.Key().String(), len(code))
-
-	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
 
 func (s *StorageService) CreateData(account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
@@ -337,6 +294,59 @@ func (s *StorageService) ReadPageByAddress(account libcore.Address) ([]byte, err
 	return buf.Bytes(), nil
 }
 
+func (s *StorageService) CreateContract(account libcore.Address, wasmCode []byte, abiCode []byte) (libcore.Hash, libcore.Hash, error) {
+	err := vm.VerifyWasm(wasmCode, abiCode)
+	if err != nil {
+		return nil, nil, err
+	}
+	rootGroup, err := s.storage.Group("/")
+	if err != nil {
+		return nil, nil, err
+	}
+	codeGroup, err := getGroup(rootGroup, "code")
+	if err != nil {
+		return nil, nil, err
+	}
+	// s.dump("create code group")
+
+	address := account.String()
+	t := s.storage.Create(address)
+	err = core.WriteBytes(t, wasmCode)
+	if err != nil {
+		return nil, nil, err
+	}
+	if abiCode == nil {
+		abiCode = make([]byte, 0)
+	}
+	err = core.WriteBytes(t, abiCode)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = t.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	d, err := t.Data()
+	if err != nil {
+		return nil, nil, err
+	}
+	_, err = codeGroup.AddData(address, d.Key())
+	if err != nil {
+		return nil, nil, err
+	}
+	err = codeGroup.Commit()
+	if err != nil {
+		return nil, nil, err
+	}
+	// s.dump("create code account")
+	d.Dispose()
+	t.Dispose()
+	glog.Infoln("> create contract", address, d.Key().String(), len(wasmCode), len(abiCode))
+
+	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
+}
+
 func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, dataAccount libcore.Address, method string, params [][]byte) (int64, libcore.Hash, libcore.Hash, []byte, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
@@ -357,31 +367,33 @@ func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, da
 		return 0, nil, nil, nil, err
 	}
 	codeReader := codeData.Open()
-	buf := new(bytes.Buffer)
-	if _, err := io.Copy(buf, codeReader); err != nil {
+	wasmCode, err := core.ReadBytes(codeReader)
+	if err != nil {
+		return 0, nil, nil, nil, err
+	}
+	abiCode, err := core.ReadBytes(codeReader)
+	if err != nil {
 		return 0, nil, nil, nil, err
 	}
 	codeReader.Close()
 	codeData.Dispose()
 
-	wasmData, err := s.ReadData(dataAccount)
+	wasmData, _ := s.ReadData(dataAccount)
+	usedCost, newWasmData, resultData, err := vm.RunWasm(cost, wasmCode, abiCode, wasmData, method, params) // remainCost
 	if err != nil {
-		glog.Error(err)
-		wasmData, err = core.Marshal(&pb.DataMap{})
+		return 0, nil, nil, nil, err
+	}
+	if newWasmData != nil {
+		rootHash, dataHash, err := s.CreateData(dataAccount, newWasmData)
 		if err != nil {
 			return 0, nil, nil, nil, err
 		}
+		glog.Infoln("> run contract", codeAccount.String(), dataAccount.String(), method, len(wasmData), len(newWasmData), string(resultData))
+		return usedCost, rootHash, dataHash, resultData, nil
+	} else {
+		glog.Infoln("> run contract", codeAccount.String(), dataAccount.String(), method, string(resultData))
+		return usedCost, nil, nil, resultData, nil
 	}
-	usedCost, newWasmData, result, err := vm.RunWasm(cost, buf.Bytes(), wasmData, method, params) // remainCost
-	if err != nil {
-		return 0, nil, nil, nil, err
-	}
-	rootHash, dataHash, err := s.CreateData(dataAccount, newWasmData)
-	if err != nil {
-		return 0, nil, nil, nil, err
-	}
-	glog.Infoln("> run contract", codeAccount.String(), dataAccount.String(), method, string(result))
-	return usedCost, rootHash, dataHash, result, nil
 }
 
 func (s *StorageService) Init(c libcore.Config) error {

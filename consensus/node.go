@@ -1545,7 +1545,7 @@ func (n *Node) GetMessage(data []byte) (*pb.Message, error) {
 	return m.(*pb.Message), nil
 }
 
-func (n *Node) ReceiveMessage(t string, msg *pb.Message) (byte, *Peer, []byte) {
+func (n *Node) ReceiveMessage(t string, msg *pb.Message) (core.DataType, *Peer, []byte) {
 	fromIndex := msg.GetNode()
 	data := msg.GetData()
 	glog.Infof("<<< receive %s from node %d, length: %d\n", t, fromIndex, len(data))
@@ -1553,7 +1553,7 @@ func (n *Node) ReceiveMessage(t string, msg *pb.Message) (byte, *Peer, []byte) {
 	if fromPeer != nil {
 		glog.Infof("<<< receive peer %s %d(%s) from %s(%s)\n", t, msg.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
 		if len(data) > 0 {
-			meta := data[0]
+			meta := core.DataType(data[0])
 			return meta, fromPeer, data
 		}
 	}
