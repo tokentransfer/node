@@ -97,6 +97,7 @@ message ContractInfo {
     string Method           = 2;
     repeated bytes Params   = 3;
     bytes Code              = 4;
+    bytes Abi               = 5;
 }
 
 message PageInfo {
