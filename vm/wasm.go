@@ -2,6 +2,7 @@ package vm
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -274,6 +275,7 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 		outputs := util.ToArray(&wm.funcDef, "outputs")
 		hasOutput := false
 		outputType := core.CORE_DATA_INT64
+		outputData := false
 		if len(outputs) > 0 {
 			output := outputs[0]
 			m, ok := output.(map[string]interface{})
@@ -284,6 +286,7 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 				}
 				hasOutput = true
 				outputType = t
+				outputData = util.ToBoolean(&m, "data")
 			}
 		}
 
@@ -305,7 +308,16 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 					list = append(list, ui64)
 					fmt.Println(index, t, ui64)
 				} else {
-					d, err := t.AsBytes(data)
+					inputData := util.ToBoolean(&m, "data")
+					if inputData && t == core.CORE_DATA_STRING {
+						s := hex.EncodeToString(wasmData)
+						retData, err := core.MarshalData(s)
+						if err != nil {
+							return nil, nil, err
+						}
+						data = retData // use wasm data instead
+					}
+					d, err := core.AsBytes(data)
 					if err != nil {
 						return nil, nil, err
 					}
@@ -354,11 +366,19 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 				}
 				defer wm.free(mod, uint64(retPtr), uint64(retSize))
 
-				returnData, err := outputType.FromBytes(retData)
-				if err != nil {
-					return nil, nil, err
+				if outputData {
+					newWasmData, err := hex.DecodeString(string(retData))
+					if err != nil {
+						return nil, nil, err
+					}
+					return newWasmData, nil, nil // return as wasm data
+				} else {
+					returnData, err := outputType.FromBytes(retData)
+					if err != nil {
+						return nil, nil, err
+					}
+					return nil, returnData, nil
 				}
-				return nil, returnData, nil
 			}
 		} else {
 			return nil, nil, nil

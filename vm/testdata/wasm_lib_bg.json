@@ -524,6 +524,60 @@
                 "outputs":[
                 ]
             }
+        },
+        {
+            "name": "process",
+            "type": "function",
+            "inputs": [
+                {
+                    "name": "a",
+                    "type": "int32"
+                },
+                {
+                    "name": "b",
+                    "type": "string",
+                    "data":true
+                },
+                {
+                    "name": "c",
+                    "type": "int32"
+                }
+            ],
+            "outputs":[
+                {
+                    "name": "result",
+                    "type": "string",
+                    "data":true
+                }
+            ],
+            "wasm":{
+                "name": "process",
+                "type": "function",
+                "inputs": [
+                    {
+                        "name": "a",
+                        "type": "int32"
+                    },
+                    {
+                        "name": "b",
+                        "type": "int32"
+                    },
+                    {
+                        "name": "c",
+                        "type": "int32"
+                    },
+                    {
+                        "name": "d",
+                        "type": "int32"
+                    },
+                    {
+                        "name": "e",
+                        "type": "int32"
+                    }
+                ],
+                "outputs":[
+                ]
+            }
         }
     ]
 }

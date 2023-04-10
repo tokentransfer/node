@@ -95,6 +95,17 @@ func ToString(m *map[string]interface{}, key string) string {
 	return ""
 }
 
+func ToBoolean(m *map[string]interface{}, key string) bool {
+	item, ok := (*m)[key]
+	if ok {
+		s, ok := item.(bool)
+		if ok {
+			return s
+		}
+	}
+	return false
+}
+
 func PrintJSON(name string, o interface{}) {
 	jsonBytes, err := json.MarshalIndent(o, "", " ")
 	if err != nil {

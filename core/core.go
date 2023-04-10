@@ -298,6 +298,42 @@ func MarshalData(data interface{}) ([]byte, error) {
 		meta = CORE_DATA_BYTES
 		bs = make([]byte, len(*data))
 		copy(bs, *data)
+
+	case []interface{}:
+		list := &pb.DataList{}
+		for _, item := range data {
+			data, err := MarshalData(item)
+			if err != nil {
+				return nil, err
+			}
+			list.List = append(list.List, &pb.Data{Bytes: data})
+		}
+		return Marshal(list)
+	case *[]interface{}:
+		list := &pb.DataList{}
+		for _, item := range *data {
+			data, err := MarshalData(item)
+			if err != nil {
+				return nil, err
+			}
+			list.List = append(list.List, &pb.Data{Bytes: data})
+		}
+		return Marshal(list)
+	case map[string]interface{}:
+		m := &pb.DataMap{Map: make(map[string]*pb.Data)}
+		for k, v := range data {
+			data, err := MarshalData(v)
+			if err != nil {
+				return nil, err
+			}
+			if m.Map == nil {
+				m.Map = make(map[string]*pb.Data)
+			}
+			m.Map[k] = &pb.Data{Bytes: data}
+		}
+		return Marshal(m)
+	case proto.Message:
+		return Marshal(data)
 	default:
 		err := util.ErrorOfInvalid("data type", fmt.Sprintf("%v", data))
 		return nil, err
@@ -381,8 +417,7 @@ func UnmarshalData(data []byte) (DataType, interface{}, error) {
 		copy(d, bs)
 		o = d
 	default:
-		err := util.ErrorOfInvalid("type", "data")
-		return 0, nil, err
+		return Unmarshal(data)
 	}
 	return meta, o, nil
 }
