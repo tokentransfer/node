@@ -1,5 +1,6 @@
 /node
 /data
+/consensus/data
 /test/node.*
 /test/ca.srl
 /config.json

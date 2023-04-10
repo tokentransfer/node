@@ -391,7 +391,7 @@ func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, da
 		glog.Infoln("> run contract", codeAccount.String(), dataAccount.String(), method, len(wasmData), len(newWasmData), string(resultData))
 		return usedCost, rootHash, dataHash, resultData, nil
 	} else {
-		glog.Infoln("> run contract", codeAccount.String(), dataAccount.String(), method, string(resultData))
+		glog.Infoln("> run contract", codeAccount.String(), dataAccount.String(), method, resultData)
 		return usedCost, nil, nil, resultData, nil
 	}
 }

@@ -309,13 +309,22 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 					fmt.Println(index, t, ui64)
 				} else {
 					inputData := util.ToBoolean(&m, "data")
-					if inputData && t == core.CORE_DATA_STRING {
-						s := hex.EncodeToString(wasmData)
-						retData, err := core.MarshalData(s)
-						if err != nil {
-							return nil, nil, err
+					if inputData && len(wasmData) > 0 { // use wasm data instead
+						switch t {
+						case core.CORE_DATA_STRING:
+							retData, err := core.MarshalData(string(wasmData))
+							if err != nil {
+								return nil, nil, err
+							}
+							data = retData
+						case core.CORE_DATA_BYTES:
+							s := hex.EncodeToString(wasmData)
+							retData, err := core.MarshalData(s)
+							if err != nil {
+								return nil, nil, err
+							}
+							data = retData
 						}
-						data = retData // use wasm data instead
 					}
 					d, err := core.AsBytes(data)
 					if err != nil {
@@ -330,7 +339,7 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 					if !ok {
 						return nil, nil, util.ErrorOfInvalid("write memory", fmt.Sprintf("%d, %d", dataPtr, dataSize))
 					}
-					fmt.Println(index, t, d, dataPtr, dataSize)
+					fmt.Println(index, t, string(d), dataPtr, dataSize)
 					list = append(list, dataPtr, dataSize)
 					defer wm.free(mod, dataPtr, dataSize)
 				}
@@ -366,12 +375,19 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 				}
 				defer wm.free(mod, uint64(retPtr), uint64(retSize))
 
-				if outputData {
-					newWasmData, err := hex.DecodeString(string(retData))
-					if err != nil {
-						return nil, nil, err
+				if outputData { // return as wasm data
+					switch outputType {
+					case core.CORE_DATA_STRING:
+						return retData, nil, nil
+					case core.CORE_DATA_BYTES:
+						newWasmData, err := hex.DecodeString(string(retData))
+						if err != nil {
+							return nil, nil, err
+						}
+						return newWasmData, nil, nil
+					default:
+						return retData, nil, err
 					}
-					return newWasmData, nil, nil // return as wasm data
 				} else {
 					returnData, err := outputType.FromBytes(retData)
 					if err != nil {

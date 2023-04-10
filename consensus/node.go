@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -212,6 +213,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	secret := util.ToString(&txm, "secret")
 	to := util.ToString(&txm, "to")
 	value := util.ToString(&txm, "value")
+	gas := util.ToInt64(&txm, "gas")
 
 	_, fromKey, err := as.NewKeyFromSecret(secret)
 	if err != nil {
@@ -240,7 +242,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 		Account:     fromAccount,
 		Sequence:    seq,
 		Amount:      *amount,
-		Gas:         int64(10),
+		Gas:         gas,
 		Destination: toAccount,
 	}
 
@@ -267,13 +269,39 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 				contractInfo.Method = util.ToString(&cm, "method")
 			}
 			if util.Has(&cm, "params") {
-				params := util.ToArray(&cm, "params")
-				list := make([][]byte, 0)
-				for i := 0; i < len(params); i++ {
-					s := params[i].(string)
-					list = append(list, []byte(s))
+				if params := util.ToString(&cm, "params"); len(params) > 0 {
+					list := make([][]byte, 0)
+					ps := strings.Split(params, ",")
+					for i := 0; i < len(ps); i++ {
+						items := strings.Split(ps[i], ":")
+						if len(items) == 2 {
+							t, err := core.GetDataTypeByName(items[1])
+							if err != nil {
+								return "", nil, err
+							}
+							data, err := t.FromString(items[0])
+							if err != nil {
+								return "", nil, err
+							}
+							list = append(list, data)
+						} else {
+							return "", nil, util.ErrorOfInvalid("parameter", params)
+						}
+					}
+					contractInfo.Params = list
 				}
-				contractInfo.Params = list
+				if params := util.ToArray(&cm, "params"); params != nil {
+					list := make([][]byte, 0)
+					for i := 0; i < len(params); i++ {
+						item := params[i]
+						data, err := core.MarshalData(item)
+						if err != nil {
+							return "", nil, err
+						}
+						list = append(list, data)
+					}
+					contractInfo.Params = list
+				}
 			}
 			if util.Has(&cm, "code") {
 				codeString := util.ToString(&cm, "code")
@@ -294,6 +322,26 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 					return "", nil, err
 				}
 				contractInfo.Code = fileData
+			}
+			if util.Has(&cm, "abi") {
+				abiString := util.ToString(&cm, "abi")
+				abiData, err := hex.DecodeString(abiString)
+				if err != nil {
+					return "", nil, err
+				}
+				contractInfo.Abi = abiData
+			} else if util.Has(&cm, "json") {
+				jsonPath := util.ToString(&cm, "json")
+				f, err := os.Open(jsonPath)
+				if err != nil {
+					return "", nil, err
+				}
+				defer f.Close()
+				jsonData, err := io.ReadAll(f)
+				if err != nil {
+					return "", nil, err
+				}
+				contractInfo.Abi = jsonData
 			}
 
 			contractData, err := core.Marshal(contractInfo)
@@ -366,6 +414,10 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	if err != nil {
 		return "", nil, err
 	}
+	err = n.verifyTransaction(tx)
+	if err != nil {
+		return "", nil, err
+	}
 	blob := libcore.Bytes(data).String()
 	return blob, tx, nil
 }
@@ -392,7 +444,7 @@ func (n *Node) sendTransaction(tx libblock.Transaction) (libblock.TransactionWit
 
 	txWithData, _, err := n.processTransaction(tx)
 	if err != nil {
-		glog.Error(err) // ignore the error after verified transaction
+		return nil, err
 	}
 	return txWithData, nil
 }
@@ -524,7 +576,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		receipt := txWithData.GetReceipt()
-		_, err = n.HashReceipt(receipt)
+		_, err = n.consensusService.HashReceipt(receipt)
 		if err != nil {
 			return nil, err
 		}
@@ -541,7 +593,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, err = n.HashTransaction(txWithData)
+		_, err = n.consensusService.HashTransaction(txWithData)
 		if err != nil {
 			return nil, err
 		}
@@ -560,7 +612,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, err = n.HashTransaction(txWithData)
+		_, err = n.consensusService.HashTransaction(txWithData)
 		if err != nil {
 			return nil, err
 		}
@@ -577,7 +629,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, err = n.HashBlock(block)
+		_, err = n.consensusService.HashBlock(block)
 		if err != nil {
 			return nil, err
 		}
@@ -590,7 +642,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, err = n.HashBlock(block)
+		_, err = n.consensusService.HashBlock(block)
 		if err != nil {
 			return nil, err
 		}
@@ -666,7 +718,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, err = n.HashState(s)
+		_, err = n.consensusService.HashState(s)
 		if err != nil {
 			return nil, err
 		}
@@ -687,7 +739,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			_, err = n.HashState(s)
+			_, err = n.consensusService.HashState(s)
 			if err != nil {
 				return nil, err
 			}
@@ -705,7 +757,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 }
 
 func (n *Node) AddTransaction(txWithData libblock.TransactionWithData) (libcore.Hash, bool) {
-	h, err := n.HashTransaction(txWithData)
+	h, err := n.consensusService.HashTransaction(txWithData)
 	if err != nil {
 		return nil, false
 	}
@@ -775,7 +827,7 @@ func (n *Node) generate() {
 			if err != nil {
 				glog.Error(err)
 			} else {
-				h, err := n.HashBlock(block)
+				h, err := n.consensusService.HashBlock(block)
 				if err != nil {
 					glog.Error(err)
 				} else {
@@ -894,7 +946,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 				if err != nil {
 					glog.Error(err)
 				} else {
-					_, err = n.HashBlock(block)
+					_, err = n.consensusService.HashBlock(block)
 					if err != nil {
 						glog.Error(err)
 					} else {
@@ -934,7 +986,7 @@ func (n *Node) Load() error {
 			glog.Error(err)
 			break
 		}
-		_, err = n.HashBlock(b)
+		_, err = n.consensusService.HashBlock(b)
 		if err != nil {
 			glog.Error(err)
 			break
@@ -1042,7 +1094,7 @@ func (n *Node) receive() {
 				if err != nil {
 					glog.Error(err)
 				} else {
-					h, err := n.HashBlock(b)
+					h, err := n.consensusService.HashBlock(b)
 					if err != nil {
 						glog.Error(err)
 					} else {
@@ -1187,7 +1239,7 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 			if err != nil {
 				glog.Error(err)
 			} else {
-				h, err := n.HashBlock(b)
+				h, err := n.consensusService.HashBlock(b)
 				if err != nil {
 					glog.Error(err)
 				} else {
@@ -1442,78 +1494,6 @@ func (n *Node) ListPeer() []*Peer {
 	return list
 }
 
-func (n *Node) HashBlock(b libblock.Block) (libcore.Hash, error) {
-	h, _, err := n.cryptoService.Raw(b, libcrypto.RawBinary)
-	if err != nil {
-		return nil, err
-	}
-	transactions := b.GetTransactions()
-	for i := 0; i < len(transactions); i++ {
-		txWithData := transactions[i]
-		_, err := n.HashTransaction(txWithData)
-		if err != nil {
-			return nil, err
-		}
-	}
-	states := b.GetStates()
-	for i := 0; i < len(states); i++ {
-		state := states[i]
-		_, err := n.HashState(state)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return h, nil
-}
-
-func (n *Node) HashTransaction(txWithData libblock.TransactionWithData) (libcore.Hash, error) {
-	_, _, err := n.cryptoService.Raw(txWithData, libcrypto.RawBinary)
-	if err != nil {
-		return nil, err
-	}
-
-	h, _, err := n.cryptoService.Raw(txWithData.GetTransaction(), libcrypto.RawBinary)
-	if err != nil {
-		return nil, err
-	}
-
-	_, _, err = n.cryptoService.Raw(txWithData.GetReceipt(), libcrypto.RawBinary)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = n.HashReceipt(txWithData.GetReceipt())
-	if err != nil {
-		return nil, err
-	}
-	return h, nil
-}
-
-func (n *Node) HashReceipt(r libblock.Receipt) (libcore.Hash, error) {
-	h, _, err := n.cryptoService.Raw(r, libcrypto.RawBinary)
-	if err != nil {
-		return nil, err
-	}
-
-	states := r.GetStates()
-	for i := 0; i < len(states); i++ {
-		state := states[i]
-		_, err := n.HashState(state)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return h, nil
-}
-
-func (n *Node) HashState(s libblock.State) (libcore.Hash, error) {
-	h, _, err := n.cryptoService.Raw(s, libcrypto.RawBinary)
-	if err != nil {
-		return nil, err
-	}
-	return h, nil
-}
-
 func (n *Node) CreateMessage(data []byte) (*pb.Message, error) {
 	return &pb.Message{
 		Id:   n.newId(),
@@ -1558,4 +1538,8 @@ func (n *Node) ReceiveMessage(t string, msg *pb.Message) (core.DataType, *Peer, 
 		}
 	}
 	return 0, nil, nil
+}
+
+func (n *Node) HashBlock(b libblock.Block) (libcore.Hash, error) {
+	return n.consensusService.HashBlock(b)
 }

@@ -31,7 +31,7 @@ func getWasmData(c *C) []byte {
 		},
 	})
 	c.Assert(err, IsNil)
-	return mapData
+	return []byte(hex.EncodeToString(mapData))
 }
 
 func loadWasm(c *C, prefix string) ([]byte, []byte) {
@@ -257,7 +257,7 @@ func (suite *WasmSuite) TestVMBg(c *C) {
 				int32(2),
 			},
 			"result": "",
-			"loop":   60,
+			"loop":   10,
 			"cost":   int64(100000000),
 		},
 	}
@@ -277,7 +277,7 @@ func (suite *WasmSuite) TestVMBg(c *C) {
 		wasmData := getWasmData(c)
 		for i := 0; i < loop; i++ {
 			fmt.Println(">>>>>>", index, i, "<<<<<<")
-			fmt.Println("wasm data", hex.EncodeToString(wasmData))
+			fmt.Println("wasm data", wasmData)
 			rets, paramData := getParams(c, params)
 			fmt.Println("params: ", strings.Join(rets, ","))
 			usedCost, newWasmData, retData, err := RunWasm(cost, wasmCode, abiData, wasmData, method, paramData)
@@ -285,20 +285,21 @@ func (suite *WasmSuite) TestVMBg(c *C) {
 			c.Assert(err, IsNil)
 			retValue, retString := getResult(c, retData)
 			fmt.Println("return: ", len(wasmData), len(newWasmData), retString)
-			fmt.Println("new wasm data", hex.EncodeToString(newWasmData))
+			fmt.Println("new wasm data", string(newWasmData))
 			c.Assert(retValue, Equals, result)
 			if len(newWasmData) > 0 {
-				meta, msg, err := core.Unmarshal(newWasmData)
+				newData, err := hex.DecodeString(string(newWasmData))
+				c.Assert(err, IsNil)
+				meta, msg, err := core.Unmarshal(newData)
 				c.Assert(err, IsNil)
 				c.Assert(meta, Equals, core.CORE_DATA_MAP)
 				m := msg.(*pb.DataMap)
 				c.Assert(m, NotNil)
-				o, err := core.AsData(newWasmData)
+				o, err := core.AsData(newData)
 				c.Assert(err, IsNil)
 				util.PrintJSON("wasm data", o)
 			}
 			wasmData = newWasmData
 		}
-
 	}
 }

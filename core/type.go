@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -153,6 +154,104 @@ func AsUint64(data []byte) (uint64, error) {
 		return 0, e
 	}
 	return v, nil
+}
+
+func (t DataType) FromString(s string) ([]byte, error) {
+	var v interface{}
+	var e error
+	switch t {
+	case CORE_DATA_INT8:
+		i64, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = uint8(i64)
+		e = nil
+	case CORE_DATA_UINT8:
+		i64, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = uint8(i64)
+		e = nil
+	case CORE_DATA_INT16:
+		i64, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = int16(i64)
+		e = nil
+	case CORE_DATA_UINT16:
+		i64, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = uint16(i64)
+		e = nil
+	case CORE_DATA_INT32:
+		i64, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = int32(i64)
+		e = nil
+	case CORE_DATA_UINT32:
+		i64, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = uint32(i64)
+		e = nil
+	case CORE_DATA_INT64:
+		i64, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = i64
+		e = nil
+	case CORE_DATA_UINT64:
+		i64, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = uint64(i64)
+		e = nil
+	case CORE_DATA_FLOAT32:
+		f64, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = float32(f64)
+		e = nil
+	case CORE_DATA_FLOAT64:
+		f64, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return nil, err
+		}
+		v = f64
+		e = nil
+	case CORE_DATA_STRING:
+		v = s
+		e = nil
+	case CORE_DATA_BYTES:
+		hexData, err := hex.DecodeString(s)
+		if err != nil {
+			return nil, err
+		}
+		v = hexData
+		e = nil
+	default:
+		v = 0
+		e = util.ErrorOfInvalid("type", "data")
+	}
+	if e != nil {
+		return nil, e
+	}
+	data, err := MarshalData(v)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func (t DataType) FromUint64(value uint64) ([]byte, error) {
