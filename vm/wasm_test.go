@@ -274,8 +274,16 @@ func (suite *WasmSuite) TestVMBg(c *C) {
 		c.Assert(loop, NotNil)
 		c.Assert(cost, NotNil)
 
-		wasmData := getWasmData(c)
+		var wasmData []byte
 		for i := 0; i < loop; i++ {
+			if i%5 == 0 {
+				wasmData = func(c *C, index int) []byte {
+					if index%2 == 0 {
+						return []byte("")
+					}
+					return getWasmData(c)
+				}(c, i)
+			}
 			fmt.Println(">>>>>>", index, i, "<<<<<<")
 			fmt.Println("wasm data", wasmData)
 			rets, paramData := getParams(c, params)

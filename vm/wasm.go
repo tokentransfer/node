@@ -309,7 +309,7 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 					fmt.Println(index, t, ui64)
 				} else {
 					inputData := util.ToBoolean(&m, "data")
-					if inputData && len(wasmData) > 0 { // use wasm data instead
+					if inputData { // use wasm data instead
 						switch t {
 						case core.CORE_DATA_STRING:
 							retData, err := core.MarshalData(string(wasmData))
