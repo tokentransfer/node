@@ -85,10 +85,18 @@ func AsBytes(data []byte) ([]byte, error) {
 	var e error
 	switch meta {
 	case CORE_DATA_STRING:
-		v = []byte(value.(string))
+		if value != nil {
+			v = []byte(value.(string))
+		} else {
+			v = nil
+		}
 		e = nil
 	case CORE_DATA_BYTES:
-		v = value.([]byte)
+		if value != nil {
+			v = value.([]byte)
+		} else {
+			v = nil
+		}
 		e = nil
 	default:
 		v = nil

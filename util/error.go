@@ -1,19 +1,33 @@
 package util
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func ErrorOfNonexists(t string, target string) error {
-	return fmt.Errorf("can't find %s: %s", t, target)
+	e := fmt.Errorf("can't find %s: %s", t, target)
+	// glog.Error(e)
+	// debug.PrintStack()
+	return e
 }
 
 func ErrorOfInvalid(t string, target string) error {
-	return fmt.Errorf("invalid %s: %s", t, target)
+	e := fmt.Errorf("invalid %s: %s", t, target)
+	// glog.Error(e)
+	// debug.PrintStack()
+	return e
 }
 
 func ErrorOfUnknown(t string, target string) error {
-	return fmt.Errorf("unknown %s: %s", t, target)
+	e := fmt.Errorf("unknown %s: %s", t, target)
+	// glog.Error(e)
+	// debug.PrintStack()
+	return e
 }
 
 func ErrorOf(reason string, t string, target string) error {
-	return fmt.Errorf("%s %s: %s", reason, t, target)
+	e := fmt.Errorf("%s %s: %s", reason, t, target)
+	// glog.Error(e)
+	// debug.PrintStack()
+	return e
 }

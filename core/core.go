@@ -346,7 +346,7 @@ func UnmarshalData(data []byte) (DataType, interface{}, error) {
 		return 0, nil, util.ErrorOfInvalid("data", "empty")
 	}
 	if len(data) == 1 {
-		return CORE_DATA_NULL, nil, nil
+		return DataType(data[0]), nil, nil
 	}
 	var o interface{}
 
