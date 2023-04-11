@@ -390,6 +390,9 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	if tx.Gas < 10 {
 		return false, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < 10", tx.Gas))
 	}
+	if tx.Account.String() == tx.Destination.String() && !tx.Amount.IsZero() {
+		return false, util.ErrorOfInvalid("amount", "should be 0 when using same accounts")
+	}
 	gasAmount, err := core.NewAmount(int64(tx.Gas))
 	if err != nil {
 		return false, err
@@ -522,9 +525,12 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	if err != nil {
 		return nil, err
 	}
-	sequenceMap[destAccount.String()] = destSequence
-	states = append(states, destInfo)
-	accountMap[destAccount.String()] = destInfo
+	isSame := (fromAccount.String() == destAccount.String())
+	if !isSame {
+		sequenceMap[destAccount.String()] = destSequence
+		states = append(states, destInfo)
+		accountMap[destAccount.String()] = destInfo
+	}
 
 	gasAccount := config.GetGasAccount()
 	gasSequence := libstore.GetSequence(ms, gasAccount)
