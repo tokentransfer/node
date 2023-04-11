@@ -310,20 +310,22 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 				} else {
 					inputData := util.ToBoolean(&m, "data")
 					if inputData { // use wasm data instead
-						switch t {
-						case core.CORE_DATA_STRING:
-							retData, err := core.MarshalData(string(wasmData))
-							if err != nil {
-								return nil, nil, err
+						if len(wasmData) != 0 {
+							switch t {
+							case core.CORE_DATA_STRING:
+								retData, err := core.MarshalData(string(wasmData))
+								if err != nil {
+									return nil, nil, err
+								}
+								data = retData
+							case core.CORE_DATA_BYTES:
+								s := hex.EncodeToString(wasmData)
+								retData, err := core.MarshalData(s)
+								if err != nil {
+									return nil, nil, err
+								}
+								data = retData
 							}
-							data = retData
-						case core.CORE_DATA_BYTES:
-							s := hex.EncodeToString(wasmData)
-							retData, err := core.MarshalData(s)
-							if err != nil {
-								return nil, nil, err
-							}
-							data = retData
 						}
 					}
 					d, err := core.AsBytes(data)
