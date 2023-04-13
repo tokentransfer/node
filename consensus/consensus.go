@@ -282,7 +282,7 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 			err = fmt.Errorf("error block index: %d != %d", b.GetIndex(), (service.ValidatedBlock.GetIndex() + 1))
 			return
 		}
-		if !b.GetParentHash().Equals(service.ValidatedBlock.GetHash()) {
+		if b.GetParentHash().String() != service.ValidatedBlock.GetHash().String() {
 			ok = false
 			err = fmt.Errorf("error parent hash: %s != %s", b.GetParentHash().String(), service.ValidatedBlock.GetHash().String())
 			return

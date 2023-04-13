@@ -941,9 +941,8 @@ func (n *Node) discoveryPeer(p *Peer) {
 		case PeerKnown:
 			n.Consensused = n.PrepareConsensus()
 		}
-
-		fmt.Println("====", n.GetBlockNumber(), lastSendBlock, lastSendTime, p.address, p.Id, p.Status, p.BlockNumber, p.PeerCount)
 		if p.Status >= PeerKnown && n.GetBlockNumber() > p.BlockNumber {
+			glog.Infoln("===", n.GetBlockNumber(), lastSendBlock, lastSendTime, p.address, p.Id, p.Status, p.BlockNumber, p.PeerCount)
 			if lastSendBlock > 0 && lastSendBlock == (p.BlockNumber+1) && (time.Since(lastSendTime) < (time.Duration(config.GetBlockDuration() * uint32(time.Second)))) {
 				time.Sleep(3 * time.Second)
 			} else {
