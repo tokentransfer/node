@@ -943,7 +943,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 		}
 		if p.Status >= PeerKnown && n.GetBlockNumber() > p.BlockNumber {
 			glog.Infoln("===", n.GetBlockNumber(), lastSendBlock, lastSendTime, p.address, p.Id, p.Status, p.BlockNumber, p.PeerCount)
-			if lastSendBlock > 0 && lastSendBlock == (p.BlockNumber+1) && (time.Since(lastSendTime) < (time.Duration(config.GetBlockDuration() * uint32(time.Second)))) {
+			if lastSendBlock >= 0 && lastSendBlock == (p.BlockNumber+1) && (time.Since(lastSendTime) < (time.Duration(int64(config.GetBlockDuration()) * int64(time.Second)))) {
 				time.Sleep(3 * time.Second)
 			} else {
 				block, err := n.merkleService.GetBlockByIndex(uint64(p.BlockNumber + 1))
