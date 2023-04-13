@@ -1228,11 +1228,8 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 	if err != nil {
 		return err
 	}
-	meta, fromPeer, data := n.ReceiveMessage("message", m)
-	fromIndex := m.GetNode()
-	glog.Infof("<<< receive data from node %d, length: %d\n", fromIndex, len(data))
+	meta, fromPeer, data := n.ReceiveMessage("data", m)
 	if fromPeer != nil {
-		glog.Infof("<<< receive peer data %d(%s) from %s(%s)\n", m.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
 		switch meta {
 		case core.CORE_PEER_INFO:
 			_, msg, err := core.Unmarshal(data)
