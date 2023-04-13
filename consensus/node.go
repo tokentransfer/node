@@ -930,6 +930,8 @@ func (n *Node) PrepareConsensus() bool {
 func (n *Node) discoveryPeer(p *Peer) {
 	config := n.config
 
+	lastSendBlock := int64(-1)
+	lastSendTime := time.Now()
 	for {
 		switch p.Status {
 		case PeerNone:
@@ -940,9 +942,12 @@ func (n *Node) discoveryPeer(p *Peer) {
 			n.Consensused = n.PrepareConsensus()
 		}
 
+		fmt.Println("====", n.GetBlockNumber(), p.address, p.Id, p.Status, p.BlockNumber, p.PeerCount)
 		if p.Status >= PeerKnown && n.GetBlockNumber() > p.BlockNumber {
-			for i := p.BlockNumber + 1; i <= n.GetBlockNumber() && n.GetBlockNumber() > p.BlockNumber; i++ {
-				block, err := n.merkleService.GetBlockByIndex(uint64(i))
+			if lastSendBlock > 0 && lastSendBlock == (p.BlockNumber+1) && (time.Since(lastSendTime) < (time.Duration(config.GetBlockDuration() * uint32(time.Second)))) {
+				time.Sleep(3 * time.Second)
+			} else {
+				block, err := n.merkleService.GetBlockByIndex(uint64(p.BlockNumber + 1))
 				if err != nil {
 					glog.Error(err)
 				} else {
@@ -954,7 +959,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 						if err != nil {
 							glog.Error(err)
 						} else {
-							mid, msgData, err := n.SendMessage(blockData)
+							mid, msgData, err := n.EncodeMessage(blockData)
 							if err != nil {
 								glog.Error(err)
 							} else {
@@ -962,16 +967,16 @@ func (n *Node) discoveryPeer(p *Peer) {
 								if err != nil {
 									glog.Error(err)
 								} else {
+									lastSendBlock = block.GetTime()
+									lastSendTime = time.Now()
 									glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(blockData), p.GetAddress(), p.Id)
 								}
 							}
 						}
 					}
 				}
-
-				time.Sleep(2 * time.Second)
+				time.Sleep(time.Second)
 			}
-			time.Sleep(time.Second)
 		} else {
 			time.Sleep(time.Duration(config.GetBlockDuration()) * time.Second)
 		}
@@ -1103,17 +1108,19 @@ func (n *Node) receive() {
 						glog.Error(err)
 					} else {
 						if int64(b.GetIndex()) <= n.consensusService.GetBlockNumber() {
-							glog.Infoln("<<< drop block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+							glog.Infoln("<<< drop message block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 						} else {
-							glog.Infoln("<<< receive block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+							glog.Infoln("<<< receive message block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 							_, err = n.consensusService.VerifyBlock(b)
 							if err != nil {
 								glog.Error(err)
 							} else {
-								glog.Infoln("<<< verify block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+								glog.Infoln("<<< verify message block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 								err = n.consensusService.AddBlock(b)
 								if err != nil {
 									glog.Error(err)
+								} else {
+									glog.Infoln("<<< add message block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 								}
 							}
 						}
@@ -1161,7 +1168,7 @@ func (n *Node) receive() {
 
 func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 	glog.Infof("[%s][%s] recv discovery from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), publisher, len(msgData))
-	m, err := n.GetMessage(msgData)
+	m, err := n.DecodeMessage(msgData)
 	if err != nil {
 		return err
 	}
@@ -1208,7 +1215,7 @@ func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 
 func (n *Node) messageHandler(id string, data []byte) error {
 	glog.Infof("[%s][%s] recv message from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), id, len(data))
-	msg, err := n.GetMessage(data)
+	msg, err := n.DecodeMessage(data)
 	if err != nil {
 		return err
 	}
@@ -1218,7 +1225,7 @@ func (n *Node) messageHandler(id string, data []byte) error {
 
 func (n *Node) dataHandler(id string, msgData []byte) error {
 	glog.Infof("[%s][%s] recv data from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), id, len(msgData))
-	m, err := n.GetMessage(msgData)
+	m, err := n.DecodeMessage(msgData)
 	if err != nil {
 		return err
 	}
@@ -1248,18 +1255,20 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 					glog.Error(err)
 				} else {
 					if int64(b.GetIndex()) <= n.consensusService.GetBlockNumber() {
-						glog.Infoln("<<< drop block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+						glog.Infoln("<<< drop data block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 					} else {
-						glog.Infoln("<<< receive block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+						glog.Infoln("<<< receive data block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 
 						_, err = n.consensusService.VerifyBlock(b)
 						if err != nil {
 							glog.Error(err)
 						} else {
-							glog.Infoln("<<< verify block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+							glog.Infoln("<<< verify data block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 							err = n.consensusService.AddBlock(b)
 							if err != nil {
 								glog.Error(err)
+							} else {
+								glog.Infoln("<<< add data block", b.GetIndex(), h.String(), len(b.GetTransactions()))
 							}
 						}
 					}
@@ -1280,7 +1289,7 @@ func (n *Node) SendPeerInfo(toPeer *Peer) {
 	if err != nil {
 		glog.Error(err)
 	} else {
-		mid, msgData, err := n.SendMessage(peerData)
+		mid, msgData, err := n.EncodeMessage(peerData)
 		if err != nil {
 			glog.Error(err)
 		} else {
@@ -1420,7 +1429,7 @@ func (n *Node) discovery() {
 			if err != nil {
 				glog.Error(err)
 			} else {
-				_, msgData, err := n.SendMessage(peerData)
+				_, msgData, err := n.EncodeMessage(peerData)
 				if err != nil {
 					glog.Error(err)
 				} else {
@@ -1506,7 +1515,7 @@ func (n *Node) CreateMessage(data []byte) (*pb.Message, error) {
 	}, nil
 }
 
-func (n *Node) SendMessage(data []byte) (uint64, []byte, error) {
+func (n *Node) EncodeMessage(data []byte) (uint64, []byte, error) {
 	m, err := n.CreateMessage(data)
 	if err != nil {
 		return 0, nil, err
@@ -1518,7 +1527,7 @@ func (n *Node) SendMessage(data []byte) (uint64, []byte, error) {
 	return m.Id, msgData, nil
 }
 
-func (n *Node) GetMessage(data []byte) (*pb.Message, error) {
+func (n *Node) DecodeMessage(data []byte) (*pb.Message, error) {
 	meta, m, err := core.Unmarshal(data)
 	if err != nil {
 		return nil, err
