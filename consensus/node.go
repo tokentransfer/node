@@ -1036,6 +1036,10 @@ func (n *Node) Load() error {
 	return nil
 }
 
+func (n *Node) Dump(printer core.Printer) {
+	n.storageService.Dump(printer)
+}
+
 func (n *Node) GetBlockNumber() int64 {
 	if n.consensusService != nil {
 		return n.consensusService.GetBlockNumber()

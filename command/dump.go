@@ -44,12 +44,14 @@ func (i *DumpCommand) Run(args []string) int {
 		panic(err)
 	}
 
-	storageService, err := consensus.NewStorageService(config)
+	n := consensus.NewNode()
+	err = n.Init(config)
 	if err != nil {
 		panic(err)
 	}
 
-	storageService.Dump(i)
+	n.Load()
+	n.Dump(i)
 	return 0
 }
 
