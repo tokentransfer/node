@@ -263,9 +263,9 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 			err = e
 			return
 		}
-		if !arh.Equals(brh) {
+		if arh.String() != brh.String() {
 			ok = false
-			err = util.ErrorOf("unmatched", "transaction receipt", fmt.Sprintf("%s != %s", txWithData.GetHash().String(), newWithData.GetHash().String()))
+			err = util.ErrorOf("unmatched", "transaction receipt", fmt.Sprintf("%s != %s", arh.String(), brh.String()))
 			return
 		}
 

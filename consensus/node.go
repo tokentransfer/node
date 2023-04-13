@@ -886,7 +886,7 @@ func (n *Node) connect() {
 		glog.Infoln("===", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Id, n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			glog.Infoln(">>>", i+1, p.GetIndex(), p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount)
+			glog.Infoln("==>", i+1, p.GetIndex(), p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount)
 		}
 
 		if !lastConsensused && n.Consensused {
@@ -942,7 +942,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 			n.Consensused = n.PrepareConsensus()
 		}
 
-		fmt.Println("====", n.GetBlockNumber(), p.address, p.Id, p.Status, p.BlockNumber, p.PeerCount)
+		fmt.Println("====", n.GetBlockNumber(), lastSendBlock, lastSendTime, p.address, p.Id, p.Status, p.BlockNumber, p.PeerCount)
 		if p.Status >= PeerKnown && n.GetBlockNumber() > p.BlockNumber {
 			if lastSendBlock > 0 && lastSendBlock == (p.BlockNumber+1) && (time.Since(lastSendTime) < (time.Duration(config.GetBlockDuration() * uint32(time.Second)))) {
 				time.Sleep(3 * time.Second)
@@ -967,7 +967,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 								if err != nil {
 									glog.Error(err)
 								} else {
-									lastSendBlock = block.GetTime()
+									lastSendBlock = int64(block.GetIndex())
 									lastSendTime = time.Now()
 									glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(blockData), p.GetAddress(), p.Id)
 								}
