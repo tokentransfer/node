@@ -93,11 +93,16 @@ message TokenInfo {
 }
 
 message ContractInfo {
-    bytes Account           = 1;
-    string Method           = 2;
-    repeated bytes Params   = 3;
-    bytes Code              = 4;
-    bytes Abi               = 5;
+    repeated bytes Inputs   = 1;
+    repeated bytes Outputs  = 2;
+    string Method           = 3;
+    repeated bytes Params   = 4;
+}
+
+message CodeInfo {
+    string Name             = 1;
+    bytes Code              = 2;
+    bytes Abi               = 3;
 }
 
 message PageInfo {
