@@ -119,7 +119,7 @@ func getGroup(parent core.Group, name string) (core.Group, error) {
 	return g, nil
 }
 
-func (s *StorageService) CreateData(account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) WriteData(dataAccount libcore.Address, codeAccount libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
 		return nil, nil, err
@@ -128,8 +128,12 @@ func (s *StorageService) CreateData(account libcore.Address, data []byte) (libco
 	if err != nil {
 		return nil, nil, err
 	}
+	accountGroup, err := getGroup(dataGroup, dataAccount.String())
+	if err != nil {
+		return nil, nil, err
+	}
 
-	address := account.String()
+	address := codeAccount.String()
 	t := s.storage.Create(address)
 	_, err = t.Write(data)
 	if err != nil {
@@ -144,23 +148,23 @@ func (s *StorageService) CreateData(account libcore.Address, data []byte) (libco
 	if err != nil {
 		return nil, nil, err
 	}
-	_, err = dataGroup.AddData(address, d.Key())
+	_, err = accountGroup.AddData(address, d.Key())
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = dataGroup.Commit()
+	err = accountGroup.Commit()
 	if err != nil {
 		return nil, nil, err
 	}
 	d.Dispose()
 	t.Dispose()
-	glog.Infoln("> create data", address, d.Key().String(), len(data))
+	glog.Infoln("> create data", dataAccount.String(), address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
 
-func (s *StorageService) ReadData(account libcore.Address) ([]byte, error) {
+func (s *StorageService) ReadData(dataAccount libcore.Address, codeAccount libcore.Address) ([]byte, error) {
 	root, err := s.storage.Group("/")
 	if err != nil {
 		return nil, err
@@ -169,8 +173,11 @@ func (s *StorageService) ReadData(account libcore.Address) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	address := account.String()
-	key, err := group.GetKey(address)
+	account, err := getGroup(group, dataAccount.String())
+	if err != nil {
+		return nil, err
+	}
+	key, err := account.GetKey(codeAccount.String())
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +192,7 @@ func (s *StorageService) ReadData(account libcore.Address) ([]byte, error) {
 	}
 	reader.Close()
 	data.Dispose()
-	glog.Infoln("> read data", address, key.String(), data.Size())
+	glog.Infoln("> read data", dataAccount.String(), codeAccount.String(), key.String(), data.Size())
 
 	return buf.Bytes(), nil
 }
@@ -347,7 +354,7 @@ func (s *StorageService) CreateContract(account libcore.Address, wasmCode []byte
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
 
-func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, dataAccount libcore.Address, method string, params [][]byte) (int64, libcore.Hash, libcore.Hash, []byte, error) {
+func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, readAccount libcore.Address, writeAccount libcore.Address, method string, params [][]byte) (int64, libcore.Hash, libcore.Hash, []byte, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
 		return 0, nil, nil, nil, err
@@ -378,20 +385,20 @@ func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, da
 	codeReader.Close()
 	codeData.Dispose()
 
-	wasmData, _ := s.ReadData(dataAccount)
+	wasmData, _ := s.ReadData(readAccount, codeAccount)
 	usedCost, newWasmData, resultData, err := vm.RunWasm(cost, wasmCode, abiCode, wasmData, method, params) // remainCost
 	if err != nil {
 		return 0, nil, nil, nil, err
 	}
 	if newWasmData != nil {
-		rootHash, dataHash, err := s.CreateData(dataAccount, newWasmData)
+		rootHash, dataHash, err := s.WriteData(writeAccount, codeAccount, newWasmData)
 		if err != nil {
 			return 0, nil, nil, nil, err
 		}
-		glog.Infoln("> run contract", usedCost, codeAccount.String(), dataAccount.String(), method, len(wasmData), len(newWasmData), string(resultData))
+		glog.Infoln("> run contract", usedCost, codeAccount.String(), readAccount.String(), writeAccount.String(), method, len(wasmData), len(newWasmData), string(resultData))
 		return usedCost, rootHash, dataHash, resultData, nil
 	} else {
-		glog.Infoln("> run contract", usedCost, codeAccount.String(), dataAccount.String(), method, resultData)
+		glog.Infoln("> run contract", usedCost, codeAccount.String(), readAccount.String(), writeAccount.String(), method, resultData)
 		return usedCost, nil, nil, resultData, nil
 	}
 }
