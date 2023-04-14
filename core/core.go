@@ -56,6 +56,7 @@ const (
 	CORE_DATA_INFO     = DataType(145)
 	CORE_PEER_INFO     = DataType(146)
 	CORE_PAGE_INFO     = DataType(147)
+	CORE_CODE_INFO     = DataType(148)
 )
 
 var SYSTEM_CODE = "TEST"
@@ -157,6 +158,8 @@ func GetInfo(data []byte) string {
 			return "peer_info"
 		case CORE_PAGE_INFO:
 			return "page_info"
+		case CORE_CODE_INFO:
+			return "code_info"
 		default:
 			return "unknown"
 		}
@@ -463,6 +466,8 @@ func Marshal(message proto.Message) ([]byte, error) {
 		meta = CORE_PEER_INFO
 	case *pb.PageInfo:
 		meta = CORE_PAGE_INFO
+	case *pb.CodeInfo:
+		meta = CORE_CODE_INFO
 
 	default:
 		err := util.ErrorOfInvalid("type", "data")
@@ -527,6 +532,8 @@ func Unmarshal(data []byte) (DataType, proto.Message, error) {
 			msg = &pb.PeerInfo{}
 		case CORE_PAGE_INFO:
 			msg = &pb.PageInfo{}
+		case CORE_CODE_INFO:
+			msg = &pb.CodeInfo{}
 
 		default:
 			err := errors.New("error data format")

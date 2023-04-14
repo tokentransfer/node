@@ -419,16 +419,19 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 			case core.CORE_PAYLOAD_INFO:
 			case core.CORE_CONTRACT_INFO:
 				info := msg.(*pb.ContractInfo)
-				isCreate := (len(info.Code) > 0)
-				isCall := (len(info.Method) > 0 && info.Params != nil)
-				if !isCreate && !isCall {
+				if !(len(info.Method) > 0 && info.Params != nil) {
 					return false, util.ErrorOfInvalid("format", "contract info")
+				}
+			case core.CORE_PAGE_INFO:
+			case core.CORE_CODE_INFO:
+				info := msg.(*pb.CodeInfo)
+				if !(len(info.Code) > 0) {
+					return false, util.ErrorOfInvalid("format", "code info")
 				}
 			case core.CORE_META_INFO:
 			case core.CORE_TOKEN_INFO:
 			case core.CORE_DATA_INFO:
 			case core.CORE_PEER_INFO:
-			case core.CORE_PAGE_INFO:
 			default:
 				return false, util.ErrorOfInvalid("format", "info")
 			}
@@ -597,6 +600,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 }
 
 func (service *ConsensusService) ProcessPayload(remainCost int64, tx *block.Transaction, info *block.PayloadInfo, accountMap map[string]*block.AccountState) (int64, []libblock.State, error) {
+	cs := service.CryptoService
 	as := service.AccountService
 	ss := service.StorageService
 
@@ -628,37 +632,26 @@ func (service *ConsensusService) ProcessPayload(remainCost int64, tx *block.Tran
 
 		case core.CORE_CONTRACT_INFO:
 			info := msg.(*pb.ContractInfo)
-			if len(info.Code) > 0 {
-				_, codeHash, err := ss.CreateContract(tx.Destination, info.Code, info.Abi)
-				if err != nil {
-					return cost, nil, err
-				}
-				accountInfo, ok := accountMap[tx.Destination.String()]
-				if ok {
-					accountInfo.Code = &block.DataInfo{
-						Hash: codeHash,
-					}
-				}
-			} else {
-				var account libcore.Address
-				if len(info.Account) > 0 {
-					_, account, _ = as.NewAccountFromBytes(info.Account[:])
-				} else {
-					account = tx.Account
-				}
-				usedCost, _, dataHash, dataContent, err := ss.RunContract(remainCost, tx.Destination, tx.Account, account, info.Method, info.Params)
-				if err != nil {
-					return cost, nil, err
-				}
-				accountInfo, ok := accountMap[account.String()]
-				if ok {
-					accountInfo.Data = &block.DataInfo{
-						Hash:    dataHash,
-						Content: dataContent,
-					}
-				}
-				cost += usedCost
+			inputs, err := getAccounts(as, info.Inputs)
+			if err != nil {
+				return 0, nil, err
 			}
+			outputs, err := getAccounts(as, info.Outputs)
+			if err != nil {
+				return 0, nil, err
+			}
+			usedCost, _, dataHash, dataContent, err := ss.RunContract(cs, remainCost, tx.Account, tx.Destination, info.Method, info.Params, inputs, outputs)
+			if err != nil {
+				return cost, nil, err
+			}
+			accountInfo, ok := accountMap[tx.Destination.String()]
+			if ok {
+				accountInfo.Data = &block.DataInfo{
+					Hash:    dataHash,
+					Content: dataContent,
+				}
+			}
+			cost += usedCost
 
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)
@@ -675,6 +668,19 @@ func (service *ConsensusService) ProcessPayload(remainCost int64, tx *block.Tran
 				}
 			}
 
+		case core.CORE_CODE_INFO:
+			info := msg.(*pb.CodeInfo)
+			_, codeHash, err := ss.CreateContract(tx.Destination, info.Code, info.Abi)
+			if err != nil {
+				return cost, nil, err
+			}
+			accountInfo, ok := accountMap[tx.Destination.String()]
+			if ok {
+				accountInfo.Code = &block.DataInfo{
+					Hash: codeHash,
+				}
+			}
+
 		case core.CORE_META_INFO:
 		case core.CORE_TOKEN_INFO:
 		case core.CORE_DATA_INFO:
@@ -684,6 +690,21 @@ func (service *ConsensusService) ProcessPayload(remainCost int64, tx *block.Tran
 	}
 
 	return cost, states, nil
+}
+
+func getAccounts(as libaccount.AccountService, list [][]byte) ([]libcore.Address, error) {
+	if list == nil {
+		return nil, nil
+	}
+	accounts := make([]libcore.Address, 0)
+	for _, item := range list {
+		_, account, err := as.NewAccountFromBytes(item)
+		if err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, account)
+	}
+	return accounts, nil
 }
 
 func (service *ConsensusService) HashBlock(b libblock.Block) (libcore.Hash, error) {

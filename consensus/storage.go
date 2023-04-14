@@ -8,10 +8,13 @@ import (
 
 	"github.com/caivega/glog"
 	libcore "github.com/tokentransfer/interfaces/core"
+	libcrypto "github.com/tokentransfer/interfaces/crypto"
 	libstore "github.com/tokentransfer/interfaces/store"
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/store"
+	"github.com/tokentransfer/node/util"
 	"github.com/tokentransfer/node/vm"
 )
 
@@ -119,6 +122,90 @@ func getGroup(parent core.Group, name string) (core.Group, error) {
 	return g, nil
 }
 
+func (s *StorageService) ReadCode(codeAccount libcore.Address) ([]byte, []byte, error) {
+	rootGroup, err := s.storage.Group("/")
+	if err != nil {
+		return nil, nil, err
+	}
+	codeGroup, err := getGroup(rootGroup, "code")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	address := codeAccount.String()
+	codeKey, err := codeGroup.GetKey(address)
+	if err != nil {
+		return nil, nil, err
+	}
+	codeData, err := s.storage.Get(codeKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	codeReader := codeData.Open()
+	wasmCode, err := core.ReadBytes(codeReader)
+	if err != nil {
+		return nil, nil, err
+	}
+	abiCode, err := core.ReadBytes(codeReader)
+	if err != nil {
+		return nil, nil, err
+	}
+	codeReader.Close()
+	codeData.Dispose()
+	glog.Infoln("> read code", codeAccount.String(), codeKey.String(), len(wasmCode), len(abiCode))
+
+	return wasmCode, abiCode, nil
+}
+
+func (s *StorageService) WriteCode(account libcore.Address, wasmCode []byte, abiCode []byte) (core.Key, error) {
+	rootGroup, err := s.storage.Group("/")
+	if err != nil {
+		return nil, err
+	}
+	codeGroup, err := getGroup(rootGroup, "code")
+	if err != nil {
+		return nil, err
+	}
+	// s.dump("create code group")
+
+	address := account.String()
+	t := s.storage.Create(address)
+	err = core.WriteBytes(t, wasmCode)
+	if err != nil {
+		return nil, err
+	}
+	if abiCode == nil {
+		abiCode = make([]byte, 0)
+	}
+	err = core.WriteBytes(t, abiCode)
+	if err != nil {
+		return nil, err
+	}
+	err = t.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	d, err := t.Data()
+	if err != nil {
+		return nil, err
+	}
+	_, err = codeGroup.AddData(address, d.Key())
+	if err != nil {
+		return nil, err
+	}
+	err = codeGroup.Commit()
+	if err != nil {
+		return nil, err
+	}
+	// s.dump("create code account")
+	d.Dispose()
+	t.Dispose()
+	glog.Infoln("> write code", address, d.Key().String(), len(wasmCode), len(abiCode))
+
+	return d.Key(), nil
+}
+
 func (s *StorageService) WriteData(dataAccount libcore.Address, codeAccount libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
@@ -159,7 +246,7 @@ func (s *StorageService) WriteData(dataAccount libcore.Address, codeAccount libc
 	}
 	d.Dispose()
 	t.Dispose()
-	glog.Infoln("> create data", dataAccount.String(), address, d.Key().String(), len(data))
+	glog.Infoln("> write data", dataAccount.String(), address, d.Key().String(), len(data))
 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
@@ -306,99 +393,86 @@ func (s *StorageService) CreateContract(account libcore.Address, wasmCode []byte
 	if err != nil {
 		return nil, nil, err
 	}
-	rootGroup, err := s.storage.Group("/")
+	k, err := s.WriteCode(account, wasmCode, abiCode)
 	if err != nil {
 		return nil, nil, err
 	}
-	codeGroup, err := getGroup(rootGroup, "code")
-	if err != nil {
-		return nil, nil, err
-	}
-	// s.dump("create code group")
-
-	address := account.String()
-	t := s.storage.Create(address)
-	err = core.WriteBytes(t, wasmCode)
-	if err != nil {
-		return nil, nil, err
-	}
-	if abiCode == nil {
-		abiCode = make([]byte, 0)
-	}
-	err = core.WriteBytes(t, abiCode)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = t.Close()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	d, err := t.Data()
-	if err != nil {
-		return nil, nil, err
-	}
-	_, err = codeGroup.AddData(address, d.Key())
-	if err != nil {
-		return nil, nil, err
-	}
-	err = codeGroup.Commit()
-	if err != nil {
-		return nil, nil, err
-	}
-	// s.dump("create code account")
-	d.Dispose()
-	t.Dispose()
-	glog.Infoln("> create contract", address, d.Key().String(), len(wasmCode), len(abiCode))
-
-	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
+	return libcore.Hash(s.storage.Root()), libcore.Hash(k), nil
 }
 
-func (s *StorageService) RunContract(cost int64, codeAccount libcore.Address, readAccount libcore.Address, writeAccount libcore.Address, method string, params [][]byte) (int64, libcore.Hash, libcore.Hash, []byte, error) {
-	rootGroup, err := s.storage.Group("/")
+func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Hash, libcore.Hash, []byte, error) {
+	wasmCode, abiCode, err := s.ReadCode(toAccount)
 	if err != nil {
 		return 0, nil, nil, nil, err
 	}
-	codeGroup, err := getGroup(rootGroup, "code")
-	if err != nil {
-		return 0, nil, nil, nil, err
+	var wasmData []byte
+	if len(inputs) == 0 {
+		wasmData, _ = s.ReadData(fromAccount, toAccount)
+	} else {
+		inputDatas := &pb.DataList{}
+		for _, input := range inputs {
+			wasmData, _ := s.ReadData(fromAccount, input)
+			inputDatas.List = append(inputDatas.List, &pb.Data{
+				Bytes: wasmData,
+			})
+		}
+		wasmData, err = core.MarshalData(inputDatas)
+		if err != nil {
+			return 0, nil, nil, nil, err
+		}
 	}
-
-	address := codeAccount.String()
-	codeKey, err := codeGroup.GetKey(address)
-	if err != nil {
-		return 0, nil, nil, nil, err
-	}
-	codeData, err := s.storage.Get(codeKey)
-	if err != nil {
-		return 0, nil, nil, nil, err
-	}
-	codeReader := codeData.Open()
-	wasmCode, err := core.ReadBytes(codeReader)
-	if err != nil {
-		return 0, nil, nil, nil, err
-	}
-	abiCode, err := core.ReadBytes(codeReader)
-	if err != nil {
-		return 0, nil, nil, nil, err
-	}
-	codeReader.Close()
-	codeData.Dispose()
-
-	wasmData, _ := s.ReadData(readAccount, codeAccount)
 	usedCost, newWasmData, resultData, err := vm.RunWasm(cost, wasmCode, abiCode, wasmData, method, params) // remainCost
 	if err != nil {
 		return 0, nil, nil, nil, err
 	}
 	if newWasmData != nil {
-		rootHash, dataHash, err := s.WriteData(writeAccount, codeAccount, newWasmData)
-		if err != nil {
-			return 0, nil, nil, nil, err
+		if len(outputs) == 0 {
+			rootHash, dataHash, err := s.WriteData(toAccount, fromAccount, newWasmData)
+			if err != nil {
+				return 0, nil, nil, nil, err
+			}
+			glog.Infoln("> run contract", usedCost, fromAccount.String(), toAccount.String(), method, len(inputs), len(outputs), len(wasmData), len(newWasmData), string(resultData))
+			return usedCost, rootHash, dataHash, resultData, nil
+		} else {
+			t, msg, err := core.UnmarshalData(newWasmData)
+			if err != nil {
+				return 0, nil, nil, nil, err
+			}
+			if t != core.CORE_DATA_LIST {
+				return 0, nil, nil, nil, util.ErrorOfInvalid("return data", "should be data list")
+			}
+			outputDatas := msg.(*pb.DataList)
+			if len(outputDatas.List) != len(outputs) {
+				return 0, nil, nil, nil, util.ErrorOfInvalid("return data", fmt.Sprintf("%d != %d", len(outputDatas.List), len(outputs)))
+			}
+			resultInfos := &pb.DataList{}
+			for index, outputData := range outputDatas.List {
+				output := outputs[index]
+				_, dataHash, err := s.WriteData(toAccount, output, outputData.Bytes)
+				if err != nil {
+					return 0, nil, nil, nil, err
+				}
+				hashBytes, err := core.MarshalData(dataHash[:])
+				if err != nil {
+					return 0, nil, nil, nil, err
+				}
+				resultInfos.List = append(resultInfos.List, &pb.Data{
+					Bytes: hashBytes,
+				})
+			}
+			resultDatas, err := core.MarshalData(resultInfos)
+			if err != nil {
+				return 0, nil, nil, nil, err
+			}
+			dataHash, err := cs.Hash(resultDatas)
+			if err != nil {
+				return 0, nil, nil, nil, err
+			}
+			glog.Infoln("> run contract", usedCost, fromAccount.String(), toAccount.String(), method, len(inputs), len(outputs), len(wasmData), len(newWasmData), len(resultDatas), string(resultData))
+			return usedCost, nil, dataHash, resultDatas, nil
 		}
-		glog.Infoln("> run contract", usedCost, codeAccount.String(), readAccount.String(), writeAccount.String(), method, len(wasmData), len(newWasmData), string(resultData))
-		return usedCost, rootHash, dataHash, resultData, nil
 	} else {
-		glog.Infoln("> run contract", usedCost, codeAccount.String(), readAccount.String(), writeAccount.String(), method, resultData)
+		glog.Infoln("> run contract", usedCost, fromAccount.String(), toAccount.String(), method, resultData)
 		return usedCost, nil, nil, resultData, nil
 	}
 }

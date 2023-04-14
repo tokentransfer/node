@@ -253,17 +253,45 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 			contractInfo := &pb.ContractInfo{}
 
 			cm := util.ToMap(&pxm, "contract")
-			if util.Has(&cm, "account") {
-				accountString := util.ToString(&cm, "account")
-				_, account, err := as.NewAccountFromAddress(accountString)
-				if err != nil {
-					return "", nil, err
+			if util.Has(&cm, "inputs") {
+				inputs := util.ToArray(&cm, "inputs")
+				list := make([][]byte, 0)
+				for _, input := range inputs {
+					accountString, ok := input.(string)
+					if !ok {
+						return "", nil, util.ErrorOfInvalid("input", "account")
+					}
+					_, account, err := as.NewAccountFromAddress(accountString)
+					if err != nil {
+						return "", nil, err
+					}
+					accountData, err := account.MarshalBinary()
+					if err != nil {
+						return "", nil, err
+					}
+					list = append(list, accountData)
 				}
-				accountData, err := account.MarshalBinary()
-				if err != nil {
-					return "", nil, err
+				contractInfo.Inputs = list
+			}
+			if util.Has(&cm, "outputs") {
+				outputs := util.ToArray(&cm, "outputs")
+				list := make([][]byte, 0)
+				for _, output := range outputs {
+					accountString, ok := output.(string)
+					if !ok {
+						return "", nil, util.ErrorOfInvalid("output", "account")
+					}
+					_, account, err := as.NewAccountFromAddress(accountString)
+					if err != nil {
+						return "", nil, err
+					}
+					accountData, err := account.MarshalBinary()
+					if err != nil {
+						return "", nil, err
+					}
+					list = append(list, accountData)
 				}
-				contractInfo.Account = accountData
+				contractInfo.Outputs = list
 			}
 			if util.Has(&cm, "method") {
 				contractInfo.Method = util.ToString(&cm, "method")
@@ -303,13 +331,30 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 					contractInfo.Params = list
 				}
 			}
+			contractData, err := core.Marshal(contractInfo)
+			if err != nil {
+				return "", nil, err
+			}
+			dataHash, err := n.cryptoService.Hash(contractData)
+			if err != nil {
+				return "", nil, err
+			}
+			payloadInfo.Infos = append(payloadInfo.Infos, &block.DataInfo{
+				Hash:    dataHash,
+				Content: contractData,
+			})
+		}
+		if util.Has(&pxm, "code") {
+			codeInfo := &pb.CodeInfo{}
+
+			cm := util.ToMap(&pxm, "code")
 			if util.Has(&cm, "code") {
 				codeString := util.ToString(&cm, "code")
 				codeData, err := hex.DecodeString(codeString)
 				if err != nil {
 					return "", nil, err
 				}
-				contractInfo.Code = codeData
+				codeInfo.Code = codeData
 			} else if util.Has(&cm, "file") {
 				filePath := util.ToString(&cm, "file")
 				f, err := os.Open(filePath)
@@ -321,7 +366,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 				if err != nil {
 					return "", nil, err
 				}
-				contractInfo.Code = fileData
+				codeInfo.Code = fileData
 			}
 			if util.Has(&cm, "abi") {
 				abiString := util.ToString(&cm, "abi")
@@ -329,7 +374,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 				if err != nil {
 					return "", nil, err
 				}
-				contractInfo.Abi = abiData
+				codeInfo.Abi = abiData
 			} else if util.Has(&cm, "json") {
 				jsonPath := util.ToString(&cm, "json")
 				f, err := os.Open(jsonPath)
@@ -341,21 +386,20 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 				if err != nil {
 					return "", nil, err
 				}
-				contractInfo.Abi = jsonData
+				codeInfo.Abi = jsonData
 			}
 
-			contractData, err := core.Marshal(contractInfo)
+			codeData, err := core.Marshal(codeInfo)
 			if err != nil {
 				return "", nil, err
 			}
-
-			dataHash, err := n.cryptoService.Hash(contractData)
+			dataHash, err := n.cryptoService.Hash(codeData)
 			if err != nil {
 				return "", nil, err
 			}
 			payloadInfo.Infos = append(payloadInfo.Infos, &block.DataInfo{
 				Hash:    dataHash,
-				Content: contractData,
+				Content: codeData,
 			})
 		}
 		if util.Has(&pxm, "page") {
@@ -391,7 +435,6 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 			if err != nil {
 				return "", nil, err
 			}
-
 			dataHash, err := n.cryptoService.Hash(pageData)
 			if err != nil {
 				return "", nil, err
