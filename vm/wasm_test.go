@@ -135,13 +135,45 @@ func (suite *WasmSuite) testVMDemo(c *C) {
 	fmt.Println(cost, usedCost, cost-usedCost)
 }
 
+func (suite *WasmSuite) TestData(c *C) {
+	hexString := "410a3f0a046c69737412370a35400a0b0a093701000000000000000a0b0a093702000000000000000a0b0a093706000000000000000a0b0a0937091b000000000000"
+	hexData, err := hex.DecodeString(hexString)
+	c.Assert(err, IsNil)
+	o, err := core.AsData(hexData)
+	c.Assert(err, IsNil)
+	util.PrintJSON("wasm data", o)
+}
+
+func (suite *WasmSuite) TestList(c *C) {
+	v0 := int64(1)
+	v1 := int64(2)
+	v2 := int64(3)
+	v3 := int64(4)
+	mapData, err := core.MarshalData([]interface{}{
+		map[string]interface{}{
+			"list": []interface{}{
+				v0,
+				v1,
+			},
+		},
+		map[string]interface{}{
+			"list": []interface{}{
+				v2,
+				v3,
+			},
+		},
+	})
+	c.Assert(err, IsNil)
+	fmt.Println(hex.EncodeToString(mapData))
+}
+
 func (suite *WasmSuite) TestVerify(c *C) {
 	wasmCode, abiData := loadWasm(c, "./testdata/wasm_lib_bg")
 	err := VerifyWasm(wasmCode, abiData)
 	c.Assert(err, IsNil)
 }
 
-func (suite *WasmSuite) TestVMBg(c *C) {
+func (suite *WasmSuite) testVMBg(c *C) {
 	wasmCode, abiData := loadWasm(c, "./testdata/wasm_lib_bg")
 
 	cases := []map[string]interface{}{

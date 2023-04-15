@@ -155,7 +155,7 @@ func (f *chunkGroup) AddGroup(name string) (core.Group, error) {
 		g: g,
 	}
 	f.itemMap[name] = len(f.itemArray)
-	f.itemMap[item.key.String()] = len(f.itemArray)
+	// f.itemMap[item.key.String()] = len(f.itemArray)
 	f.itemArray = append(f.itemArray, item)
 	err = f.update()
 	if err != nil {
@@ -252,7 +252,7 @@ func (f *chunkGroup) Load(key core.Key) error {
 				}
 			}
 			f.itemMap[item.name] = len(f.itemArray)
-			f.itemMap[item.key.String()] = len(f.itemArray)
+			// f.itemMap[item.key.String()] = len(f.itemArray)
 
 			f.itemArray = append(f.itemArray, item)
 		}
@@ -385,38 +385,37 @@ func (f *chunkGroup) Key() core.Key {
 	return core.Key{}
 }
 
-func (f *chunkGroup) lookup(name string, key core.Key) bool {
-	index, ok := f.itemMap[name]
-	if ok {
-		item := f.itemArray[index]
-		if item != nil && item.key.String() == key.String() {
-			return true
-		}
-	}
-	return false
-}
-
 func (f *chunkGroup) AddData(name string, key core.Key) (bool, error) {
 	f.locker.Lock()
 	defer f.locker.Unlock()
 
-	if f.lookup(name, key) {
-		return true, nil
-	}
+	var item *chunkItem = nil
 
+	index, ok := f.itemMap[name]
+	if ok {
+		item = f.itemArray[index]
+		if item != nil {
+			if item.key.String() == key.String() {
+				return true, nil
+			} else {
+				item.key = key
+			}
+		}
+	}
 	err := f.storage.lockL(key)
 	if err != nil {
 		return false, err
 	}
-
-	item := &chunkItem{
-		name:  name,
-		key:   key,
-		group: false,
+	if item == nil {
+		item = &chunkItem{
+			name:  name,
+			key:   key,
+			group: false,
+		}
+		f.itemMap[name] = len(f.itemArray)
+		// f.itemMap[item.key.String()] = len(f.itemArray)
+		f.itemArray = append(f.itemArray, item)
 	}
-	f.itemMap[name] = len(f.itemArray)
-	f.itemMap[item.key.String()] = len(f.itemArray)
-	f.itemArray = append(f.itemArray, item)
 	err = f.update()
 	if err != nil {
 		return false, err
