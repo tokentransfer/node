@@ -546,11 +546,8 @@ func (n *Node) processTransaction(tx libblock.Transaction) (libblock.Transaction
 	if err != nil {
 		return nil, nil, err
 	}
+	defer n.storageService.CancelSandbox()
 	txWithData, err := n.consensusService.ProcessTransaction(tx)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = n.storageService.CancelSandbox()
 	if err != nil {
 		return nil, nil, err
 	}

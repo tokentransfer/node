@@ -313,12 +313,12 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 
 	transactionHash := ms.GetTransactionRoot()
 	stateHash := ms.GetStateRoot()
-	if !b.GetTransactionHash().Equals(transactionHash) {
+	if b.GetTransactionHash().String() != transactionHash.String() {
 		ok = false
 		err = fmt.Errorf("error transaction hash: %s != %s", b.GetTransactionHash().String(), transactionHash.String())
 		return
 	}
-	if !b.GetStateHash().Equals(stateHash) {
+	if b.GetStateHash().String() != stateHash.String() {
 		ok = false
 		err = fmt.Errorf("error state hash: %s != %s", b.GetStateHash().String(), stateHash.String())
 		return
