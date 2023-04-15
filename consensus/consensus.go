@@ -419,7 +419,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 			case core.CORE_PAYLOAD_INFO:
 			case core.CORE_CONTRACT_INFO:
 				info := msg.(*pb.ContractInfo)
-				if !(len(info.Method) > 0 && info.Params != nil) {
+				if !(len(info.Method) > 0) {
 					return false, util.ErrorOfInvalid("format", "contract info")
 				}
 			case core.CORE_PAGE_INFO:

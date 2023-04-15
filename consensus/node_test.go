@@ -1,8 +1,10 @@
 package consensus
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"testing"
 
 	libcrypto "github.com/tokentransfer/interfaces/crypto"
@@ -28,18 +30,59 @@ func dump(c *C, s core.Storage, name string) {
 
 	root, err := s.Group("/")
 	c.Assert(err, IsNil)
-	dumpGroup(c, root, chunk.LogPrinter{})
+	dumpGroup(c, s, root, chunk.LogPrinter{})
 }
 
-func dumpGroup(c *C, g core.Group, log core.Printer) {
+func dumpGroup(c *C, s core.Storage, g core.Group, log core.Printer) {
 	g.Dump(log)
-	for _, item := range g.List() {
+	for index, item := range g.List() {
 		ok, err := g.IsGroup(item)
 		c.Assert(err, IsNil)
 		if ok {
 			sub, err := g.Group(item)
 			c.Assert(err, IsNil)
-			dumpGroup(c, sub, log)
+			dumpGroup(c, s, sub, log)
+		} else {
+			switch g.Name() {
+			case "code":
+				dataKey, err := g.GetKey(item)
+				c.Assert(err, IsNil)
+
+				data, err := s.Get(dataKey)
+				c.Assert(err, IsNil)
+				reader := data.Open()
+				wasmData, err := core.ReadBytes(reader)
+				c.Assert(err, IsNil)
+				abiData, err := core.ReadBytes(reader)
+				c.Assert(err, IsNil)
+				reader.Close()
+				data.Dispose()
+
+				fmt.Println(">", index, len(wasmData), len(abiData))
+
+			default:
+				dataKey, err := g.GetKey(item)
+				c.Assert(err, IsNil)
+
+				data, err := s.Get(dataKey)
+				c.Assert(err, IsNil)
+				reader := data.Open()
+				buf := new(bytes.Buffer)
+				_, err = io.Copy(buf, reader)
+				c.Assert(err, IsNil)
+				reader.Close()
+				data.Dispose()
+				dataBytes := buf.Bytes()
+
+				fmt.Println(">", index, len(dataBytes), string(dataBytes))
+				if len(dataBytes) > 0 {
+					bs, err := hex.DecodeString(string(dataBytes))
+					c.Assert(err, IsNil)
+					o, err := core.AsData(bs)
+					c.Assert(err, IsNil)
+					util.PrintJSON(item, o)
+				}
+			}
 		}
 	}
 }
@@ -76,7 +119,7 @@ func (suite *NodeSuite) TestProcess(c *C) {
 
 	dump(c, n.storageService.storage, "before")
 
-	blob := "650801121602006DA68A0C5DAAE0715AE6B62F00F548A2C6981C2F180322083130302F54455354280A32160200396C520DD96C0DFBAE874713732C701C0F4D9EEF3A3A0A380A20F63546DCF74C70142978051086B94FC47F22D2E1B844AA149D2B71357910D93B12148E1A0361646422053603000000220536040000004243020004D33A199D322FAFD28867E3B9FB2F5AC081D56CFF1AE803635730E1D01B77D837D9EE578346DD88B68D21B9A61B8F1EFE9B2574F08B4A471F864FA7EA7A29185C4A9C013130303930343635393332303234373139343333333637303039333238343834383632323836373136393239303330393033373031353631343234343331383333353733323032393732353134373A3638343630333239353536343837373039343332333236313432383731303039363031363037393137313131393836353338313535343937393732393630323632333936323835323839393131"
+	blob := "650801121602006DA68A0C5DAAE0715AE6B62F00F548A2C6981C2F180822083130302F5445535428C09A0C3216020002834B2A40474D0AAB28EF195531F9F4354EE4523A5D0A5B0A201910E5D7D6386C7C5F5367358DDA50FD916F5F5E8B702EDDF5EC2D8BC710D88C12378E0A160200B5A1D2E92521249AB079341095CDAE44CD4998770A1602006B39BA86CAB636A780C9DD68D49B0F493793AA831A046C6973744243020004D33A199D322FAFD28867E3B9FB2F5AC081D56CFF1AE803635730E1D01B77D837D9EE578346DD88B68D21B9A61B8F1EFE9B2574F08B4A471F864FA7EA7A29185C4A9B0132313134333233313433363636383138303132353132373931373038363932323132303333383237363634353232393837343935353431303634373136363539343438393235383332393934343A3131353636353132333831393236333938303432343039353039353536383236313539313739363730393039393739383435323539383031323231303636373632323134353431353935373435"
 	data, err := hex.DecodeString(blob)
 	c.Assert(err, IsNil)
 
