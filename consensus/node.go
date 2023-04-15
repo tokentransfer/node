@@ -254,44 +254,78 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 
 			cm := util.ToMap(&pxm, "contract")
 			if util.Has(&cm, "inputs") {
-				inputs := util.ToArray(&cm, "inputs")
-				list := make([][]byte, 0)
-				for _, input := range inputs {
-					accountString, ok := input.(string)
-					if !ok {
-						return "", nil, util.ErrorOfInvalid("input", "account")
+				if inputString := util.ToString(&cm, "inputs"); len(inputString) > 0 {
+					inputs := strings.Split(inputString, ",")
+					list := make([][]byte, 0)
+					for _, accountString := range inputs {
+						_, account, err := as.NewAccountFromAddress(accountString)
+						if err != nil {
+							return "", nil, err
+						}
+						accountData, err := account.MarshalBinary()
+						if err != nil {
+							return "", nil, err
+						}
+						list = append(list, accountData)
 					}
-					_, account, err := as.NewAccountFromAddress(accountString)
-					if err != nil {
-						return "", nil, err
-					}
-					accountData, err := account.MarshalBinary()
-					if err != nil {
-						return "", nil, err
-					}
-					list = append(list, accountData)
+					contractInfo.Inputs = list
 				}
-				contractInfo.Inputs = list
+				if inputs := util.ToArray(&cm, "inputs"); inputs != nil {
+					list := make([][]byte, 0)
+					for _, input := range inputs {
+						accountString, ok := input.(string)
+						if !ok {
+							return "", nil, util.ErrorOfInvalid("input", "account")
+						}
+						_, account, err := as.NewAccountFromAddress(accountString)
+						if err != nil {
+							return "", nil, err
+						}
+						accountData, err := account.MarshalBinary()
+						if err != nil {
+							return "", nil, err
+						}
+						list = append(list, accountData)
+					}
+					contractInfo.Inputs = list
+				}
 			}
 			if util.Has(&cm, "outputs") {
-				outputs := util.ToArray(&cm, "outputs")
-				list := make([][]byte, 0)
-				for _, output := range outputs {
-					accountString, ok := output.(string)
-					if !ok {
-						return "", nil, util.ErrorOfInvalid("output", "account")
+				if outputString := util.ToString(&cm, "outputs"); len(outputString) > 0 {
+					outputs := strings.Split(outputString, ",")
+					list := make([][]byte, 0)
+					for _, accountString := range outputs {
+						_, account, err := as.NewAccountFromAddress(accountString)
+						if err != nil {
+							return "", nil, err
+						}
+						accountData, err := account.MarshalBinary()
+						if err != nil {
+							return "", nil, err
+						}
+						list = append(list, accountData)
 					}
-					_, account, err := as.NewAccountFromAddress(accountString)
-					if err != nil {
-						return "", nil, err
-					}
-					accountData, err := account.MarshalBinary()
-					if err != nil {
-						return "", nil, err
-					}
-					list = append(list, accountData)
+					contractInfo.Outputs = list
 				}
-				contractInfo.Outputs = list
+				if outputs := util.ToArray(&cm, "outputs"); outputs != nil {
+					list := make([][]byte, 0)
+					for _, output := range outputs {
+						accountString, ok := output.(string)
+						if !ok {
+							return "", nil, util.ErrorOfInvalid("output", "account")
+						}
+						_, account, err := as.NewAccountFromAddress(accountString)
+						if err != nil {
+							return "", nil, err
+						}
+						accountData, err := account.MarshalBinary()
+						if err != nil {
+							return "", nil, err
+						}
+						list = append(list, accountData)
+					}
+					contractInfo.Outputs = list
+				}
 			}
 			if util.Has(&cm, "method") {
 				contractInfo.Method = util.ToString(&cm, "method")
