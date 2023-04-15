@@ -168,6 +168,7 @@ func NewNode() *Node {
 func (n *Node) Init(c libcore.Config) error {
 	n.config = c.(*config.Config)
 	core.Init(n.config)
+	util.Init(n.config.GetMode())
 
 	_, key, err := n.accountService.NewKeyFromSecret(n.config.GetSecret())
 	if err != nil {
@@ -962,7 +963,9 @@ func (n *Node) connect() {
 			p := list[i]
 			glog.Infoln("==>", i+1, p.GetIndex(), p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount)
 		}
-
+		if len(list) == 0 {
+			n.Consensused = n.PrepareConsensus()
+		}
 		if !lastConsensused && n.Consensused {
 			lastConsensused = n.Consensused
 			n.ready.Done()
@@ -990,6 +993,10 @@ func (n *Node) PrepareConsensus() bool {
 		if p.Status >= PeerKnown && p.BlockNumber == currentBlock && (p.PeerCount == currentCount) {
 			count++
 		}
+	}
+	l := len(n.config.GetBootstraps())
+	if l == 0 {
+		return true
 	}
 	if count > 0 && (count+1) == currentCount {
 		for i := 0; i < len(list); i++ {

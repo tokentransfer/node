@@ -160,14 +160,14 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 						if len(wasmData) != 0 {
 							switch t {
 							case core.CORE_DATA_STRING:
-								retData, err := core.MarshalData(string(wasmData))
+								s := hex.EncodeToString(wasmData)
+								retData, err := core.MarshalData(s)
 								if err != nil {
 									return nil, nil, err
 								}
 								data = retData
 							case core.CORE_DATA_BYTES:
-								s := hex.EncodeToString(wasmData)
-								retData, err := core.MarshalData(s)
+								retData, err := core.MarshalData(wasmData)
 								if err != nil {
 									return nil, nil, err
 								}
@@ -227,13 +227,13 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 				if outputData { // return as wasm data
 					switch outputType {
 					case core.CORE_DATA_STRING:
-						return retData, nil, nil
-					case core.CORE_DATA_BYTES:
 						newWasmData, err := hex.DecodeString(string(retData))
 						if err != nil {
 							return nil, nil, err
 						}
 						return newWasmData, nil, nil
+					case core.CORE_DATA_BYTES:
+						return retData, nil, nil
 					default:
 						return retData, nil, err
 					}

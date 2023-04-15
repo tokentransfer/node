@@ -31,7 +31,7 @@ func NewRPCService(n *consensus.Node) *RPCService {
 
 func (service *RPCService) Init(c libcore.Config) error {
 	service.config = c.(*config.Config)
-	service.testMode = (service.config.GetMode() == "test")
+	service.testMode = util.IsTest()
 	return nil
 }
 

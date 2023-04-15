@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"sync"
@@ -417,11 +416,10 @@ func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fro
 				Bytes: wasmData,
 			})
 		}
-		listData, err := core.MarshalData(inputDatas)
+		wasmData, err = core.MarshalData(inputDatas)
 		if err != nil {
 			return 0, nil, nil, nil, nil, err
 		}
-		wasmData = []byte(hex.EncodeToString(listData))
 	}
 	usedCost, newWasmData, resultData, err := vm.RunWasm(cost, wasmCode, abiCode, wasmData, method, params) // remainCost
 	if err != nil {
@@ -454,7 +452,7 @@ func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fro
 				if err != nil {
 					return 0, nil, nil, nil, nil, err
 				}
-				hashBytes, err := core.MarshalData(dataHash[:])
+				hashBytes, err := core.MarshalData([]byte(dataHash))
 				if err != nil {
 					return 0, nil, nil, nil, nil, err
 				}
