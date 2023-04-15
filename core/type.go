@@ -164,6 +164,56 @@ func AsUint64(data []byte) (uint64, error) {
 	return v, nil
 }
 
+func AsFloat64(data []byte) (float64, error) {
+	meta, value, err := UnmarshalData(data)
+	if err != nil {
+		return 0, err
+	}
+	var v float64
+	var e error
+	switch meta {
+	case CORE_DATA_INT8:
+		v = float64(value.(int8))
+		e = nil
+	case CORE_DATA_UINT8:
+		v = float64(value.(uint8))
+		e = nil
+	case CORE_DATA_INT16:
+		v = float64(value.(int16))
+		e = nil
+	case CORE_DATA_UINT16:
+		v = float64(value.(uint16))
+		e = nil
+	case CORE_DATA_INT32:
+		v = float64(value.(int32))
+		e = nil
+	case CORE_DATA_UINT32:
+		v = float64(value.(uint32))
+		e = nil
+	case CORE_DATA_INT64:
+		v = float64(value.(int64))
+		e = nil
+	case CORE_DATA_UINT64:
+		v = float64(value.(uint64))
+		e = nil
+	case CORE_DATA_FLOAT32:
+		v = float64(value.(float32))
+		e = nil
+	case CORE_DATA_FLOAT64:
+		v = value.(float64)
+		e = nil
+	case CORE_DATA_STRING:
+		v, e = strconv.ParseFloat(value.(string), 32)
+	default:
+		v = 0
+		e = util.ErrorOfInvalid("type", "data")
+	}
+	if e != nil {
+		return 0, e
+	}
+	return v, nil
+}
+
 func (t DataType) FromString(s string) ([]byte, error) {
 	var v interface{}
 	var e error

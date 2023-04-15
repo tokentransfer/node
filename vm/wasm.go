@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -115,158 +114,6 @@ func (wm *WasmModule) Verify(mod api.Module, abiCode []byte, method string, para
 		return nil, util.ErrorOfInvalid("parameter", fmt.Sprintf("%d != %d", tLen, pLen))
 	}
 	return f, nil
-}
-
-func getBigNumberValue(data []byte) (int64, error) {
-	meta, value, err := core.UnmarshalData(data)
-	if err != nil {
-		return 0, err
-	}
-	var v int64
-	var e error
-	switch meta {
-	case core.CORE_DATA_INT8:
-		v = int64(value.(int8))
-		e = nil
-	case core.CORE_DATA_UINT8:
-		v = int64(value.(uint8))
-		e = nil
-	case core.CORE_DATA_INT16:
-		v = int64(value.(int16))
-		e = nil
-	case core.CORE_DATA_UINT16:
-		v = int64(value.(uint16))
-		e = nil
-	case core.CORE_DATA_INT32:
-		v = int64(value.(int32))
-		e = nil
-	case core.CORE_DATA_UINT32:
-		v = int64(value.(uint32))
-		e = nil
-	case core.CORE_DATA_INT64:
-		v = value.(int64)
-		e = nil
-	case core.CORE_DATA_UINT64:
-		v = int64(value.(uint64))
-		e = nil
-	case core.CORE_DATA_FLOAT32:
-		v = int64(api.EncodeF32(value.(float32)))
-		e = nil
-	case core.CORE_DATA_FLOAT64:
-		v = int64(api.EncodeF64(value.(float64)))
-		e = nil
-	case core.CORE_DATA_STRING:
-		v, e = strconv.ParseInt(value.(string), 10, 32)
-	default:
-		v = 0
-		e = util.ErrorOfInvalid("type", "data")
-	}
-	if e != nil {
-		return 0, e
-	}
-	return v, nil
-}
-
-func getF32Value(data []byte) (float32, error) {
-	meta, value, err := core.UnmarshalData(data)
-	if err != nil {
-		return 0, err
-	}
-	var v float32
-	var e error
-	switch meta {
-	case core.CORE_DATA_INT8:
-		v = float32(value.(int8))
-		e = nil
-	case core.CORE_DATA_UINT8:
-		v = float32(value.(uint8))
-		e = nil
-	case core.CORE_DATA_INT16:
-		v = float32(value.(int16))
-		e = nil
-	case core.CORE_DATA_UINT16:
-		v = float32(value.(uint16))
-		e = nil
-	case core.CORE_DATA_INT32:
-		v = float32(value.(int32))
-		e = nil
-	case core.CORE_DATA_UINT32:
-		v = float32(value.(uint32))
-		e = nil
-	case core.CORE_DATA_INT64:
-		v = float32(value.(int64))
-		e = nil
-	case core.CORE_DATA_UINT64:
-		v = float32(value.(uint64))
-		e = nil
-	case core.CORE_DATA_FLOAT32:
-		v = value.(float32)
-		e = nil
-	case core.CORE_DATA_STRING:
-		f32, err := strconv.ParseFloat(value.(string), 32)
-		if err != nil {
-			return 0, err
-		}
-		v = float32(f32)
-		e = nil
-	default:
-		v = 0
-		e = util.ErrorOfInvalid("type", "data")
-	}
-	if e != nil {
-		return 0, e
-	}
-	return v, nil
-}
-
-func getF64Value(data []byte) (float64, error) {
-	meta, value, err := core.UnmarshalData(data)
-	if err != nil {
-		return 0, err
-	}
-	var v float64
-	var e error
-	switch meta {
-	case core.CORE_DATA_INT8:
-		v = float64(value.(int8))
-		e = nil
-	case core.CORE_DATA_UINT8:
-		v = float64(value.(uint8))
-		e = nil
-	case core.CORE_DATA_INT16:
-		v = float64(value.(int16))
-		e = nil
-	case core.CORE_DATA_UINT16:
-		v = float64(value.(uint16))
-		e = nil
-	case core.CORE_DATA_INT32:
-		v = float64(value.(int32))
-		e = nil
-	case core.CORE_DATA_UINT32:
-		v = float64(value.(uint32))
-		e = nil
-	case core.CORE_DATA_INT64:
-		v = float64(value.(int64))
-		e = nil
-	case core.CORE_DATA_UINT64:
-		v = float64(value.(uint64))
-		e = nil
-	case core.CORE_DATA_FLOAT32:
-		v = float64(value.(float32))
-		e = nil
-	case core.CORE_DATA_FLOAT64:
-		v = value.(float64)
-		e = nil
-	case core.CORE_DATA_STRING:
-		v, e = strconv.ParseFloat(value.(string), 32)
-	default:
-		v = 0
-		e = util.ErrorOfInvalid("type", "data")
-	}
-	if e != nil {
-		return 0, e
-	}
-	return v, nil
 }
 
 func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, method string, params [][]byte) ([]byte, []byte, error) {
@@ -426,13 +273,14 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 				}
 				list = append(list, api.EncodeI64(int64(i64)))
 			case api.ValueTypeF32:
-				f32, err := getF32Value(p)
+				f64, err := core.AsFloat64(p)
 				if err != nil {
 					return nil, nil, err
 				}
-				list = append(list, api.EncodeF32(float32(f32)))
+				f32 := float32(f64)
+				list = append(list, api.EncodeF32(f32))
 			case api.ValueTypeF64:
-				f64, err := getF64Value(p)
+				f64, err := core.AsFloat64(p)
 				if err != nil {
 					return nil, nil, err
 				}
