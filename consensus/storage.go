@@ -400,10 +400,10 @@ func (s *StorageService) CreateContract(account libcore.Address, wasmCode []byte
 	return libcore.Hash(s.storage.Root()), libcore.Hash(k), nil
 }
 
-func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Hash, libcore.Hash, []byte, error) {
+func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Address, libcore.Hash, libcore.Hash, []byte, error) {
 	wasmCode, abiCode, err := s.ReadCode(toAccount)
 	if err != nil {
-		return 0, nil, nil, nil, err
+		return 0, nil, nil, nil, nil, err
 	}
 	var wasmData []byte
 	if len(inputs) == 0 {
@@ -418,43 +418,43 @@ func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fro
 		}
 		wasmData, err = core.MarshalData(inputDatas)
 		if err != nil {
-			return 0, nil, nil, nil, err
+			return 0, nil, nil, nil, nil, err
 		}
 	}
 	usedCost, newWasmData, resultData, err := vm.RunWasm(cost, wasmCode, abiCode, wasmData, method, params) // remainCost
 	if err != nil {
-		return 0, nil, nil, nil, err
+		return 0, nil, nil, nil, nil, err
 	}
 	if newWasmData != nil {
 		if len(outputs) == 0 {
-			rootHash, dataHash, err := s.WriteData(toAccount, fromAccount, newWasmData)
+			rootHash, dataHash, err := s.WriteData(fromAccount, toAccount, newWasmData)
 			if err != nil {
-				return 0, nil, nil, nil, err
+				return 0, nil, nil, nil, nil, err
 			}
 			glog.Infoln("> run contract", usedCost, fromAccount.String(), toAccount.String(), method, len(inputs), len(outputs), len(wasmData), len(newWasmData), string(resultData))
-			return usedCost, rootHash, dataHash, resultData, nil
+			return usedCost, fromAccount, rootHash, dataHash, resultData, nil
 		} else {
 			t, msg, err := core.UnmarshalData(newWasmData)
 			if err != nil {
-				return 0, nil, nil, nil, err
+				return 0, nil, nil, nil, nil, err
 			}
 			if t != core.CORE_DATA_LIST {
-				return 0, nil, nil, nil, util.ErrorOfInvalid("return data", "should be data list")
+				return 0, nil, nil, nil, nil, util.ErrorOfInvalid("return data", "should be data list")
 			}
 			outputDatas := msg.(*pb.DataList)
 			if len(outputDatas.List) != len(outputs) {
-				return 0, nil, nil, nil, util.ErrorOfInvalid("return data", fmt.Sprintf("%d != %d", len(outputDatas.List), len(outputs)))
+				return 0, nil, nil, nil, nil, util.ErrorOfInvalid("return data", fmt.Sprintf("%d != %d", len(outputDatas.List), len(outputs)))
 			}
 			resultInfos := &pb.DataList{}
 			for index, outputData := range outputDatas.List {
 				output := outputs[index]
 				_, dataHash, err := s.WriteData(toAccount, output, outputData.Bytes)
 				if err != nil {
-					return 0, nil, nil, nil, err
+					return 0, nil, nil, nil, nil, err
 				}
 				hashBytes, err := core.MarshalData(dataHash[:])
 				if err != nil {
-					return 0, nil, nil, nil, err
+					return 0, nil, nil, nil, nil, err
 				}
 				resultInfos.List = append(resultInfos.List, &pb.Data{
 					Bytes: hashBytes,
@@ -462,18 +462,18 @@ func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fro
 			}
 			resultDatas, err := core.MarshalData(resultInfos)
 			if err != nil {
-				return 0, nil, nil, nil, err
+				return 0, nil, nil, nil, nil, err
 			}
 			dataHash, err := cs.Hash(resultDatas)
 			if err != nil {
-				return 0, nil, nil, nil, err
+				return 0, nil, nil, nil, nil, err
 			}
 			glog.Infoln("> run contract", usedCost, fromAccount.String(), toAccount.String(), method, len(inputs), len(outputs), len(wasmData), len(newWasmData), len(resultDatas), string(resultData))
-			return usedCost, nil, dataHash, resultDatas, nil
+			return usedCost, toAccount, nil, dataHash, resultDatas, nil
 		}
 	} else {
 		glog.Infoln("> run contract", usedCost, fromAccount.String(), toAccount.String(), method, resultData)
-		return usedCost, nil, nil, resultData, nil
+		return usedCost, fromAccount, nil, nil, resultData, nil
 	}
 }
 

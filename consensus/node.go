@@ -348,8 +348,8 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 			codeInfo := &pb.CodeInfo{}
 
 			cm := util.ToMap(&pxm, "code")
-			if util.Has(&cm, "code") {
-				codeString := util.ToString(&cm, "code")
+			if util.Has(&cm, "data") {
+				codeString := util.ToString(&cm, "data")
 				codeData, err := hex.DecodeString(codeString)
 				if err != nil {
 					return "", nil, err
