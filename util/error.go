@@ -17,9 +17,13 @@ func IsTest() bool {
 	return Mode == "test"
 }
 
+func IsDebug() bool {
+	return Mode == "debug"
+}
+
 func ErrorOfNonexists(t string, target string) error {
 	e := fmt.Errorf("can't find %s: %s", t, target)
-	if IsTest() {
+	if IsDebug() {
 		glog.Error(e)
 		debug.PrintStack()
 	}
@@ -28,7 +32,7 @@ func ErrorOfNonexists(t string, target string) error {
 
 func ErrorOfInvalid(t string, target string) error {
 	e := fmt.Errorf("invalid %s: %s", t, target)
-	if IsTest() {
+	if IsDebug() {
 		glog.Error(e)
 		debug.PrintStack()
 	}
@@ -37,7 +41,7 @@ func ErrorOfInvalid(t string, target string) error {
 
 func ErrorOfUnknown(t string, target string) error {
 	e := fmt.Errorf("unknown %s: %s", t, target)
-	if IsTest() {
+	if IsDebug() {
 		glog.Error(e)
 		debug.PrintStack()
 	}
@@ -46,7 +50,7 @@ func ErrorOfUnknown(t string, target string) error {
 
 func ErrorOf(reason string, t string, target string) error {
 	e := fmt.Errorf("%s %s: %s", reason, t, target)
-	if IsTest() {
+	if IsDebug() {
 		glog.Error(e)
 		debug.PrintStack()
 	}
