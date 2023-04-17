@@ -565,7 +565,7 @@ func (n *Node) processTransaction(tx libblock.Transaction) (libblock.Transaction
 }
 
 func (n *Node) getNextSequence(address libcore.Address) uint64 {
-	accountEntry, err := n.consensusService.GetAccountInfo(address, nil, nil)
+	accountEntry, err := n.consensusService.GetAccountInfo(address)
 	if err != nil {
 		return uint64(1)
 	}
@@ -623,7 +623,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		accountEntry, err := n.consensusService.GetAccountInfo(a, nil, nil)
+		accountEntry, err := n.consensusService.GetAccountInfo(a)
 		if err != nil {
 			return nil, err
 		}
@@ -810,7 +810,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			s, err := n.consensusService.GetAccountInfo(a, nil, nil)
+			s, err := n.consensusService.GetAccountInfo(a)
 			if err != nil {
 				return nil, err
 			}

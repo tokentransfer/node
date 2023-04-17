@@ -64,7 +64,7 @@ type AccountState struct {
 	State
 
 	Name   string
-	Amount core.Amount
+	Amount string
 
 	User  *DataInfo
 	Code  *DataInfo
@@ -79,15 +79,15 @@ func (s *AccountState) GetName() string {
 }
 
 func (s *AccountState) GetStateKey() []string {
+	list := make([]string, 0)
 	name := s.GetName()
-	if len(name) == 0 {
-		name = s.Account.String()
+	if len(name) > 0 {
+		list = append(list, name)
+		list = append(list, core.GetVersionKey(name, s.Version, "-"))
 	}
-	return []string{
-		name,
-		core.GetAccountKey(s.Account, s.Amount.Currency, s.Amount.Issuer, "-"),
-		core.GetVersionKey(name, s.Version, "-"),
-	}
+	list = append(list, s.Account.String())
+	list = append(list, core.GetVersionKey(s.Account.String(), s.Version, "-"))
+	return list
 }
 
 func (s *AccountState) UnmarshalBinary(data []byte) error {
@@ -106,11 +106,6 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	a, err := core.NewAmount(state.Amount)
-	if err != nil {
-		return err
-	}
-
 	s.State.StateType = libblock.StateType(core.CORE_ACCOUNT_STATE)
 	s.State.BlockIndex = state.State.BlockIndex
 	s.State.Account = account
@@ -119,7 +114,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.State.Version = state.State.Version
 
 	s.Name = state.Name
-	s.Amount = *a
+	s.Amount = state.Amount
 
 	s.User = fromDataInfo(state.User)
 	s.Code = fromDataInfo(state.Code)
@@ -145,7 +140,7 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 			Previous:   []byte(s.Previous),
 			Version:    s.Version,
 		},
-		Amount: s.Amount.String(),
+		Amount: s.Amount,
 
 		Name:  s.Name,
 		User:  toDataInfo(s.User, libcrypto.RawBinary),
@@ -172,7 +167,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 				Previous:  []byte(s.Previous),
 				Version:   s.Version,
 			},
-			Amount: s.Amount.String(),
+			Amount: s.Amount,
 
 			Name:  s.Name,
 			User:  toDataInfo(s.User, libcrypto.RawIgnoreSigningFields),
@@ -191,7 +186,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 				Previous:  []byte(s.Previous),
 				Version:   s.Version,
 			},
-			Amount: s.Amount.String(),
+			Amount: s.Amount,
 
 			Name:  s.Name,
 			User:  toDataInfo(s.User, libcrypto.RawIgnoreVariableFields),
