@@ -70,6 +70,10 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 		if err != nil {
 			return nil, err
 		}
+		amount, err := core.NewValue("100000000000000")
+		if err != nil {
+			return nil, err
+		}
 		states := []libblock.State{
 			&block.AccountState{
 				State: block.State{
@@ -78,7 +82,7 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 					Sequence:   uint64(0),
 					BlockIndex: uint64(0),
 				},
-				Amount: "100000000000000",
+				Amount: *amount,
 			},
 		}
 
@@ -368,9 +372,6 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	if !ok {
 		return false, errors.New("error transaction")
 	}
-	if !tx.Amount.IsNative() {
-		return false, util.ErrorOfInvalid("amount", tx.Amount.String())
-	}
 
 	account := tx.Account
 	sequence := libstore.GetSequence(ms, account) + 1
@@ -386,10 +387,14 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	if tx.Gas < 10 {
 		return false, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < 10", tx.Gas))
 	}
-	if tx.Account.String() == tx.Destination.String() && !tx.Amount.IsZero() {
+	isZero, err := tx.Amount.IsZero()
+	if err != nil {
+		return false, err
+	}
+	if tx.Account.String() == tx.Destination.String() && !isZero {
 		return false, util.ErrorOfInvalid("amount", "should be 0 when using same accounts")
 	}
-	gasAmount, err := core.NewAmount(int64(tx.Gas))
+	gasAmount, err := core.NewValue(fmt.Sprintf("%d", tx.Gas))
 	if err != nil {
 		return false, err
 	}
@@ -397,15 +402,15 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	if err != nil {
 		return false, err
 	}
-	infoAmount, err := core.NewAmount(info.Amount)
+	remain, err := info.Amount.Subtract(totalAmount)
 	if err != nil {
 		return false, err
 	}
-	remain, err := infoAmount.Subtract(*totalAmount)
+	isNegative, err := remain.IsNegative()
 	if err != nil {
 		return false, err
 	}
-	if remain.Less(*gasAmount.ZeroClone()) {
+	if isNegative {
 		return false, util.ErrorOf("insuffient", "amount", remain.String())
 	}
 
@@ -458,44 +463,44 @@ func (service *ConsensusService) getAccountInfo(account libcore.Address, sequenc
 		info.Version = lastInfo.Version + 1
 		return info, nil
 	} else {
+		zero, err := core.NewValue("0")
+		if err != nil {
+			return nil, err
+		}
 		info := &block.AccountState{
 			State: block.State{
 				StateType: block.ACCOUNT_STATE,
 				Account:   account,
 				Sequence:  sequence,
 			},
-			Amount: "0",
+			Amount: *zero,
 		}
 		return info, nil
 	}
 }
 
-func (service *ConsensusService) addBalance(info *block.AccountState, amount *core.Amount) error {
-	infoAmount, err := core.NewAmount(info.Amount)
+func (service *ConsensusService) addBalance(info *block.AccountState, amount *core.Value) error {
+	newAmount, err := info.Amount.Add(*amount)
 	if err != nil {
 		return err
 	}
-	newAmount, err := infoAmount.Add(*amount)
-	if err != nil {
-		return err
-	}
-	info.Amount = newAmount.Value.String()
+	info.Amount = newAmount
 	return nil
 }
 
-func (service *ConsensusService) removeBalance(info *block.AccountState, amount *core.Amount) error {
-	infoAmount, err := core.NewAmount(info.Amount)
+func (service *ConsensusService) removeBalance(info *block.AccountState, amount *core.Value) error {
+	newAmount, err := info.Amount.Subtract(*amount)
 	if err != nil {
 		return err
 	}
-	newAmount, err := infoAmount.Subtract(*amount)
+	isNegative, err := newAmount.IsNegative()
 	if err != nil {
 		return err
 	}
-	if newAmount.Less(*amount.ZeroClone()) {
+	if isNegative {
 		return errors.New("insuffient amount")
 	}
-	info.Amount = newAmount.Value.String()
+	info.Amount = newAmount
 	return nil
 }
 
@@ -506,9 +511,6 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	tx, ok := t.(*block.Transaction)
 	if !ok {
 		return nil, util.ErrorOfInvalid("transaction", t.GetHash().String())
-	}
-	if !tx.Amount.IsNative() {
-		return nil, util.ErrorOfInvalid("amount", tx.Amount.String())
 	}
 
 	sequenceMap := map[string]uint64{}
@@ -574,7 +576,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		return nil, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < %d", tx.Gas, gas))
 	}
 
-	gasAmount, err := core.NewAmount(int64(gas))
+	gasAmount, err := core.NewValue(fmt.Sprintf("%d", gas))
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +584,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	if err != nil {
 		return nil, err
 	}
-	err = service.removeBalance(fromInfo, totalAmount)
+	err = service.removeBalance(fromInfo, &totalAmount)
 	if err != nil {
 		return nil, err
 	}

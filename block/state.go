@@ -64,7 +64,7 @@ type AccountState struct {
 	State
 
 	Name   string
-	Amount string
+	Amount core.Value
 
 	User  *DataInfo
 	Code  *DataInfo
@@ -106,6 +106,11 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
+	v, err := core.NewValue(state.Amount)
+	if err != nil {
+		return err
+	}
+
 	s.State.StateType = libblock.StateType(core.CORE_ACCOUNT_STATE)
 	s.State.BlockIndex = state.State.BlockIndex
 	s.State.Account = account
@@ -114,7 +119,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.State.Version = state.State.Version
 
 	s.Name = state.Name
-	s.Amount = state.Amount
+	s.Amount = *v
 
 	s.User = fromDataInfo(state.User)
 	s.Code = fromDataInfo(state.Code)
@@ -140,7 +145,7 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 			Previous:   []byte(s.Previous),
 			Version:    s.Version,
 		},
-		Amount: s.Amount,
+		Amount: s.Amount.String(),
 
 		Name:  s.Name,
 		User:  toDataInfo(s.User, libcrypto.RawBinary),
@@ -167,7 +172,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 				Previous:  []byte(s.Previous),
 				Version:   s.Version,
 			},
-			Amount: s.Amount,
+			Amount: s.Amount.String(),
 
 			Name:  s.Name,
 			User:  toDataInfo(s.User, libcrypto.RawIgnoreSigningFields),
@@ -186,7 +191,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 				Previous:  []byte(s.Previous),
 				Version:   s.Version,
 			},
-			Amount: s.Amount,
+			Amount: s.Amount.String(),
 
 			Name:  s.Name,
 			User:  toDataInfo(s.User, libcrypto.RawIgnoreVariableFields),

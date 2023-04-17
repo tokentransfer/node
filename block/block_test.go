@@ -2,6 +2,7 @@ package block
 
 import (
 	"encoding/hex"
+	"fmt"
 	"log"
 	"testing"
 
@@ -47,7 +48,7 @@ func generateTransaction(seq uint64, value int64, gas int64) *Transaction {
 		panic(err)
 	}
 
-	v, err := core.NewAmount(value)
+	v, err := core.NewValue(fmt.Sprintf("%d", value))
 	if err != nil {
 		panic(err)
 	}

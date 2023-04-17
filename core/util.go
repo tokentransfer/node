@@ -89,18 +89,18 @@ func (t Time) Short() string {
 }
 
 type Value struct {
-	value int64
+	value string
 }
 
 func NewValue(s string) (*Value, error) {
-	v, err := strconv.ParseInt(s, 10, 64)
+	_, err := decimal.NewFromString(s)
 	if err != nil {
 		return nil, err
 	}
-	return &Value{v}, nil
+	return &Value{s}, nil
 }
 
-func (v *Value) Value() int64 {
+func (v *Value) Value() string {
 	return v.value
 }
 
@@ -109,49 +109,73 @@ func (v Value) Clone() Value {
 }
 
 func (v Value) ZeroClone() Value {
-	return Value{0}
+	return Value{"0"}
 }
 
 func (v Value) Subtract(a Value) (Value, error) {
-	ai := decimal.NewFromInt(v.value)
-	bi := decimal.NewFromInt(a.value)
-	ci := ai.Sub(bi)
-	_, err := CheckValueInteger("value", ci.String())
+	ai, err := decimal.NewFromString(v.value)
 	if err != nil {
-		return Value{0}, err
+		return Value{"0"}, err
 	}
-	return Value{v.value - a.value}, nil
+	bi, err := decimal.NewFromString(a.value)
+	if err != nil {
+		return Value{"0"}, err
+	}
+	ci := ai.Sub(bi)
+	return Value{ci.String()}, nil
 }
 
 func (v Value) Add(a Value) (Value, error) {
-	ai := decimal.NewFromInt(v.value)
-	bi := decimal.NewFromInt(a.value)
-	ci := ai.Add(bi)
-	_, err := CheckValueInteger("value", ci.String())
+	ai, err := decimal.NewFromString(v.value)
 	if err != nil {
-		return Value{0}, err
+		return Value{"0"}, err
 	}
-	return Value{v.value + a.value}, nil
+	bi, err := decimal.NewFromString(a.value)
+	if err != nil {
+		return Value{"0"}, err
+	}
+	ci := ai.Add(bi)
+	return Value{ci.String()}, nil
 }
 
-func (v Value) Less(a Value) bool {
-	return v.value < a.value
+func (v Value) Less(a Value) (bool, error) {
+	ai, err := decimal.NewFromString(v.value)
+	if err != nil {
+		return false, err
+	}
+	bi, err := decimal.NewFromString(a.value)
+	if err != nil {
+		return false, err
+	}
+	return ai.LessThan(bi), nil
 }
 
-func (v *Value) IsNegative() bool {
-	return v.value < 0
+func (v *Value) IsNegative() (bool, error) {
+	vi, err := decimal.NewFromString(v.value)
+	if err != nil {
+		return false, err
+	}
+	return vi.IsNegative(), nil
 }
 
-func (v *Value) IsPositive() bool {
-	return v.value > 0
+func (v *Value) IsPositive() (bool, error) {
+	vi, err := decimal.NewFromString(v.value)
+	if err != nil {
+		return false, err
+	}
+	return vi.IsPositive(), nil
 }
 
-func (v *Value) IsZero() bool {
-	return v.value == 0
+func (v *Value) IsZero() (bool, error) {
+	vi, err := decimal.NewFromString(v.value)
+	if err != nil {
+		return false, err
+	}
+	return vi.IsZero(), nil
 }
 
 func (v *Value) String() string {
-	return fmt.Sprintf("%d", v.value)
+	return v.value
 }
 
 type Amount struct {
@@ -164,7 +188,7 @@ func NewAmount(v interface{}) (*Amount, error) {
 	switch n := v.(type) {
 	case int64:
 		return &Amount{
-			Value: Value{n},
+			Value: Value{fmt.Sprintf("%d", n)},
 		}, nil
 	case string:
 		amount := new(Amount)
@@ -271,25 +295,25 @@ func (a *Amount) Add(b Amount) (*Amount, error) {
 	}, nil
 }
 
-func (a *Amount) Less(b Amount) bool {
+func (a *Amount) Less(b Amount) (bool, error) {
 	if !equalsAmountCurrency(a, &b) {
-		return false
+		return false, nil
 	}
 	if !libcore.Equals(a.Issuer, b.Issuer) {
-		return false
+		return false, nil
 	}
 	return a.Value.Less(b.Value)
 }
 
-func (a *Amount) IsNegative() bool {
+func (a *Amount) IsNegative() (bool, error) {
 	return a.Value.IsNegative()
 }
 
-func (a *Amount) IsPositive() bool {
+func (a *Amount) IsPositive() (bool, error) {
 	return a.Value.IsPositive()
 }
 
-func (a *Amount) IsZero() bool {
+func (a *Amount) IsZero() (bool, error) {
 	return a.Value.IsZero()
 }
 

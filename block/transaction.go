@@ -19,7 +19,7 @@ type Transaction struct {
 
 	Account     libcore.Address
 	Sequence    uint64
-	Amount      core.Amount
+	Amount      core.Value
 	Gas         int64
 	Destination libcore.Address
 	Payload     *PayloadInfo
@@ -66,7 +66,7 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	a, err := core.NewAmount(t.Amount)
+	a, err := core.NewValue(t.Amount)
 	if err != nil {
 		return err
 	}

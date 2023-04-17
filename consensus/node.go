@@ -232,7 +232,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	if err != nil {
 		return "", nil, err
 	}
-	amount, err := core.NewAmount(value)
+	amount, err := core.NewValue(value)
 	if err != nil {
 		return "", nil, err
 	}

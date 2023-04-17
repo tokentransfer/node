@@ -7,6 +7,7 @@ import (
 	. "github.com/tokentransfer/check"
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
+	"github.com/tokentransfer/node/core"
 )
 
 type StateSuite struct{}
@@ -22,6 +23,11 @@ func (suite *StateSuite) TestState(c *C) {
 		panic(err)
 	}
 
+	v, err := core.NewValue("100")
+	if err != nil {
+		panic(err)
+	}
+
 	s1 := &AccountState{
 		State: State{
 			StateType: 1,
@@ -32,7 +38,7 @@ func (suite *StateSuite) TestState(c *C) {
 			BlockIndex: uint64(2),
 		},
 
-		Amount: "100",
+		Amount: *v,
 	}
 	// util.PrintJSON("state", s1)
 
@@ -46,7 +52,7 @@ func (suite *StateSuite) TestState(c *C) {
 			BlockIndex: uint64(2),
 		},
 
-		Amount: "100",
+		Amount: *v,
 	}
 	// util.PrintJSON("state", s2)
 
