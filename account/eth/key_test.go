@@ -99,11 +99,23 @@ func (suite *KeySuite) TestSignAndVerify(c *C) {
 	k, err := GenerateFamilySeed("masterpassphrase")
 	c.Assert(err, IsNil)
 
-	fmt.Println("hash", libcore.Hash(h).String())
-	sig, err := k.Sign(h, msg)
+	pk, err := k.GetPublic()
 	c.Assert(err, IsNil)
 
-	pk, err := k.GetPublic()
+	pkdata, err := pk.MarshalBinary()
+	c.Assert(err, IsNil)
+
+	pk2 := &Public{}
+	err = pk2.UnmarshalBinary(pkdata)
+	c.Assert(err, IsNil)
+
+	pk2data, err := pk2.MarshalBinary()
+	c.Assert(err, IsNil)
+
+	c.Assert(pkdata, DeepEquals, pk2data)
+
+	fmt.Println("hash", libcore.Hash(h).String())
+	sig, err := k.Sign(h, msg)
 	c.Assert(err, IsNil)
 
 	ok, err := pk.Verify(h, msg, sig)

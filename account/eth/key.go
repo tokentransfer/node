@@ -1,18 +1,14 @@
 package eth
 
 import (
-	"bytes"
 	"crypto/ecdsa"
-	"crypto/rand"
 	"encoding/hex"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libcore "github.com/tokentransfer/interfaces/core"
-	"github.com/tokentransfer/node/util"
 )
 
 func GenerateFamilySeed(password string) (*Key, error) {
@@ -123,20 +119,12 @@ func (p *Private) MarshalText() ([]byte, error) {
 
 func (p *Private) Sign(hash libcore.Hash, msg []byte) (libcore.Signature, error) {
 	hashBytes := []byte(hash)
-	r, s, err := ecdsa.Sign(rand.Reader, p.PrivateKey, hashBytes)
+
+	sig, err := crypto.Sign(hashBytes, p.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
-	buf := new(bytes.Buffer)
-	err = util.WriteBytes(buf, r.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	err = util.WriteBytes(buf, s.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	return libcore.Signature(buf.Bytes()), nil
+	return libcore.Signature(sig[:64]), nil
 }
 
 func (p *Private) GeneratePublic() (libaccount.PublicKey, error) {
@@ -181,18 +169,8 @@ func (p *Public) MarshalText() ([]byte, error) {
 }
 
 func (p *Public) Verify(hash libcore.Hash, msg []byte, signature libcore.Signature) (bool, error) {
-	buf := bytes.NewBuffer([]byte(signature))
-	rbytes, err := util.ReadBytes(buf)
-	if err != nil {
-		return false, err
-	}
-	sbytes, err := util.ReadBytes(buf)
-	if err != nil {
-		return false, err
-	}
-	r := new(big.Int).SetBytes(rbytes)
-	s := new(big.Int).SetBytes(sbytes)
-	ok := ecdsa.Verify(p.PublicKey, hash, r, s)
+	pubk := crypto.FromECDSAPub(p.PublicKey)
+	ok := crypto.VerifySignature(pubk, hash, []byte(signature))
 	return ok, nil
 }
 
