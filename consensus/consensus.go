@@ -70,7 +70,7 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 		if err != nil {
 			return nil, err
 		}
-		amount, err := core.NewValue("100000000000000")
+		amount, err := util.NewValue("100000000000000")
 		if err != nil {
 			return nil, err
 		}
@@ -394,7 +394,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	if tx.Account.String() == tx.Destination.String() && !isZero {
 		return false, util.ErrorOfInvalid("amount", "should be 0 when using same accounts")
 	}
-	gasAmount, err := core.NewValue(fmt.Sprintf("%d", tx.Gas))
+	gasAmount, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
 	if err != nil {
 		return false, err
 	}
@@ -463,7 +463,7 @@ func (service *ConsensusService) getAccountInfo(account libcore.Address, sequenc
 		info.Version = lastInfo.Version + 1
 		return info, nil
 	} else {
-		zero, err := core.NewValue("0")
+		zero, err := util.NewValue("0")
 		if err != nil {
 			return nil, err
 		}
@@ -479,7 +479,7 @@ func (service *ConsensusService) getAccountInfo(account libcore.Address, sequenc
 	}
 }
 
-func (service *ConsensusService) addBalance(info *block.AccountState, amount *core.Value) error {
+func (service *ConsensusService) addBalance(info *block.AccountState, amount *util.Value) error {
 	newAmount, err := info.Amount.Add(*amount)
 	if err != nil {
 		return err
@@ -488,7 +488,7 @@ func (service *ConsensusService) addBalance(info *block.AccountState, amount *co
 	return nil
 }
 
-func (service *ConsensusService) removeBalance(info *block.AccountState, amount *core.Value) error {
+func (service *ConsensusService) removeBalance(info *block.AccountState, amount *util.Value) error {
 	newAmount, err := info.Amount.Subtract(*amount)
 	if err != nil {
 		return err
@@ -576,7 +576,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		return nil, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < %d", tx.Gas, gas))
 	}
 
-	gasAmount, err := core.NewValue(fmt.Sprintf("%d", gas))
+	gasAmount, err := util.NewValue(fmt.Sprintf("%d", gas))
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"os"
 	"strings"
 	"sync"
@@ -80,13 +81,13 @@ func (p *Peer) GetPublicKey() libaccount.PublicKey {
 	return p.Key
 }
 
-func (p *Peer) GetIndex() uint64 {
+func (p *Peer) GetIndex(n *Node) uint64 {
 	if p.index == 0 {
 		address, err := p.Key.GenerateAddress()
 		if err != nil {
 			return 0
 		}
-		index, err := core.GetIndex(address.String())
+		index, err := n.GetIndex(address.String())
 		if err != nil {
 			return 0
 		}
@@ -97,13 +98,13 @@ func (p *Peer) GetIndex() uint64 {
 	return p.index
 }
 
-func (p *Peer) GetAddress() string {
+func (p *Peer) GetAddress(n *Node) string {
 	if len(p.address) == 0 {
 		address, err := p.Key.GenerateAddress()
 		if err != nil {
 			return ""
 		}
-		index, err := core.GetIndex(address.String())
+		index, err := n.GetIndex(address.String())
 		if err != nil {
 			return ""
 		}
@@ -167,7 +168,6 @@ func NewNode() *Node {
 
 func (n *Node) Init(c libcore.Config) error {
 	n.config = c.(*config.Config)
-	core.Init(n.config)
 	util.Init(n.config.GetMode())
 
 	_, key, err := n.accountService.NewKeyFromSecret(n.config.GetSecret())
@@ -232,13 +232,13 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	if err != nil {
 		return "", nil, err
 	}
-	amount, err := core.NewValue(value)
+	amount, err := util.NewValue(value)
 	if err != nil {
 		return "", nil, err
 	}
 	seq := n.getNextSequence(fromAccount)
 	tx := &block.Transaction{
-		TransactionType: libblock.TransactionType(1),
+		TransactionType: block.TRANSACTION,
 
 		Account:     fromAccount,
 		Sequence:    seq,
@@ -735,6 +735,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			hash := tx.GetHash()
 			list[i] = blob
 			glog.Infoln("sign transaction", hash.String(), blob)
+			util.PrintJSON("tx", tx)
 		}
 		return list, nil
 
@@ -761,7 +762,8 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		l := len(params)
 		list := make([]string, l)
 		for i := 0; i < l; i++ {
-			blob := params[i].(string)
+			item := params[i].(map[string]interface{})
+			blob := util.ToString(&item, "blob")
 
 			data, err := hex.DecodeString(blob)
 			if err != nil {
@@ -958,10 +960,10 @@ func (n *Node) connect() {
 	for {
 		list := n.ListPeer()
 
-		glog.Infoln("===", 0, n.self.GetIndex(), n.self.GetAddress(), n.self.Id, n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
+		glog.Infoln("===", 0, n.self.GetIndex(n), n.self.GetAddress(n), n.self.Id, n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			glog.Infoln("==>", i+1, p.GetIndex(), p.GetAddress(), p.Id, p.Status, p.BlockNumber, p.PeerCount)
+			glog.Infoln("==>", i+1, p.GetIndex(n), p.GetAddress(n), p.Id, p.Status, p.BlockNumber, p.PeerCount)
 		}
 		if len(list) == 0 {
 			n.Consensused = n.PrepareConsensus()
@@ -976,11 +978,11 @@ func (n *Node) connect() {
 }
 
 func (n *Node) ConnectTo(p *Peer) {
-	glog.Infoln("connected to", p.GetAddress())
+	glog.Infoln("connected to", p.GetAddress(n))
 }
 
 func (n *Node) SendRequestInfo(p *Peer) {
-	glog.Infoln("request to", p.GetAddress())
+	glog.Infoln("request to", p.GetAddress(n))
 }
 
 func (n *Node) PrepareConsensus() bool {
@@ -1049,7 +1051,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 								} else {
 									lastSendBlock = int64(block.GetIndex())
 									lastSendTime = time.Now()
-									glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(blockData), p.GetAddress(), p.Id)
+									glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(blockData), p.GetAddress(n), p.Id)
 								}
 							}
 						}
@@ -1161,7 +1163,7 @@ func (n *Node) send() {
 				if err != nil {
 					glog.Error(err)
 				} else {
-					glog.Infof(">>> send message %d(%s) to %s(%s)\n", m.Id, core.GetInfo(data), p.GetAddress(), p.Id)
+					glog.Infof(">>> send message %d(%s) to %s(%s)\n", m.Id, core.GetInfo(data), p.GetAddress(n), p.Id)
 				}
 			}
 		}
@@ -1175,7 +1177,7 @@ func (n *Node) receive() {
 		fromIndex := m.GetNode()
 		glog.Infof("<<< receive message from node %d, length: %d\n", fromIndex, len(data))
 		if fromPeer != nil {
-			glog.Infof("<<< receive peer message %d(%s) from %s(%s)\n", m.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
+			glog.Infof("<<< receive peer message %d(%s) from %s(%s)\n", m.Id, core.GetInfo(data), fromPeer.GetAddress(n), fromPeer.Id)
 			switch meta {
 			case core.CORE_BLOCK:
 				b := &block.Block{}
@@ -1247,7 +1249,7 @@ func (n *Node) receive() {
 }
 
 func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
-	glog.Infof("[%s][%s] recv discovery from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), publisher, len(msgData))
+	glog.Infof("[%s][%s] recv discovery from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(n), publisher, len(msgData))
 	m, err := n.DecodeMessage(msgData)
 	if err != nil {
 		return err
@@ -1268,7 +1270,7 @@ func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 		if err != nil {
 			return err
 		}
-		index, err := core.GetIndex(address.String())
+		index, err := n.GetIndex(address.String())
 		if err != nil {
 			return err
 		}
@@ -1293,8 +1295,21 @@ func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 	return nil
 }
 
+func (n *Node) GetIndex(address string) (uint64, error) {
+	_, a, err := n.accountService.NewAccountFromAddress(address)
+	if err != nil {
+		return 0, err
+	}
+	data, err := a.MarshalBinary()
+	if err != nil {
+		return 0, err
+	}
+	m := new(big.Int).SetBytes(data)
+	return m.Uint64(), nil
+}
+
 func (n *Node) messageHandler(id string, data []byte) error {
-	glog.Infof("[%s][%s] recv message from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), id, len(data))
+	glog.Infof("[%s][%s] recv message from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(n), id, len(data))
 	msg, err := n.DecodeMessage(data)
 	if err != nil {
 		return err
@@ -1304,7 +1319,7 @@ func (n *Node) messageHandler(id string, data []byte) error {
 }
 
 func (n *Node) dataHandler(id string, msgData []byte) error {
-	glog.Infof("[%s][%s] recv data from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(), id, len(msgData))
+	glog.Infof("[%s][%s] recv data from peer[%s], len: %d", n.config.GetChainId(), n.self.GetAddress(n), id, len(msgData))
 	m, err := n.DecodeMessage(msgData)
 	if err != nil {
 		return err
@@ -1374,7 +1389,7 @@ func (n *Node) SendPeerInfo(toPeer *Peer) {
 			if err != nil {
 				glog.Error(err)
 			} else {
-				glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(peerData), toPeer.GetAddress(), toPeer.Id)
+				glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(peerData), toPeer.GetAddress(n), toPeer.Id)
 			}
 		}
 	}
@@ -1557,9 +1572,9 @@ func (n *Node) AddPeer(p *Peer) error {
 	n.peerLocker.Lock()
 	defer n.peerLocker.Unlock()
 
-	_, ok := n.peers[p.GetIndex()]
+	_, ok := n.peers[p.GetIndex(n)]
 	if !ok {
-		n.peers[p.GetIndex()] = p
+		n.peers[p.GetIndex(n)] = p
 		go n.discoveryPeer(p)
 	}
 	return nil
@@ -1569,7 +1584,7 @@ func (n *Node) RemovePeer(p *Peer) error {
 	n.peerLocker.Lock()
 	defer n.peerLocker.Unlock()
 
-	delete(n.peers, p.GetIndex())
+	delete(n.peers, p.GetIndex(n))
 	return nil
 }
 
@@ -1588,7 +1603,7 @@ func (n *Node) CreateMessage(data []byte) (*pb.Message, error) {
 	return &pb.Message{
 		Id:   n.newId(),
 		Data: data,
-		Node: n.self.GetIndex(),
+		Node: n.self.GetIndex(n),
 	}, nil
 }
 
@@ -1621,7 +1636,7 @@ func (n *Node) ReceiveMessage(t string, msg *pb.Message) (core.DataType, *Peer, 
 	glog.Infof("<<< receive %s from node %d, length: %d\n", t, fromIndex, len(data))
 	fromPeer := n.GetPeer(fromIndex)
 	if fromPeer != nil {
-		glog.Infof("<<< receive peer %s %d(%s) from %s(%s)\n", t, msg.Id, core.GetInfo(data), fromPeer.GetAddress(), fromPeer.Id)
+		glog.Infof("<<< receive peer %s %d(%s) from %s(%s)\n", t, msg.Id, core.GetInfo(data), fromPeer.GetAddress(n), fromPeer.Id)
 		if len(data) > 0 {
 			meta := core.DataType(data[0])
 			return meta, fromPeer, data

@@ -142,11 +142,11 @@ func (s *StorageService) ReadCode(codeAccount libcore.Address) ([]byte, []byte, 
 		return nil, nil, err
 	}
 	codeReader := codeData.Open()
-	wasmCode, err := core.ReadBytes(codeReader)
+	wasmCode, err := util.ReadBytes(codeReader)
 	if err != nil {
 		return nil, nil, err
 	}
-	abiCode, err := core.ReadBytes(codeReader)
+	abiCode, err := util.ReadBytes(codeReader)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -170,14 +170,14 @@ func (s *StorageService) WriteCode(account libcore.Address, wasmCode []byte, abi
 
 	address := account.String()
 	t := s.storage.Create(address)
-	err = core.WriteBytes(t, wasmCode)
+	err = util.WriteBytes(t, wasmCode)
 	if err != nil {
 		return nil, err
 	}
 	if abiCode == nil {
 		abiCode = make([]byte, 0)
 	}
-	err = core.WriteBytes(t, abiCode)
+	err = util.WriteBytes(t, abiCode)
 	if err != nil {
 		return nil, err
 	}

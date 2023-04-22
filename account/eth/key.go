@@ -1,18 +1,18 @@
 package eth
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libcore "github.com/tokentransfer/interfaces/core"
+	"github.com/tokentransfer/node/util"
 )
 
 func GenerateFamilySeed(password string) (*Key, error) {
@@ -127,16 +127,16 @@ func (p *Private) Sign(hash libcore.Hash, msg []byte) (libcore.Signature, error)
 	if err != nil {
 		return nil, err
 	}
-	rt, err := r.MarshalText()
+	buf := new(bytes.Buffer)
+	err = util.WriteBytes(buf, r.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	st, err := s.MarshalText()
+	err = util.WriteBytes(buf, s.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	str := strings.Join([]string{string(rt), string(st)}, ":")
-	return libcore.Signature(str), nil
+	return libcore.Signature(buf.Bytes()), nil
 }
 
 func (p *Private) GeneratePublic() (libaccount.PublicKey, error) {
@@ -181,23 +181,17 @@ func (p *Public) MarshalText() ([]byte, error) {
 }
 
 func (p *Public) Verify(hash libcore.Hash, msg []byte, signature libcore.Signature) (bool, error) {
-	str := string(signature)
-	list := strings.Split(str, ":")
-	if len(list) != 2 {
-		return false, errors.New("error signature")
-	}
-	rs := list[0]
-	r := new(big.Int)
-	err := r.UnmarshalText([]byte(rs))
+	buf := bytes.NewBuffer([]byte(signature))
+	rbytes, err := util.ReadBytes(buf)
 	if err != nil {
 		return false, err
 	}
-	ss := list[1]
-	s := new(big.Int)
-	err = s.UnmarshalText([]byte(ss))
+	sbytes, err := util.ReadBytes(buf)
 	if err != nil {
 		return false, err
 	}
+	r := new(big.Int).SetBytes(rbytes)
+	s := new(big.Int).SetBytes(sbytes)
 	ok := ecdsa.Verify(p.PublicKey, hash, r, s)
 	return ok, nil
 }

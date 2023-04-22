@@ -6,6 +6,7 @@ import (
 
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
+	"github.com/tokentransfer/node/util"
 
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
@@ -19,7 +20,7 @@ type Transaction struct {
 
 	Account     libcore.Address
 	Sequence    uint64
-	Amount      core.Value
+	Amount      util.Value
 	Gas         int64
 	Destination libcore.Address
 	Payload     *PayloadInfo
@@ -66,7 +67,7 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	a, err := core.NewValue(t.Amount)
+	a, err := util.NewValue(t.Amount)
 	if err != nil {
 		return err
 	}
@@ -139,11 +140,11 @@ func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
 		}
 		return core.Marshal(t)
 	} else { //ignore variable fields
-		fromData, err := addressToByte(tx.Account)
+		fromAccount, err := addressToByte(tx.Account)
 		if err != nil {
 			return nil, err
 		}
-		toData, err := addressToByte(tx.Destination)
+		toAccount, err := addressToByte(tx.Destination)
 		if err != nil {
 			return nil, err
 		}
@@ -151,11 +152,11 @@ func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
 		t := &pb.Transaction{
 			TransactionType: uint32(tx.TransactionType),
 
-			Account:     fromData,
+			Account:     fromAccount,
 			Sequence:    tx.Sequence,
 			Amount:      tx.Amount.String(),
 			Gas:         tx.Gas,
-			Destination: toData,
+			Destination: toAccount,
 			Payload:     toPayloadInfo(tx.Payload, libcrypto.RawIgnoreVariableFields),
 			PublicKey:   []byte(tx.PublicKey),
 			Signature:   []byte(tx.Signature),

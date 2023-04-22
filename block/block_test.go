@@ -6,8 +6,8 @@ import (
 	"log"
 	"testing"
 
-	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/crypto"
+	"github.com/tokentransfer/node/util"
 
 	. "github.com/tokentransfer/check"
 	libblock "github.com/tokentransfer/interfaces/block"
@@ -48,7 +48,7 @@ func generateTransaction(seq uint64, value int64, gas int64) *Transaction {
 		panic(err)
 	}
 
-	v, err := core.NewValue(fmt.Sprintf("%d", value))
+	v, err := util.NewValue(fmt.Sprintf("%d", value))
 	if err != nil {
 		panic(err)
 	}

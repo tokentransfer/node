@@ -7,7 +7,7 @@ import (
 	. "github.com/tokentransfer/check"
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
-	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/util"
 )
 
 type StateSuite struct{}
@@ -23,7 +23,7 @@ func (suite *StateSuite) TestState(c *C) {
 		panic(err)
 	}
 
-	v, err := core.NewValue("100")
+	v, err := util.NewValue("100")
 	if err != nil {
 		panic(err)
 	}

@@ -8,10 +8,10 @@ import (
 	"github.com/btcsuite/btcutil/bech32"
 
 	"github.com/piligo/gmsm/sm2"
-	"github.com/tokentransfer/node/util"
 
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libcore "github.com/tokentransfer/interfaces/core"
+	"github.com/tokentransfer/node/util"
 )
 
 func GenerateFamilySeed(password string) (*Key, error) {

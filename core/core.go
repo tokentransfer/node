@@ -1,12 +1,9 @@
 package core
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"math"
-	"math/big"
 
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/util"
@@ -547,62 +544,4 @@ func Unmarshal(data []byte) (DataType, proto.Message, error) {
 		return meta, msg, nil
 	}
 	return 0, nil, errors.New("null data")
-}
-
-func WriteBytes(w io.Writer, b []byte) error {
-	l := len(b)
-	err := binary.Write(w, util.BYTE_ORDER, uint32(l))
-	if err != nil {
-		return err
-	}
-	if l > 0 {
-		n, err := w.Write(b)
-		if err != nil {
-			return err
-		}
-		if n != l {
-			return errors.New("error write")
-		}
-	}
-	return nil
-}
-
-func ReadBytes(r io.Reader) ([]byte, error) {
-	return ReadBytesWith(r, 0)
-}
-
-func ReadBytesWith(r io.Reader, maxSize uint32) ([]byte, error) {
-	l := uint32(0)
-	err := binary.Read(r, util.BYTE_ORDER, &l)
-	if err != nil {
-		return nil, err
-	}
-	if maxSize > 0 && l > maxSize {
-		return nil, fmt.Errorf("[ERROR] read bytes limit: %d > %d", l, maxSize)
-	}
-	b := make([]byte, l)
-	if l > 0 {
-		n, err := io.ReadFull(r, b)
-		if err != nil {
-			return nil, err
-		}
-		if n != int(l) {
-			return nil, fmt.Errorf("[ERROR] error read: %d != %d", n, int(l))
-		}
-	}
-	return b, nil
-}
-
-func GetIndex(address string) (uint64, error) {
-	_, a, err := as.NewAccountFromAddress(address)
-	if err != nil {
-		return 0, err
-	}
-	data, err := a.MarshalBinary()
-	if err != nil {
-		return 0, err
-	}
-	n := new(big.Int)
-	m := n.SetBytes(data)
-	return m.Uint64(), nil
 }

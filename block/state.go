@@ -64,7 +64,7 @@ type AccountState struct {
 	State
 
 	Name   string
-	Amount core.Value
+	Amount util.Value
 
 	User  *DataInfo
 	Code  *DataInfo
@@ -83,10 +83,10 @@ func (s *AccountState) GetStateKey() []string {
 	name := s.GetName()
 	if len(name) > 0 {
 		list = append(list, name)
-		list = append(list, core.GetVersionKey(name, s.Version, "-"))
+		list = append(list, util.GetVersionKey(name, s.Version, "-"))
 	}
 	list = append(list, s.Account.String())
-	list = append(list, core.GetVersionKey(s.Account.String(), s.Version, "-"))
+	list = append(list, util.GetVersionKey(s.Account.String(), s.Version, "-"))
 	return list
 }
 
@@ -106,7 +106,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	v, err := core.NewValue(state.Amount)
+	v, err := util.NewValue(state.Amount)
 	if err != nil {
 		return err
 	}
