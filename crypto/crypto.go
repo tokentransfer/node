@@ -2,11 +2,11 @@ package crypto
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"hash"
 
 	"github.com/tokentransfer/node/account"
+	"github.com/tokentransfer/node/util"
 
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libcore "github.com/tokentransfer/interfaces/core"
@@ -108,7 +108,7 @@ func (service *CryptoService) Verify(s libcrypto.Signable) (bool, error) {
 		return false, err
 	}
 	if !libcore.Equals(a, s.GetAccount()) {
-		return false, errors.New("error signature")
+		return false, util.ErrorOfInvalid("unmatched", "signature")
 	}
 	data, err := s.Raw(true)
 	if err != nil {

@@ -128,9 +128,12 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 				s := states[j]
 				s.SetBlockIndex(v.GetIndex() + 1)
 
-				key := fmt.Sprintf("%d-%s", s.GetStateType(), s.GetStateKey())
-				index := s.GetIndex()
-				stateMap[key] = []uint64{uint64(i), index}
+				keys := s.GetStateKey()
+				for k := 0; k < len(keys); k++ {
+					key := fmt.Sprintf("%d-%s", s.GetStateType(), keys[k])
+					index := s.GetIndex()
+					stateMap[key] = []uint64{uint64(i), index}
+				}
 			}
 
 			err := ms.PutTransaction(txWithData)
@@ -150,10 +153,13 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 			for j := 0; j < len(rs); j++ {
 				s := rs[j]
 
-				key := fmt.Sprintf("%d-%s", s.GetStateType(), s.GetStateKey())
-				item, ok := stateMap[key]
-				if ok && item[0] == uint64(i) && item[1] == s.GetIndex() {
-					states = append(states, s)
+				keys := s.GetStateKey()
+				for k := 0; k < len(keys); k++ {
+					key := fmt.Sprintf("%d-%s", s.GetStateType(), keys[k])
+					item, ok := stateMap[key]
+					if ok && item[0] == uint64(i) && item[1] == s.GetIndex() {
+						states = append(states, s)
+					}
 				}
 			}
 		}
@@ -195,6 +201,27 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 	return b, nil
 }
 
+func (service *ConsensusService) AddBlock(b libblock.Block) error {
+	ms := service.MerkleService
+	ss := service.StorageService
+
+	err := ss.CommitSandbox()
+	if err != nil {
+		return err
+	}
+	err = ms.PutBlock(b)
+	if err != nil {
+		return err
+	}
+	err = ms.Commit()
+	if err != nil {
+		return err
+	}
+	service.ValidatedBlock = b
+
+	return nil
+}
+
 func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err error) {
 	ms := service.MerkleService
 	cs := service.CryptoService
@@ -207,8 +234,6 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 		if !ok || err != nil {
 			ss.CancelSandbox()
 			ms.Cancel()
-		} else {
-			ss.CommitSandbox()
 		}
 	}()
 
@@ -324,22 +349,6 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 		return
 	}
 	return
-}
-
-func (service *ConsensusService) AddBlock(b libblock.Block) error {
-	ms := service.MerkleService
-
-	err := ms.PutBlock(b)
-	if err != nil {
-		return err
-	}
-	err = ms.Commit()
-	if err != nil {
-		return err
-	}
-	service.ValidatedBlock = b
-
-	return nil
 }
 
 func (service *ConsensusService) GetAccountInfo(account libcore.Address) (*block.AccountState, error) {

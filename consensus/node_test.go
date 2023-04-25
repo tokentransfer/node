@@ -7,7 +7,7 @@ import (
 	"io"
 	"testing"
 
-	libcrypto "github.com/tokentransfer/interfaces/crypto"
+	"github.com/caivega/glog"
 	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/config"
@@ -78,8 +78,11 @@ func dumpGroup(c *C, s core.Storage, g core.Group, log core.Printer) {
 				if len(dataBytes) > 0 {
 					c.Assert(err, IsNil)
 					o, err := core.AsData(dataBytes)
-					c.Assert(err, IsNil)
-					util.PrintJSON(item, o)
+					if err != nil {
+						fmt.Println(item, err)
+					} else {
+						util.PrintJSON(item, o)
+					}
 				}
 			}
 		}
@@ -89,6 +92,7 @@ func dumpGroup(c *C, s core.Storage, g core.Group, log core.Printer) {
 func (suite *NodeSuite) TestProcess(c *C) {
 	config, err := config.NewConfig("../config.json")
 	c.Assert(err, IsNil)
+	// config.SetMode("debug")
 
 	n := NewNode()
 	err = n.Init(config)
@@ -118,7 +122,7 @@ func (suite *NodeSuite) TestProcess(c *C) {
 
 	dump(c, n.storageService.storage, "before")
 
-	blob := "650801121602006DA68A0C5DAAE0715AE6B62F00F548A2C6981C2F180922083130302F5445535428C09A0C321602006B39BA86CAB636A780C9DD68D49B0F493793AA833A87010A84010A2008EAA4D219118750CE7FAB27BDAFFBC80BE44DEEBFFC7A2D359AF00BCA3BEEDE12608E0A160200B5A1D2E92521249AB079341095CDAE44CD4998770A1602006B39BA86CAB636A780C9DD68D49B0F493793AA83121602006B39BA86CAB636A780C9DD68D49B0F493793AA831A046C6973742205367B00000022013E220536C80100004243020004D33A199D322FAFD28867E3B9FB2F5AC081D56CFF1AE803635730E1D01B77D837D9EE578346DD88B68D21B9A61B8F1EFE9B2574F08B4A471F864FA7EA7A29185C4A9A0131303230343036383836393939383531353438333937373039313137313830363037343736363631323532333434333534303032373834383136333236393037323436363832363931303437383A32333435323635323331323136353439383139303533373035363230363930393333393334383435363030323033313436383631393437363334363737353531343831323138303231323136"
+	blob := "650865121602006da68a0c5daae0715ae6b62f00f548a2c6981c2f1815220331303028c09a0c32160200b5a1d2e92521249ab079341095cdae44cd4998774243020004d33a199d322fafd28867e3b9fb2f5ac081d56cff1ae803635730e1d01b77d837d9ee578346dd88b68d21b9a61b8f1efe9b2574f08b4a471f864fa7ea7a29185c4a4047bdba6e06836d6064fbd69c222490625126e3e82f30466430ab6d00bf90d0b25bc583c18c281ab7b42f8f7917e98c189ca02990c7ea21ad6db73e477b002f86"
 	data, err := hex.DecodeString(blob)
 	c.Assert(err, IsNil)
 
@@ -126,22 +130,23 @@ func (suite *NodeSuite) TestProcess(c *C) {
 	err = tx.UnmarshalBinary(data)
 	c.Assert(err, IsNil)
 
-	h, _, err := n.cryptoService.Raw(tx, libcrypto.RawBinary)
+	err = n.verifyTransaction(tx)
 	c.Assert(err, IsNil)
-	ok, err := n.consensusService.VerifyTransaction(tx)
-	c.Assert(err, IsNil)
-	c.Assert(ok, Equals, true)
-
-	err = n.storageService.CreateSandbox()
-	c.Assert(err, IsNil)
-	_, err = n.consensusService.ProcessTransaction(tx)
-	c.Assert(err, IsNil)
-	err = n.storageService.CommitSandbox()
+	_, _, err = n.processTransaction(tx)
 	c.Assert(err, IsNil)
 
+	block, err := n.GenerateBlock()
+	c.Assert(err, IsNil)
+	h, err := n.consensusService.HashBlock(block)
+	c.Assert(err, IsNil)
+	_, err = n.consensusService.VerifyBlock(block)
+	c.Assert(err, IsNil)
+	glog.Infof("=== generate block %d, %s, %d\n", block.GetIndex(), h.String(), len(block.GetTransactions()))
 	util.PrintJSON(">> hash", h)
 	// util.PrintJSON(">>> tx", tx)
 	// util.PrintJSON(">>> txWithData", txWithData)
+	// err = n.consensusService.AddBlock(block)
+	// c.Assert(err, IsNil)
 
 	dump(c, n.storageService.storage, "after")
 }

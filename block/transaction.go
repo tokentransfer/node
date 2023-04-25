@@ -1,7 +1,6 @@
 package block
 
 import (
-	"errors"
 	"log"
 
 	"github.com/tokentransfer/node/core"
@@ -56,7 +55,7 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 		return err
 	}
 	if meta != core.CORE_TRANSACTION {
-		return errors.New("error transaction data")
+		return util.ErrorOfInvalid("unmatched", "transaction with data")
 	}
 	t := msg.(*pb.Transaction)
 
@@ -216,7 +215,7 @@ func (txWithData *TransactionWithData) UnmarshalBinary(data []byte) error {
 		return err
 	}
 	if meta != core.CORE_TRANSACTION_WITH_DATA {
-		return errors.New("error transaction with data")
+		return util.ErrorOfInvalid("unmatched", "transaction with data")
 	}
 
 	td := msg.(*pb.TransactionWithData)
@@ -317,7 +316,7 @@ func (txWithData *TransactionWithData) Raw(ignoreSigningFields bool) ([]byte, er
 
 func ReadTransaction(data []byte) (libblock.Transaction, error) {
 	if len(data) == 0 {
-		return nil, errors.New("error transaction")
+		return nil, util.ErrorOfInvalid("null", "transaction data")
 	}
 	meta := core.GetMeta(data)
 	switch meta {
@@ -329,6 +328,6 @@ func ReadTransaction(data []byte) (libblock.Transaction, error) {
 		}
 		return tx, nil
 	default:
-		return nil, errors.New("error data")
+		return nil, util.ErrorOfInvalid("transaction", "data")
 	}
 }

@@ -171,6 +171,15 @@ func (v *Value) MarshalText() ([]byte, error) {
 	return []byte(v.String()), nil
 }
 
+func (v Value) MarshalJSON() ([]byte, error) {
+	return []byte(v.String()), nil
+}
+
+func (v *Value) UnmarshalJSON(b []byte) error {
+	v.value = string(b)
+	return nil
+}
+
 func (t Time) MarshalJSON() ([]byte, error) {
 	return []byte(strconv.FormatUint(uint64(t.Uint32()), 10)), nil
 }

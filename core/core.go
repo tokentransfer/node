@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
@@ -485,63 +484,64 @@ func GetMeta(data []byte) DataType {
 }
 
 func Unmarshal(data []byte) (DataType, proto.Message, error) {
-	if len(data) > 0 {
-		meta := DataType(data[0])
-		bs := data[1:]
-
-		var msg proto.Message
-		switch meta {
-		case CORE_MESSAGE:
-			msg = &pb.Message{}
-		case CORE_DATA:
-			msg = &pb.Data{}
-
-		case CORE_DATA_LIST:
-			msg = &pb.DataList{}
-		case CORE_DATA_MAP:
-			msg = &pb.DataMap{}
-
-		case CORE_BLOCK:
-			msg = &pb.Block{}
-		case CORE_TRANSACTION:
-			msg = &pb.Transaction{}
-		case CORE_RECEIPT:
-			msg = &pb.Receipt{}
-		case CORE_TRANSACTION_WITH_DATA:
-			msg = &pb.TransactionWithData{}
-		case CORE_MESSAGE_KEY:
-			msg = &pb.MessageKey{}
-
-		case CORE_ACCOUNT_STATE:
-			msg = &pb.AccountState{}
-
-		case CORE_PAYLOAD_INFO:
-			msg = &pb.PayloadInfo{}
-		case CORE_CONTRACT_INFO:
-			msg = &pb.ContractInfo{}
-		case CORE_META_INFO:
-			msg = &pb.MetaInfo{}
-		case CORE_TOKEN_INFO:
-			msg = &pb.TokenInfo{}
-		case CORE_DATA_INFO:
-			msg = &pb.DataInfo{}
-		case CORE_PEER_INFO:
-			msg = &pb.PeerInfo{}
-		case CORE_PAGE_INFO:
-			msg = &pb.PageInfo{}
-		case CORE_CODE_INFO:
-			msg = &pb.CodeInfo{}
-
-		default:
-			err := errors.New("error data format")
-			return 0, nil, err
-		}
-
-		err := proto.Unmarshal(bs, msg)
-		if err != nil {
-			return 0, nil, err
-		}
-		return meta, msg, nil
+	if len(data) == 0 {
+		return 0, nil, util.ErrorOfInvalid("data", "null")
 	}
-	return 0, nil, errors.New("null data")
+
+	meta := DataType(data[0])
+	bs := data[1:]
+
+	var msg proto.Message
+	switch meta {
+	case CORE_MESSAGE:
+		msg = &pb.Message{}
+	case CORE_DATA:
+		msg = &pb.Data{}
+
+	case CORE_DATA_LIST:
+		msg = &pb.DataList{}
+	case CORE_DATA_MAP:
+		msg = &pb.DataMap{}
+
+	case CORE_BLOCK:
+		msg = &pb.Block{}
+	case CORE_TRANSACTION:
+		msg = &pb.Transaction{}
+	case CORE_RECEIPT:
+		msg = &pb.Receipt{}
+	case CORE_TRANSACTION_WITH_DATA:
+		msg = &pb.TransactionWithData{}
+	case CORE_MESSAGE_KEY:
+		msg = &pb.MessageKey{}
+
+	case CORE_ACCOUNT_STATE:
+		msg = &pb.AccountState{}
+
+	case CORE_PAYLOAD_INFO:
+		msg = &pb.PayloadInfo{}
+	case CORE_CONTRACT_INFO:
+		msg = &pb.ContractInfo{}
+	case CORE_META_INFO:
+		msg = &pb.MetaInfo{}
+	case CORE_TOKEN_INFO:
+		msg = &pb.TokenInfo{}
+	case CORE_DATA_INFO:
+		msg = &pb.DataInfo{}
+	case CORE_PEER_INFO:
+		msg = &pb.PeerInfo{}
+	case CORE_PAGE_INFO:
+		msg = &pb.PageInfo{}
+	case CORE_CODE_INFO:
+		msg = &pb.CodeInfo{}
+
+	default:
+		err := util.ErrorOfInvalid("format", "data")
+		return 0, nil, err
+	}
+
+	err := proto.Unmarshal(bs, msg)
+	if err != nil {
+		return 0, nil, err
+	}
+	return meta, msg, nil
 }

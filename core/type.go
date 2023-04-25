@@ -218,6 +218,13 @@ func (t DataType) FromString(s string) ([]byte, error) {
 	var v interface{}
 	var e error
 	switch t {
+	case CORE_DATA_BOOLEAN:
+		b, err := strconv.ParseBool(s)
+		if err != nil {
+			return nil, err
+		}
+		v = b
+		e = nil
 	case CORE_DATA_INT8:
 		i64, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {

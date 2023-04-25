@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"chainmaker.org/chainmaker/common/v2/helper"
 	protocol "chainmaker.org/chainmaker/protocol/v2"
 	"github.com/tokentransfer/node/config"
+	"github.com/tokentransfer/node/util"
 
 	"github.com/caivega/glog"
 )
@@ -34,7 +34,7 @@ func loadFile(filePath string) ([]byte, error) {
 		}
 		return fileBytes, nil
 	}
-	return nil, errors.New("empty file path")
+	return nil, util.ErrorOfInvalid("empty", "file path")
 }
 
 func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
@@ -50,7 +50,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 	case "liquid", emptyProvider:
 		netType = protocol.Liquid
 	default:
-		return nil, errors.New("unsupported net provider")
+		return nil, util.ErrorOfInvalid("unsupported", "net provider")
 	}
 
 	authType := c.AuthType
@@ -86,7 +86,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 			glog.Infof("load net tls cert file path: %s", certPath)
 		}
 	default:
-		return nil, errors.New("wrong auth")
+		return nil, util.ErrorOfInvalid("wrong", "auth type")
 	}
 
 	keyBytes, _ := loadFile(keyPath)
@@ -137,9 +137,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 		WithHolePunch(c.NetConfig.EnablePunch),
 	)
 	if err != nil {
-		errMsg := fmt.Sprintf("new net failed: %s", err.Error())
-		glog.Error(errMsg)
-		return nil, errors.New(errMsg)
+		return nil, util.ErrorOfInvalid("new net", err.Error())
 	}
 
 	privateKey, err := asym.PrivateKeyFromPEM(keyBytes, nil)

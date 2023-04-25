@@ -150,6 +150,10 @@ func (c *Config) GetMode() string {
 	return c.Mode
 }
 
+func (c *Config) SetMode(m string) {
+	c.Mode = m
+}
+
 func (c *Config) GetGasAccount() libcore.Address {
 	return c.gasAccount
 }
