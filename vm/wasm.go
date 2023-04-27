@@ -128,6 +128,7 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 		hasOutput := false
 		outputType := core.CORE_DATA_INT64
 		outputData := false
+		outputHex := false
 		if len(outputs) > 0 {
 			output := outputs[0]
 			m, ok := output.(map[string]interface{})
@@ -139,6 +140,7 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 				hasOutput = true
 				outputType = t
 				outputData = util.ToBoolean(&m, "data")
+				outputHex = util.ToBoolean(&m, "hex")
 			}
 		}
 
@@ -161,16 +163,21 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 					fmt.Println(index, t, ui64)
 				} else {
 					inputData := util.ToBoolean(&m, "data")
+					hexData := util.ToBoolean(&m, "hex")
 					if inputData { // use wasm data instead
 						if len(wasmData) != 0 {
 							switch t {
 							case core.CORE_DATA_STRING:
-								s := hex.EncodeToString(wasmData)
-								retData, err := core.MarshalData(s)
-								if err != nil {
-									return nil, nil, err
+								if hexData {
+									s := hex.EncodeToString(wasmData)
+									retData, err := core.MarshalData(s)
+									if err != nil {
+										return nil, nil, err
+									}
+									data = retData
+								} else {
+									data = wasmData
 								}
-								data = retData
 							case core.CORE_DATA_BYTES:
 								retData, err := core.MarshalData(wasmData)
 								if err != nil {
@@ -232,15 +239,19 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 				if outputData { // return as wasm data
 					switch outputType {
 					case core.CORE_DATA_STRING:
-						newWasmData, err := hex.DecodeString(string(retData))
-						if err != nil {
-							return nil, nil, err
+						if outputHex {
+							newWasmData, err := hex.DecodeString(string(retData))
+							if err != nil {
+								return nil, nil, err
+							}
+							return newWasmData, nil, nil
+						} else {
+							return retData, nil, nil
 						}
-						return newWasmData, nil, nil
 					case core.CORE_DATA_BYTES:
 						return retData, nil, nil
 					default:
-						return retData, nil, err
+						return retData, nil, nil
 					}
 				} else {
 					returnData, err := outputType.FromBytes(retData)

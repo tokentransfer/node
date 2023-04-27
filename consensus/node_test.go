@@ -79,7 +79,7 @@ func dumpGroup(c *C, s core.Storage, g core.Group, log core.Printer) {
 					c.Assert(err, IsNil)
 					o, err := core.AsData(dataBytes)
 					if err != nil {
-						fmt.Println(item, err)
+						fmt.Println(item, err, string(dataBytes))
 					} else {
 						util.PrintJSON(item, o)
 					}
@@ -104,7 +104,7 @@ func (suite *NodeSuite) TestTransaction(c *C) {
 func (suite *NodeSuite) TestProcess(c *C) {
 	config, err := config.NewConfig("../config.json")
 	c.Assert(err, IsNil)
-	config.SetMode("debug")
+	// config.SetMode("debug")
 
 	n := NewNode()
 	err = n.Init(config)
