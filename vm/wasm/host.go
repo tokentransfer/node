@@ -43,6 +43,24 @@ func NewHostFunc(
 	}
 }
 
+func NewFunc(
+	name string,
+	f api.GoModuleFunction,
+	paramTypes []api.ValueType,
+	paramNames []string,
+	resultTypes []api.ValueType,
+	resultNames []string,
+) *HostFunc {
+	return &HostFunc{
+		Name:        name,
+		Func:        f,
+		ParamTypes:  paramTypes,
+		ParamNames:  paramNames,
+		ResultTypes: resultTypes,
+		ResultNames: resultNames,
+	}
+}
+
 func (f *HostFunc) Export(builder wazero.HostModuleBuilder) {
 	builder.NewFunctionBuilder().WithGoModuleFunction(f.Func, f.ParamTypes, f.ResultTypes).
 		WithParameterNames(f.ParamNames...).

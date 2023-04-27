@@ -3,12 +3,14 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"math/big"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -734,8 +736,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			}
 			hash := tx.GetHash()
 			list[i] = blob
-			glog.Infoln("sign transaction", hash.String(), blob)
-			util.PrintJSON("tx", tx)
+			glog.Infoln("sign transaction", hash.String(), len(blob))
 		}
 		return list, nil
 
@@ -776,6 +777,37 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			}
 			_, err = n.sendTransaction(tx)
 			if err != nil {
+				if util.IsTest() || util.IsDebug() {
+					blobDir := "./consensus/data"
+					isExists, isDir := util.Exists(blobDir)
+					if isExists && isDir {
+						blobFile := path.Join(blobDir, "tx.blob")
+						e := util.WriteFile(blobFile, []byte(blob))
+						if e != nil {
+							return nil, e
+						}
+						glog.Infoln("write blob to ", blobFile)
+
+						rawFile := path.Join(blobDir, "tx.raw")
+						e = util.WriteFile(rawFile, []byte(fmt.Sprintf("%v", data)))
+						if e != nil {
+							return nil, e
+						}
+						glog.Infoln("write raw to ", rawFile)
+
+						jsonFile := path.Join(blobDir, "tx.json")
+						jsonBytes, e := json.MarshalIndent(tx, "", " ")
+						if e != nil {
+							return nil, e
+						}
+						e = util.WriteFile(jsonFile, jsonBytes)
+						if e != nil {
+							return nil, e
+						}
+						glog.Infoln("write json to ", jsonFile)
+					}
+				}
+				glog.Error(err)
 				return nil, err
 			}
 

@@ -241,3 +241,29 @@ func ReadFile(p string) ([]byte, error) {
 	}
 	return data, nil
 }
+
+func WriteFile(p string, data []byte) error {
+	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	n, err := f.Write(data)
+	if err != nil {
+		return err
+	}
+	if n != len(data) {
+		return fmt.Errorf("[ERROR] error write: %d != %d", n, len(data))
+	}
+	return nil
+}
+
+// isExists, isDir
+func Exists(p string) (bool, bool) {
+	info, err := os.Stat(p)
+	if err != nil {
+		return os.IsExist(err), false
+	}
+	return true, info.IsDir()
+}

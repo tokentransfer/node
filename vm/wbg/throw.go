@@ -9,13 +9,15 @@ import (
 	"github.com/tokentransfer/node/vm/wasm"
 )
 
-var wbgThrow = wasm.NewHostFunc(
-	"__wbindgen_throw", wasm.WasmFunc(wbgThrowFn),
+var wbgThrow = wasm.NewFunc(
+	"__wbindgen_throw", api.GoModuleFunc(wbgThrowFn),
 	[]api.ValueType{api.ValueTypeI32, api.ValueTypeI32},
-	"msg_ptr", "msg_len",
+	[]string{"msg_ptr", "msg_len"},
+	[]api.ValueType{},
+	[]string{},
 )
 
-func wbgThrowFn(_ context.Context, mod api.Module, params []uint64) uint32 {
+func wbgThrowFn(_ context.Context, mod api.Module, params []uint64) {
 	ptr := params[0]
 	len := params[1]
 	data, ok := mod.Memory().Read(uint32(ptr), uint32(len))
