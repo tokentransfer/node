@@ -12,6 +12,7 @@ import (
 	"github.com/tokentransfer/node/util"
 	"github.com/tokentransfer/node/vm/env"
 	"github.com/tokentransfer/node/vm/wasi"
+	"github.com/tokentransfer/node/vm/wbg"
 )
 
 const (
@@ -49,6 +50,10 @@ func (wm *WasmModule) Load(cost *api.Cost, wasmCode []byte) (api.Module, error) 
 		return nil, err
 	}
 	err = wasi.LoadModule(ctx, runtime)
+	if err != nil {
+		return nil, err
+	}
+	err = wbg.LoadModule(ctx, runtime)
 	if err != nil {
 		return nil, err
 	}
