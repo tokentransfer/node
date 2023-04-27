@@ -122,8 +122,10 @@ func (suite *NodeSuite) TestProcess(c *C) {
 
 	dump(c, n.storageService.storage, "before")
 
-	blob := "650865121602006da68a0c5daae0715ae6b62f00f548a2c6981c2f1815220331303028c09a0c32160200b5a1d2e92521249ab079341095cdae44cd4998774243020004d33a199d322fafd28867e3b9fb2f5ac081d56cff1ae803635730e1d01b77d837d9ee578346dd88b68d21b9a61b8f1efe9b2574f08b4a471f864fa7ea7a29185c4a4047bdba6e06836d6064fbd69c222490625126e3e82f30466430ab6d00bf90d0b25bc583c18c281ab7b42f8f7917e98c189ca02990c7ea21ad6db73e477b002f86"
-	data, err := hex.DecodeString(blob)
+	blobData, err := util.ReadFile("./data/tx.blob")
+	c.Assert(err, IsNil)
+	fmt.Println(len(blobData), string(blobData))
+	data, err := hex.DecodeString(string(blobData))
 	c.Assert(err, IsNil)
 
 	tx := &block.Transaction{}

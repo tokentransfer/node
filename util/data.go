@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"os"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/tjfoc/gmsm/sm3"
@@ -225,4 +226,18 @@ func ReadBytesWith(r io.Reader, maxSize uint32) ([]byte, error) {
 		}
 	}
 	return b, nil
+}
+
+func ReadFile(p string) ([]byte, error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
