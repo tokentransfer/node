@@ -145,6 +145,7 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 		}
 
 		states := make([]libblock.State, 0)
+		hashMap := make(map[string]libblock.State)
 		for i := 0; i < len(list); i++ {
 			txWithData := list[i]
 
@@ -156,9 +157,11 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 				keys := s.GetStateKey()
 				for k := 0; k < len(keys); k++ {
 					key := fmt.Sprintf("%d-%s", s.GetStateType(), keys[k])
-					item, ok := stateMap[key]
-					if ok && item[0] == uint64(i) && item[1] == s.GetIndex() {
+					item, sok := stateMap[key]
+					_, hok := hashMap[s.GetHash().String()]
+					if sok && !hok && item[0] == uint64(i) && item[1] == s.GetIndex() {
 						states = append(states, s)
+						hashMap[s.GetHash().String()] = s
 					}
 				}
 			}
