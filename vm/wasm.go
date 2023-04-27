@@ -176,7 +176,11 @@ func (wm *WasmModule) Run(mod api.Module, f api.Function, wasmData []byte, metho
 									}
 									data = retData
 								} else {
-									data = wasmData
+									retData, err := core.MarshalData(string(wasmData))
+									if err != nil {
+										return nil, nil, err
+									}
+									data = retData
 								}
 							case core.CORE_DATA_BYTES:
 								retData, err := core.MarshalData(wasmData)
