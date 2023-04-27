@@ -1,7 +1,6 @@
 package merkle
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/tokentransfer/go-MerklePatriciaTree/mpt"
@@ -43,7 +42,7 @@ func (t *MerkleTree) Cancel() error {
 }
 
 func (t *MerkleTree) Verify(key []byte) ([]byte, error) {
-	return nil, errors.New("unsupport")
+	return nil, util.ErrorOfInvalid("unsupport", "verify proof") // TODO
 }
 
 func (t *MerkleTree) GetData(key []byte) ([]byte, error) {
@@ -67,12 +66,12 @@ func (t *MerkleTree) Close() error {
 }
 
 func (t *MerkleTree) PutDatas(keys [][]byte, values [][]byte) error {
-	ll := len(keys)
-	if ll == 0 || ll != len(values) {
-		return errors.New("empty")
+	llk := len(keys)
+	llv := len(values)
+	if llk == 0 || llk != llv {
+		return util.ErrorOfUnmatched("the length", "the keys and values", llk, llv)
 	}
-
-	for i := 0; i < ll; i++ {
+	for i := 0; i < llk; i++ {
 		key := keys[i]
 		value := values[i]
 		err := t.PutData(key, value)
@@ -86,7 +85,7 @@ func (t *MerkleTree) PutDatas(keys [][]byte, values [][]byte) error {
 func (t *MerkleTree) GetDatas(keys [][]byte) ([][]byte, error) {
 	ll := len(keys)
 	if ll == 0 {
-		return nil, errors.New("null keys")
+		return nil, util.ErrorOfEmpty("keys", "datas")
 	}
 
 	values := make([][]byte, ll)
@@ -118,7 +117,7 @@ func (t *MerkleTree) HasData(key []byte) bool {
 
 // TODO
 func (t *MerkleTree) RemoveData(key []byte) error {
-	return errors.New("unsupported")
+	return util.ErrorOf("unsupported", "remove", "data")
 }
 
 func (t *MerkleTree) ListData(f func(key []byte, value []byte) error) error {
@@ -270,7 +269,7 @@ func (service *MerkleService) PutState(state libblock.State, s ...interface{}) e
 func (service *MerkleService) GetStateByHash(h libcore.Hash, s ...interface{}) (libblock.State, error) {
 	data, err := service.sm.GetData(h)
 	if err != nil {
-		return nil, util.ErrorOfNonexists("state", h.String())
+		return nil, util.ErrorOfNotFound("state", h.String())
 	}
 	state, err := block.ReadState(data)
 	if err != nil {
@@ -283,7 +282,7 @@ func (service *MerkleService) GetStateByTypeAndKey(stateType libblock.StateType,
 	stateTypeAndKey := getStateKeyWithType(stateKey, stateType)
 	h, err := service.im.GetData([]byte(stateTypeAndKey))
 	if err != nil {
-		return nil, util.ErrorOfNonexists("state", stateTypeAndKey)
+		return nil, util.ErrorOfNotFound("state", stateTypeAndKey)
 	}
 	return service.GetStateByHash(libcore.Hash(h))
 }
@@ -292,7 +291,7 @@ func (service *MerkleService) GetStateByTypeAndAddress(stateType libblock.StateT
 	stateTypeTypeAndAddress := getStateKeyWithType(account.String(), stateType)
 	h, err := service.im.GetData([]byte(stateTypeTypeAndAddress))
 	if err != nil {
-		return nil, util.ErrorOfNonexists("state", stateTypeTypeAndAddress)
+		return nil, util.ErrorOfNotFound("state", stateTypeTypeAndAddress)
 	}
 	return service.GetStateByHash(libcore.Hash(h))
 }
@@ -301,7 +300,7 @@ func (service *MerkleService) GetStateByAddressAndIndex(account libcore.Address,
 	stateAddressAndIndexKey := getStateKey(fmt.Sprintf("%s:%d", account.String(), index))
 	h, err := service.im.GetData([]byte(stateAddressAndIndexKey))
 	if err != nil {
-		return nil, util.ErrorOfNonexists("state", stateAddressAndIndexKey)
+		return nil, util.ErrorOfNotFound("state", stateAddressAndIndexKey)
 	}
 	return service.GetStateByHash(libcore.Hash(h))
 }
@@ -310,7 +309,7 @@ func (service *MerkleService) GetStateByAddress(account libcore.Address, s ...in
 	stateAddressKey := getStateKey(account.String())
 	h, err := service.im.GetData([]byte(stateAddressKey))
 	if err != nil {
-		return nil, util.ErrorOfNonexists("state", stateAddressKey)
+		return nil, util.ErrorOfNotFound("state", stateAddressKey)
 	}
 	return service.GetStateByHash(libcore.Hash(h))
 }
@@ -345,7 +344,7 @@ func (service *MerkleService) PutTransaction(txWithData libblock.TransactionWith
 func (service *MerkleService) GetTransactionByHash(h libcore.Hash, s ...interface{}) (libblock.TransactionWithData, error) {
 	data, err := service.tm.GetData(h)
 	if err != nil {
-		return nil, util.ErrorOfNonexists("transaction", h.String())
+		return nil, util.ErrorOfNotFound("transaction", h.String())
 	}
 	txWithData := &block.TransactionWithData{}
 	err = txWithData.UnmarshalBinary(data)
@@ -359,7 +358,7 @@ func (service *MerkleService) GetTransactionByIndex(account libcore.Address, ind
 	accountKey := getTransactionKey(fmt.Sprintf("%s:%d", account.String(), index))
 	h, err := service.im.GetData([]byte(accountKey))
 	if err != nil {
-		return nil, util.ErrorOfNonexists("transaction", fmt.Sprintf("%s, %d", account.String(), index))
+		return nil, util.ErrorOfNotFound("transaction", fmt.Sprintf("%s, %d", account.String(), index))
 	}
 	return service.GetTransactionByHash(libcore.Hash(h))
 }
@@ -390,7 +389,7 @@ func (service *MerkleService) PutBlock(b libblock.Block, s ...interface{}) error
 func (service *MerkleService) GetBlockByHash(hash libcore.Hash, s ...interface{}) (libblock.Block, error) {
 	data, err := service.bm.GetData(hash)
 	if err != nil {
-		return nil, util.ErrorOfNonexists("block", hash.String())
+		return nil, util.ErrorOfNotFound("block", hash.String())
 	}
 	b := &block.Block{}
 	err = b.UnmarshalBinary(data)
@@ -404,7 +403,7 @@ func (service *MerkleService) GetBlockByIndex(index uint64, s ...interface{}) (l
 	name := getBlockKey(index)
 	data, err := service.im.GetData([]byte(name))
 	if err != nil {
-		return nil, util.ErrorOfNonexists("block", fmt.Sprintf("%d", index))
+		return nil, util.ErrorOfNotFound("block", fmt.Sprintf("%d", index))
 	}
 	h := libcore.Hash(data)
 	return service.GetBlockByHash(h)
@@ -450,8 +449,9 @@ func (service *MerkleService) Cancel(s ...interface{}) error {
 	return nil
 }
 
+// TODO
 func (service *MerkleService) Verify(key []byte, s ...interface{}) ([]byte, error) {
-	return nil, errors.New("unsupport")
+	return nil, util.ErrorOf("unsupport", "verify proof", "merkle service")
 }
 
 func getBlockKey(index uint64) string {

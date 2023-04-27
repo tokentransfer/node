@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -228,7 +227,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	}
 	fromAddress := fromAccount.String()
 	if fromAddress != from {
-		return "", nil, fmt.Errorf("error account: %s != %s", fromAddress, from)
+		return "", nil, util.ErrorOfUnmatched("account", "in secret", from, fromAddress)
 	}
 	_, toAccount, err := as.NewAccountFromAddress(to)
 	if err != nil {
@@ -542,7 +541,7 @@ func (n *Node) processTransaction(tx libblock.Transaction) (libblock.Transaction
 		return nil, nil, err
 	}
 	if !ok {
-		return nil, nil, errors.New("error transaction")
+		return nil, nil, util.ErrorOfInvalid("verify", "transaction")
 	}
 
 	err = n.storageService.CreateSandbox()
@@ -853,15 +852,16 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 				return nil, err
 			}
 			return s, nil
+		default:
+			return nil, util.ErrorOfUnknown("state", fmt.Sprintf("%d(%s)", stateType, stateTypeName))
 		}
-		return nil, errors.New("error")
 
 	case "dump":
 		n.storageService.Dump(chunk.LogPrinter{})
 		return n.storageService.storage.Root().String(), nil
 
 	default:
-		return nil, fmt.Errorf("no such method %s", method)
+		return nil, util.ErrorOfNotFound("method", method)
 	}
 }
 

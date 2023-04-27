@@ -1,8 +1,6 @@
 package block
 
 import (
-	"errors"
-
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/util"
@@ -207,7 +205,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 
 func ReadState(data []byte) (libblock.State, error) {
 	if len(data) == 0 {
-		return nil, errors.New("error entry")
+		return nil, util.ErrorOf("empty", "data", "entry")
 	}
 	meta := core.GetMeta(data)
 	switch meta {
@@ -219,7 +217,7 @@ func ReadState(data []byte) (libblock.State, error) {
 		}
 		return s, nil
 	default:
-		return nil, errors.New("error data")
+		return nil, util.ErrorOfUnknown("data", "state")
 	}
 }
 

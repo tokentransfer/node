@@ -21,8 +21,17 @@ func IsDebug() bool {
 	return Mode == "debug"
 }
 
-func ErrorOfNonexists(t string, target string) error {
-	e := fmt.Errorf("can't find %s: %s", t, target)
+func ErrorOfEmpty(t string, target string) error {
+	e := fmt.Errorf("empty %s: %s", t, target)
+	if IsDebug() {
+		glog.Error(e)
+		debug.PrintStack()
+	}
+	return e
+}
+
+func ErrorOfNotFound(t string, target string) error {
+	e := fmt.Errorf("not found %s: %s", t, target)
 	if IsDebug() {
 		glog.Error(e)
 		debug.PrintStack()
@@ -41,6 +50,15 @@ func ErrorOfInvalid(t string, target string) error {
 
 func ErrorOfUnknown(t string, target string) error {
 	e := fmt.Errorf("unknown %s: %s", t, target)
+	if IsDebug() {
+		glog.Error(e)
+		debug.PrintStack()
+	}
+	return e
+}
+
+func ErrorOfUnmatched(t, target string, expected interface{}, actual interface{}) error {
+	e := fmt.Errorf("unmatched %s: %s, %v != %v", t, target, expected, actual)
 	if IsDebug() {
 		glog.Error(e)
 		debug.PrintStack()

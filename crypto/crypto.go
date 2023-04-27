@@ -44,7 +44,7 @@ func (service *CryptoService) Raw(h libcrypto.Hashable, rt libcrypto.RawType) (l
 	case libcrypto.RawIgnoreSigningFields:
 		rawData, err = h.Raw(true)
 	default:
-		err = fmt.Errorf("unknown raw type %d", rt)
+		err = util.ErrorOfUnknown("raw type", fmt.Sprintf("%d", rt))
 	}
 	if err != nil {
 		return nil, nil, err
@@ -108,7 +108,7 @@ func (service *CryptoService) Verify(s libcrypto.Signable) (bool, error) {
 		return false, err
 	}
 	if !libcore.Equals(a, s.GetAccount()) {
-		return false, util.ErrorOfInvalid("unmatched", "signature")
+		return false, util.ErrorOfUnmatched("address", "in public key", s.GetAccount().String(), a.String())
 	}
 	data, err := s.Raw(true)
 	if err != nil {

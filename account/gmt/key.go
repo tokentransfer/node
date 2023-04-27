@@ -271,11 +271,11 @@ func encodeSegWitAddress(witnessHrp string, witnessVersion byte, witnessProgram 
 	// Check validity by decoding the created address.
 	hrp, version, program, err := decodeSegWitAddress(bech)
 	if err != nil {
-		return "", fmt.Errorf("invalid segwit address: %v", err)
+		return "", util.ErrorOfInvalid("segwit address", err.Error())
 	}
 
 	if hrp != witnessHrp || version != witnessVersion || !bytes.Equal(program, witnessProgram) {
-		return "", fmt.Errorf("invalid segwit address")
+		return "", util.ErrorOfInvalid("segwit address", "unmatched")
 	}
 
 	return bech, nil
@@ -293,13 +293,13 @@ func decodeSegWitAddress(address string) (string, byte, []byte, error) {
 	// The first byte of the decoded address is the witness version, it must
 	// exist.
 	if len(data) < 1 {
-		return "", 0, nil, fmt.Errorf("no witness version")
+		return "", 0, nil, util.ErrorOfEmpty("witness", "version")
 	}
 
 	// ...and be <= 16.
 	version := data[0]
 	if version > 16 {
-		return "", 0, nil, fmt.Errorf("invalid witness version: %v", version)
+		return "", 0, nil, util.ErrorOfInvalid("witness version", fmt.Sprintf("%v", version))
 	}
 
 	// The remaining characters of the address returned are grouped into
@@ -312,13 +312,12 @@ func decodeSegWitAddress(address string) (string, byte, []byte, error) {
 
 	// The regrouped data must be between 2 and 40 bytes.
 	if len(regrouped) < 2 || len(regrouped) > 40 {
-		return "", 0, nil, fmt.Errorf("invalid data length")
+		return "", 0, nil, util.ErrorOfInvalid("data length", fmt.Sprintf("%d", len(regrouped)))
 	}
 
 	// For witness version 0, address MUST be exactly 20 or 32 bytes.
 	if version == 0 && len(regrouped) != 20 && len(regrouped) != 32 {
-		return "", 0, nil, fmt.Errorf("invalid data length for witness "+
-			"version 0: %v", len(regrouped))
+		return "", 0, nil, util.ErrorOfInvalid("data length for witness version 0", fmt.Sprintf("%d", len(regrouped)))
 	}
 
 	return hrp, version, regrouped, nil

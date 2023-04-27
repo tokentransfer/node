@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/big"
 	"os"
 
@@ -213,7 +214,7 @@ func ReadBytesWith(r io.Reader, maxSize uint32) ([]byte, error) {
 		return nil, err
 	}
 	if maxSize > 0 && l > maxSize {
-		return nil, fmt.Errorf("[ERROR] read bytes limit: %d > %d", l, maxSize)
+		return nil, ErrorOfInvalid("data size", fmt.Sprintf("%d > %d", l, maxSize))
 	}
 	b := make([]byte, l)
 	if l > 0 {
@@ -222,7 +223,7 @@ func ReadBytesWith(r io.Reader, maxSize uint32) ([]byte, error) {
 			return nil, err
 		}
 		if n != int(l) {
-			return nil, fmt.Errorf("[ERROR] error read: %d != %d", n, int(l))
+			return nil, ErrorOfUnmatched("data size", "read", int(l), n)
 		}
 	}
 	return b, nil
@@ -243,20 +244,7 @@ func ReadFile(p string) ([]byte, error) {
 }
 
 func WriteFile(p string, data []byte) error {
-	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	n, err := f.Write(data)
-	if err != nil {
-		return err
-	}
-	if n != len(data) {
-		return fmt.Errorf("[ERROR] error write: %d != %d", n, len(data))
-	}
-	return nil
+	return ioutil.WriteFile(p, data, 0644)
 }
 
 // isExists, isDir

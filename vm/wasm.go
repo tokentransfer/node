@@ -80,34 +80,34 @@ func (wm *WasmModule) Verify(mod api.Module, abiCode []byte, method string, para
 	mallocName := util.ToString(&memoryMap, "malloc")
 	mallocFn := mod.ExportedFunction(mallocName)
 	if mallocFn == nil {
-		return nil, util.ErrorOfNonexists("function", "malloc")
+		return nil, util.ErrorOfNotFound("function", "malloc")
 	} else {
 		wm.mallocFn = mallocFn
 	}
 	freeName := util.ToString(&memoryMap, "free")
 	freeFn := mod.ExportedFunction(freeName)
 	if freeFn == nil {
-		return nil, util.ErrorOfNonexists("function", "free")
+		return nil, util.ErrorOfNotFound("function", "free")
 	} else {
 		wm.freeFn = freeFn
 	}
 	moveName := util.ToString(&memoryMap, "move")
 	moveFn := mod.ExportedFunction(moveName)
 	if moveFn == nil {
-		return nil, util.ErrorOfNonexists("function", "free")
+		return nil, util.ErrorOfNotFound("function", "free")
 	} else {
 		wm.moveFn = moveFn
 	}
 
 	m := util.ToMap(&defineMap, method)
 	if m == nil {
-		return nil, util.ErrorOfNonexists("method in abi", method)
+		return nil, util.ErrorOfNotFound("method in abi", method)
 	} else {
 		wm.funcDef = m
 	}
 	f := mod.ExportedFunction(method)
 	if f == nil {
-		return nil, util.ErrorOfNonexists("method in wasm module", method)
+		return nil, util.ErrorOfNotFound("method in wasm module", method)
 	}
 	types := f.Definition().ParamTypes()
 	tLen := len(types)
@@ -342,7 +342,7 @@ func (wm *WasmModule) malloc(m api.Module, size uint64) (uint64, error) {
 		}
 		return results[0], nil
 	}
-	return 0, util.ErrorOfNonexists("function", "malloc")
+	return 0, util.ErrorOfNotFound("function", "malloc")
 }
 
 func (wm *WasmModule) free(m api.Module, ptr uint64, size uint64) error {
@@ -353,7 +353,7 @@ func (wm *WasmModule) free(m api.Module, ptr uint64, size uint64) error {
 		}
 		return nil
 	}
-	return util.ErrorOfNonexists("function", "malloc")
+	return util.ErrorOfNotFound("function", "malloc")
 }
 
 func (wm *WasmModule) move(m api.Module, delta int32) (uint64, error) {
@@ -364,7 +364,7 @@ func (wm *WasmModule) move(m api.Module, delta int32) (uint64, error) {
 		}
 		return results[0], nil
 	}
-	return 0, util.ErrorOfNonexists("function", "move")
+	return 0, util.ErrorOfNotFound("function", "move")
 }
 
 func verifyType(t core.DataType, pt api.ValueType) bool {
@@ -541,15 +541,15 @@ func VerifyWasm(wasmCode []byte, abiCode []byte) error {
 
 		mallocName := util.ToString(&memoryMap, "malloc")
 		if mod.ExportedFunction(mallocName) == nil {
-			return util.ErrorOfNonexists("function", "malloc")
+			return util.ErrorOfNotFound("function", "malloc")
 		}
 		freeName := util.ToString(&memoryMap, "free")
 		if mod.ExportedFunction(freeName) == nil {
-			return util.ErrorOfNonexists("function", "free")
+			return util.ErrorOfNotFound("function", "free")
 		}
 		moveName := util.ToString(&memoryMap, "move")
 		if mod.ExportedFunction(moveName) == nil {
-			return util.ErrorOfNonexists("function", "move")
+			return util.ErrorOfNotFound("function", "move")
 		}
 
 		for name, fd := range mod.ExportedFunctionDefinitions() {

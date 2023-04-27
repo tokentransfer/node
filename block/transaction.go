@@ -55,7 +55,7 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 		return err
 	}
 	if meta != core.CORE_TRANSACTION {
-		return util.ErrorOfInvalid("unmatched", "transaction with data")
+		return util.ErrorOfUnmatched("data type", "transaction with data", core.CORE_TRANSACTION, meta)
 	}
 	t := msg.(*pb.Transaction)
 
@@ -215,7 +215,7 @@ func (txWithData *TransactionWithData) UnmarshalBinary(data []byte) error {
 		return err
 	}
 	if meta != core.CORE_TRANSACTION_WITH_DATA {
-		return util.ErrorOfInvalid("unmatched", "transaction with data")
+		return util.ErrorOfUnmatched("data type", "transaction with data", core.CORE_TRANSACTION_WITH_DATA, meta)
 	}
 
 	td := msg.(*pb.TransactionWithData)

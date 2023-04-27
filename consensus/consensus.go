@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -293,7 +292,7 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 		}
 		if arh.String() != brh.String() {
 			ok = false
-			err = util.ErrorOf("unmatched", "transaction receipt", fmt.Sprintf("%s != %s", arh.String(), brh.String()))
+			err = util.ErrorOfUnmatched("raw hash", "transaction receipt", arh.String(), brh.String())
 			return
 		}
 
@@ -307,23 +306,23 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 	if service.ValidatedBlock != nil {
 		if b.GetIndex() != (service.ValidatedBlock.GetIndex() + 1) {
 			ok = false
-			err = fmt.Errorf("error block index: %d != %d", b.GetIndex(), (service.ValidatedBlock.GetIndex() + 1))
+			err = util.ErrorOfUnmatched("index", "block", (service.ValidatedBlock.GetIndex() + 1), b.GetIndex())
 			return
 		}
 		if b.GetParentHash().String() != service.ValidatedBlock.GetHash().String() {
 			ok = false
-			err = fmt.Errorf("error parent hash: %s != %s", b.GetParentHash().String(), service.ValidatedBlock.GetHash().String())
+			err = util.ErrorOfUnmatched("parent hash", "block", service.ValidatedBlock.GetHash().String(), b.GetParentHash().String())
 			return
 		}
 	} else {
 		if b.GetIndex() != 0 {
 			ok = false
-			err = errors.New("error block index")
+			err = util.ErrorOfInvalid("index", "block")
 			return
 		}
 		if !b.GetParentHash().IsZero() {
 			ok = false
-			err = errors.New("error parent hash")
+			err = util.ErrorOfInvalid("parent hash", "block")
 			return
 		}
 	}
@@ -343,12 +342,12 @@ func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err err
 	stateHash := ms.GetStateRoot()
 	if b.GetTransactionHash().String() != transactionHash.String() {
 		ok = false
-		err = fmt.Errorf("error transaction hash: %s != %s", b.GetTransactionHash().String(), transactionHash.String())
+		err = util.ErrorOfUnmatched("hash", "transaction", b.GetTransactionHash().String(), transactionHash.String())
 		return
 	}
 	if b.GetStateHash().String() != stateHash.String() {
 		ok = false
-		err = fmt.Errorf("error state hash: %s != %s", b.GetStateHash().String(), stateHash.String())
+		err = util.ErrorOfUnmatched("hash", "state", b.GetStateHash().String(), stateHash.String())
 		return
 	}
 	return
@@ -364,7 +363,7 @@ func (service *ConsensusService) GetAccountInfo(account libcore.Address) (*block
 	}
 	info, ok := state.(*block.AccountState)
 	if !ok {
-		return nil, errors.New("error account state")
+		return nil, util.ErrorOfInvalid("data", "account state")
 	}
 	return info, nil
 }
@@ -378,22 +377,22 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 		return false, err
 	}
 	if !ok {
-		return false, errors.New("error transaction")
+		return false, util.ErrorOfInvalid("verify", "transaction")
 	}
 	tx, ok := t.(*block.Transaction)
 	if !ok {
-		return false, errors.New("error transaction")
+		return false, util.ErrorOfInvalid("data", "transaction")
 	}
 
 	account := tx.Account
 	sequence := libstore.GetSequence(ms, account) + 1
 	if tx.Sequence != sequence {
-		return false, fmt.Errorf("error sequence: %d != %d", tx.Sequence, sequence)
+		return false, util.ErrorOfInvalid("sequence", fmt.Sprintf("%d != %d", tx.Sequence, sequence))
 	}
 
 	info, err := service.GetAccountInfo(account)
 	if err != nil || info == nil {
-		return false, util.ErrorOfNonexists("account", account.String())
+		return false, util.ErrorOfNotFound("account", account.String())
 	}
 
 	if tx.Gas < 10 {
@@ -510,7 +509,7 @@ func (service *ConsensusService) removeBalance(info *block.AccountState, amount 
 		return err
 	}
 	if isNegative {
-		return errors.New("insuffient amount")
+		return util.ErrorOf("insuffient amount", "nagative", "balance")
 	}
 	info.Amount = newAmount
 	return nil

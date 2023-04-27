@@ -89,10 +89,22 @@ func dumpGroup(c *C, s core.Storage, g core.Group, log core.Printer) {
 	}
 }
 
+func (suite *NodeSuite) TestTransaction(c *C) {
+	blobData, err := util.ReadFile("./data/tx.blob")
+	c.Assert(err, IsNil)
+	fmt.Println(len(blobData), string(blobData))
+	data, err := hex.DecodeString(string(blobData))
+	c.Assert(err, IsNil)
+
+	tx := &block.Transaction{}
+	err = tx.UnmarshalBinary(data)
+	c.Assert(err, IsNil)
+}
+
 func (suite *NodeSuite) TestProcess(c *C) {
 	config, err := config.NewConfig("../config.json")
 	c.Assert(err, IsNil)
-	// config.SetMode("debug")
+	config.SetMode("debug")
 
 	n := NewNode()
 	err = n.Init(config)

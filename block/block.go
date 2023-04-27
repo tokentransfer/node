@@ -1,11 +1,11 @@
 package block
 
 import (
-	"errors"
 	"log"
 
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
+	"github.com/tokentransfer/node/util"
 
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
@@ -44,7 +44,7 @@ func (b *Block) UnmarshalBinary(data []byte) error {
 	}
 
 	if meta != core.CORE_BLOCK {
-		return errors.New("error block data")
+		return util.ErrorOfInvalid("data", "block")
 	}
 	block := msg.(*pb.Block)
 	b.BlockIndex = block.BlockIndex

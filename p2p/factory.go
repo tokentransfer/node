@@ -7,14 +7,13 @@ SPDX-License-Identifier: Apache-2.0
 package p2p
 
 import (
-	"errors"
+	"fmt"
 
 	libp2p "chainmaker.org/chainmaker/net-libp2p/libp2pnet"
 	liquid "chainmaker.org/chainmaker/net-liquid/liquidnet"
 	"chainmaker.org/chainmaker/protocol/v2"
+	"github.com/tokentransfer/node/util"
 )
-
-var ErrorNetType = errors.New("error net type")
 
 // NetFactory provide a way to create net instance.
 type NetFactory struct {
@@ -296,7 +295,7 @@ func (nf *NetFactory) NewNet(netType protocol.NetType, opts ...NetOption) (proto
 		}
 		nf.n = liquidNet
 	default:
-		return nil, ErrorNetType
+		return nil, util.ErrorOfUnknown("net type", fmt.Sprintf("%d", nf.netType))
 	}
 	if err := nf.Apply(opts...); err != nil {
 		return nil, err
@@ -329,7 +328,7 @@ func WithStunClient(clientListenAddr, stunServerAddr, networkType string, enable
 		case protocol.Liquid:
 			n, ok := nf.n.(*liquid.LiquidNet)
 			if !ok {
-				return errors.New("nf.n is not LiquidNet")
+				return util.ErrorOfUnknown("network", "not LiquidNet")
 			}
 			if enable {
 				n.StunClientConfig().ClientListenAddr = liquid.GenMaAddr(clientListenAddr)
@@ -355,7 +354,7 @@ func WithStunServer(enable, twoPublicAddr bool, other string, notifyAddr, localN
 		case protocol.Liquid:
 			n, ok := nf.n.(*liquid.LiquidNet)
 			if !ok {
-				return errors.New("nf.n is not LiquidNet")
+				return util.ErrorOfUnknown("network", "not LiquidNet")
 			}
 			if enable {
 				n.StunServerConfig().EnableServer = enable
@@ -387,7 +386,7 @@ func WithHolePunch(enable bool) NetOption {
 		case protocol.Liquid:
 			n, ok := nf.n.(*liquid.LiquidNet)
 			if !ok {
-				return errors.New("nf.n is not LiquidNet")
+				return util.ErrorOfUnknown("network", "not LiquidNet")
 			}
 			n.HolePunchConfig().EnablePunch = enable
 		}

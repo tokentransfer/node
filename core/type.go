@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/hex"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -397,7 +396,7 @@ func GetDataTypeByName(name string) (DataType, error) {
 	if dataType, ok := dataTypes[n]; ok {
 		return dataType, nil
 	}
-	return 0, fmt.Errorf("unknown DataType: %s", name)
+	return 0, util.ErrorOfUnknown("DataType", name)
 }
 
 func GetDataTypes() []DataType {

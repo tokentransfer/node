@@ -1,10 +1,9 @@
 package block
 
 import (
-	"errors"
-
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
+	"github.com/tokentransfer/node/util"
 
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
@@ -34,7 +33,7 @@ func (r *Receipt) UnmarshalBinary(data []byte) error {
 	}
 
 	if meta != core.CORE_RECEIPT {
-		return errors.New("error receipt data")
+		return util.ErrorOfInvalid("data", "receipt")
 	}
 	receipt := msg.(*pb.Receipt)
 	r.TransactionResult = libblock.TransactionResult(receipt.TransactionResult)

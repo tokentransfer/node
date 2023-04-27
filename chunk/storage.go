@@ -86,7 +86,7 @@ func (s *chunkStorage) GetVersion(n int64) (core.Key, error) {
 	link := core.GetKey(indexString)
 	linkEntry, ok := s.getEntry(link)
 	if !ok {
-		return nil, util.ErrorOfNonexists("link", indexString)
+		return nil, util.ErrorOfNotFound("link", indexString)
 	}
 	k, err := core.ParseKey(linkEntry.name)
 	if err != nil {
@@ -343,7 +343,7 @@ func (s *chunkStorage) Get(key core.Key) (core.Data, error) {
 		}
 		return &chunkData{s, key, false}, nil
 	}
-	return nil, util.ErrorOfNonexists("file", key.String())
+	return nil, util.ErrorOfNotFound("file", key.String())
 }
 
 func (s *chunkStorage) Chunk(key core.Key) ([]byte, error) {
@@ -351,7 +351,7 @@ func (s *chunkStorage) Chunk(key core.Key) ([]byte, error) {
 	if ok {
 		return entry.data, nil
 	}
-	return nil, util.ErrorOfNonexists("chunk", key.String())
+	return nil, util.ErrorOfNotFound("chunk", key.String())
 }
 
 func (s *chunkStorage) Size(key core.Key) (int64, error) {
@@ -362,7 +362,7 @@ func (s *chunkStorage) Size(key core.Key) (int64, error) {
 		}
 		return int64(len(entry.data)), nil
 	}
-	return 0, util.ErrorOfNonexists("entry", key.String())
+	return 0, util.ErrorOfNotFound("entry", key.String())
 }
 
 func (s *chunkStorage) Reference(key core.Key) (int64, error) {
@@ -370,7 +370,7 @@ func (s *chunkStorage) Reference(key core.Key) (int64, error) {
 	if ok {
 		return int64(entry.refs), nil
 	}
-	return 0, util.ErrorOfNonexists("entry", key.String())
+	return 0, util.ErrorOfNotFound("entry", key.String())
 }
 
 func (s *chunkStorage) Commit(storage core.Storage, key core.Key) error {
@@ -592,7 +592,7 @@ func (s *chunkStorage) lockL(key core.Key) error {
 func (s *chunkStorage) lock(key core.Key) error {
 	entry, ok := s.getEntry(key)
 	if !ok {
-		return util.ErrorOfNonexists("entry", key.String())
+		return util.ErrorOfNotFound("entry", key.String())
 	}
 	entry.refs++
 	_, _, err := s.putEntry(key, entry)
@@ -612,7 +612,7 @@ func (s *chunkStorage) releaseL(key core.Key) error {
 func (s *chunkStorage) release(key core.Key) error {
 	entry, ok := s.getEntry(key)
 	if !ok {
-		return util.ErrorOfNonexists("entry", key.String())
+		return util.ErrorOfNotFound("entry", key.String())
 	}
 	if entry.refs == 0 {
 		return util.ErrorOfInvalid("state", key.String())

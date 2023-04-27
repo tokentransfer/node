@@ -2,11 +2,11 @@ package store
 
 import (
 	"encoding/hex"
-	"errors"
 	"sync"
 
 	"github.com/caivega/glog"
 	libcore "github.com/tokentransfer/interfaces/core"
+	"github.com/tokentransfer/node/util"
 )
 
 type MemoryService struct {
@@ -42,7 +42,7 @@ func (service *MemoryService) PutDatas(keys [][]byte, values [][]byte) error {
 	lk := len(keys)
 	lv := len(values)
 	if lk != lv {
-		return errors.New("length error")
+		return util.ErrorOfUnmatched("the length", "datas", lk, lv)
 	}
 	for i := 0; i < lk; i++ {
 		s := hex.EncodeToString(keys[i])

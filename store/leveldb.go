@@ -1,12 +1,12 @@
 package store
 
 import (
-	"errors"
 	"path"
 
 	"github.com/syndtr/goleveldb/leveldb"
 
 	libcore "github.com/tokentransfer/interfaces/core"
+	"github.com/tokentransfer/node/util"
 )
 
 type LevelService struct {
@@ -48,7 +48,7 @@ func (service *LevelService) open() error {
 			}
 			service.db = db
 		} else {
-			return errors.New("no config or path for leveldb")
+			return util.ErrorOfEmpty("config or path", "for leveldb")
 		}
 	}
 	return nil
@@ -79,7 +79,7 @@ func (service *LevelService) PutDatas(keys [][]byte, values [][]byte) error {
 	lk := len(keys)
 	lv := len(values)
 	if lk != lv {
-		return errors.New("length error")
+		return util.ErrorOfUnmatched("the length", "datas", lk, lv)
 	}
 	bs := leveldb.MakeBatch(lk)
 	for i := 0; i < lk; i++ {

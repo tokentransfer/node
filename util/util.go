@@ -1,7 +1,6 @@
 package util
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -203,33 +202,27 @@ func (t *HumanTime) UnmarshalJSON(b []byte) error {
 
 func CheckValueInteger(key string, item interface{}) (bool, error) {
 	if item != nil {
-		switch item.(type) {
+		switch v := item.(type) {
 		case float64:
-			v, iss := item.(float64)
-			return iss && float64(int64(v)) == v, nil
+			return float64(int64(v)) == v, nil
 		case int64:
-			_, iss := item.(int64)
-			return iss, nil
+			return true, nil
 		case string:
-			s, iss := item.(string)
-			if !iss {
-				return false, nil
-			}
 			z := big.NewInt(0)
-			_, ok := z.SetString(s, 10)
+			_, ok := z.SetString(v, 10)
 			if !ok {
 				return false, nil
 			}
 
 			maxV := big.NewInt(MAX_VALUE)
 			if z.Cmp(maxV) > 0 {
-				err := errors.New("error " + key + ", out of range")
+				err := ErrorOfInvalid(key, "out of range")
 				return false, err
 			}
 
 			minV := big.NewInt(-MAX_VALUE)
 			if z.Cmp(minV) < 0 {
-				err := errors.New("error " + key + ", out of range")
+				err := ErrorOfInvalid(key, "out of range")
 				return false, err
 			}
 
@@ -254,19 +247,19 @@ func CheckTotal(key string, s string, decimals int64) (int64, error) {
 	z := a.Mul(b.Pow(p))
 
 	if !z.IsInteger() {
-		err := errors.New("error " + key)
+		err := ErrorOfInvalid("key", key)
 		return 0, err
 	}
 
 	maxV := decimal.NewFromInt(MAX_VALUE)
 	if !z.LessThanOrEqual(maxV) {
-		err := errors.New("error " + key + ", out of range")
+		err := ErrorOfInvalid(key, "out of range")
 		return 0, err
 	}
 
 	minV := decimal.NewFromInt(-MAX_VALUE)
 	if z.LessThan(minV) {
-		err := errors.New("error " + key + ", out of range")
+		err := ErrorOfInvalid(key, "out of range")
 		return 0, err
 	}
 
