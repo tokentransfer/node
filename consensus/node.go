@@ -214,8 +214,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	from := util.ToString(&txm, "from")
 	secret := util.ToString(&txm, "secret")
 	to := util.ToString(&txm, "to")
-	value := util.ToString(&txm, "value")
-	gas := util.ToInt64(&txm, "gas")
+	gas := util.ToUint64(&txm, "gas")
 
 	_, fromKey, err := as.NewKeyFromSecret(secret)
 	if err != nil {
@@ -233,17 +232,12 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	if err != nil {
 		return "", nil, err
 	}
-	amount, err := util.NewValue(value)
-	if err != nil {
-		return "", nil, err
-	}
 	seq := n.getNextSequence(fromAccount)
 	tx := &block.Transaction{
 		TransactionType: block.TRANSACTION,
 
 		Account:     fromAccount,
 		Sequence:    seq,
-		Amount:      *amount,
 		Gas:         gas,
 		Destination: toAccount,
 	}
@@ -628,7 +622,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return accountEntry.Amount, nil
+		return accountEntry.Gas, nil
 
 	case "getData":
 		item := params[0].(map[string]interface{})

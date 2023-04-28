@@ -400,7 +400,7 @@ func (s *StorageService) CreateContract(account libcore.Address, wasmCode []byte
 	return libcore.Hash(s.storage.Root()), libcore.Hash(k), nil
 }
 
-func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Address, libcore.Hash, libcore.Hash, []byte, error) {
+func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost uint64, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Address, libcore.Hash, libcore.Hash, []byte, error) {
 	wasmCode, abiCode, err := s.ReadCode(toAccount)
 	if err != nil {
 		return 0, nil, nil, nil, nil, err
@@ -421,7 +421,7 @@ func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fro
 			return 0, nil, nil, nil, nil, err
 		}
 	}
-	usedCost, newWasmData, resultData, err := vm.RunWasm(cost, wasmCode, abiCode, wasmData, method, params) // remainCost
+	usedCost, newWasmData, resultData, err := vm.RunWasm(int64(cost), wasmCode, abiCode, wasmData, method, params) // remainCost
 	if err != nil {
 		return 0, nil, nil, nil, nil, err
 	}

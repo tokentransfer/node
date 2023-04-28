@@ -69,7 +69,7 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 		if err != nil {
 			return nil, err
 		}
-		amount, err := util.NewValue("100000000000000")
+		v, err := util.NewValue("100000000000000")
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +81,7 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 					Sequence:   uint64(0),
 					BlockIndex: uint64(0),
 				},
-				Amount: *amount,
+				Gas: *v,
 			},
 		}
 
@@ -398,22 +398,11 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	if tx.Gas < 10 {
 		return false, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < 10", tx.Gas))
 	}
-	isZero, err := tx.Amount.IsZero()
+	gasValue, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
 	if err != nil {
 		return false, err
 	}
-	if tx.Account.String() == tx.Destination.String() && !isZero {
-		return false, util.ErrorOfInvalid("amount", "should be 0 when using same accounts")
-	}
-	gasAmount, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
-	if err != nil {
-		return false, err
-	}
-	totalAmount, err := tx.Amount.Add(*gasAmount)
-	if err != nil {
-		return false, err
-	}
-	remain, err := info.Amount.Subtract(totalAmount)
+	remain, err := info.Gas.Subtract(*gasValue)
 	if err != nil {
 		return false, err
 	}
@@ -484,34 +473,34 @@ func (service *ConsensusService) getAccountInfo(account libcore.Address, sequenc
 				Account:   account,
 				Sequence:  sequence,
 			},
-			Amount: *zero,
+			Gas: *zero,
 		}
 		return info, nil
 	}
 }
 
-func (service *ConsensusService) addBalance(info *block.AccountState, amount *util.Value) error {
-	newAmount, err := info.Amount.Add(*amount)
+func (service *ConsensusService) addBalance(info *block.AccountState, value *util.Value) error {
+	newValue, err := info.Gas.Add(*value)
 	if err != nil {
 		return err
 	}
-	info.Amount = newAmount
+	info.Gas = newValue
 	return nil
 }
 
-func (service *ConsensusService) removeBalance(info *block.AccountState, amount *util.Value) error {
-	newAmount, err := info.Amount.Subtract(*amount)
+func (service *ConsensusService) removeBalance(info *block.AccountState, value *util.Value) error {
+	newValue, err := info.Gas.Subtract(*value)
 	if err != nil {
 		return err
 	}
-	isNegative, err := newAmount.IsNegative()
+	isNegative, err := newValue.IsNegative()
 	if err != nil {
 		return err
 	}
 	if isNegative {
-		return util.ErrorOf("insuffient amount", "nagative", "balance")
+		return util.ErrorOf("insuffient gas", "nagative", "balance")
 	}
-	info.Amount = newAmount
+	info.Gas = newValue
 	return nil
 }
 
@@ -566,11 +555,11 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	states = append(states, gasInfo)
 	accountMap[gasAccount.String()] = gasInfo
 
-	gas := int64(0) //gasPrice gasLimit
+	gas := uint64(0) //gasPrice gasLimit
 	if tx.Payload != nil && len(tx.Payload.Infos) > 0 {
-		dataCost := int64(0)
+		dataCost := uint64(0)
 		for _, info := range tx.Payload.Infos {
-			dataCost += int64(len(info.Content)) // 1:1
+			dataCost += uint64(len(info.Content)) // 1:1
 		}
 		wasmCost, payloadStates, err := service.ProcessPayload(tx.Gas-dataCost, tx, tx.Payload, accountMap)
 		if err != nil {
@@ -591,15 +580,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	if err != nil {
 		return nil, err
 	}
-	totalAmount, err := tx.Amount.Add(*gasAmount)
-	if err != nil {
-		return nil, err
-	}
-	err = service.removeBalance(fromInfo, &totalAmount)
-	if err != nil {
-		return nil, err
-	}
-	err = service.addBalance(destInfo, &tx.Amount)
+	err = service.removeBalance(fromInfo, gasAmount)
 	if err != nil {
 		return nil, err
 	}
@@ -620,13 +601,13 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	}, nil
 }
 
-func (service *ConsensusService) ProcessPayload(remainCost int64, tx *block.Transaction, info *block.PayloadInfo, accountMap map[string]*block.AccountState) (int64, []libblock.State, error) {
+func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Transaction, info *block.PayloadInfo, accountMap map[string]*block.AccountState) (uint64, []libblock.State, error) {
 	cs := service.CryptoService
 	as := service.AccountService
 	ss := service.StorageService
 
 	states := make([]libblock.State, 0)
-	cost := int64(0)
+	cost := uint64(0)
 	for _, payload := range info.Infos {
 		meta, msg, err := core.Unmarshal(payload.Content)
 		if err != nil {
@@ -672,7 +653,7 @@ func (service *ConsensusService) ProcessPayload(remainCost int64, tx *block.Tran
 					Content: dataContent,
 				}
 			}
-			cost += usedCost
+			cost += uint64(usedCost)
 
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)

@@ -19,8 +19,7 @@ type Transaction struct {
 
 	Account     libcore.Address
 	Sequence    uint64
-	Amount      util.Value
-	Gas         int64
+	Gas         uint64
 	Destination libcore.Address
 	Payload     *PayloadInfo
 	PublicKey   libcore.PublicKey
@@ -66,13 +65,7 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	a, err := util.NewValue(t.Amount)
-	if err != nil {
-		return err
-	}
-
 	tx.Sequence = t.Sequence
-	tx.Amount = *a
 	tx.Gas = t.Gas
 
 	tx.Destination, err = byteToAddress(t.Destination)
@@ -106,7 +99,6 @@ func (tx *Transaction) MarshalBinary() ([]byte, error) {
 
 		Account:     fromData,
 		Sequence:    tx.Sequence,
-		Amount:      tx.Amount.String(),
 		Gas:         tx.Gas,
 		Destination: toData,
 		Payload:     toPayloadInfo(tx.Payload, libcrypto.RawBinary),
@@ -131,7 +123,6 @@ func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
 
 			Account:     fromAccount,
 			Sequence:    tx.Sequence,
-			Amount:      tx.Amount.String(),
 			Gas:         tx.Gas,
 			Destination: toAccount,
 			Payload:     toPayloadInfo(tx.Payload, libcrypto.RawIgnoreSigningFields),
@@ -153,7 +144,6 @@ func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
 
 			Account:     fromAccount,
 			Sequence:    tx.Sequence,
-			Amount:      tx.Amount.String(),
 			Gas:         tx.Gas,
 			Destination: toAccount,
 			Payload:     toPayloadInfo(tx.Payload, libcrypto.RawIgnoreVariableFields),

@@ -61,8 +61,8 @@ func (s *State) GetVersion() uint64 {
 type AccountState struct {
 	State
 
-	Name   string
-	Amount util.Value
+	Name string
+	Gas  util.Value
 
 	User  *DataInfo
 	Code  *DataInfo
@@ -104,7 +104,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	v, err := util.NewValue(state.Amount)
+	v, err := util.NewValue(state.Gas)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.State.Version = state.State.Version
 
 	s.Name = state.Name
-	s.Amount = *v
+	s.Gas = *v
 
 	s.User = fromDataInfo(state.User)
 	s.Code = fromDataInfo(state.Code)
@@ -143,7 +143,7 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 			Previous:   []byte(s.Previous),
 			Version:    s.Version,
 		},
-		Amount: s.Amount.String(),
+		Gas: s.Gas.String(),
 
 		Name:  s.Name,
 		User:  toDataInfo(s.User, libcrypto.RawBinary),
@@ -170,7 +170,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 				Previous:  []byte(s.Previous),
 				Version:   s.Version,
 			},
-			Amount: s.Amount.String(),
+			Gas: s.Gas.String(),
 
 			Name:  s.Name,
 			User:  toDataInfo(s.User, libcrypto.RawIgnoreSigningFields),
@@ -189,7 +189,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 				Previous:  []byte(s.Previous),
 				Version:   s.Version,
 			},
-			Amount: s.Amount.String(),
+			Gas: s.Gas.String(),
 
 			Name:  s.Name,
 			User:  toDataInfo(s.User, libcrypto.RawIgnoreVariableFields),

@@ -38,7 +38,7 @@ func (suite *StateSuite) TestState(c *C) {
 			BlockIndex: uint64(2),
 		},
 
-		Amount: *v,
+		Gas: *v,
 	}
 	// util.PrintJSON("state", s1)
 
@@ -52,7 +52,7 @@ func (suite *StateSuite) TestState(c *C) {
 			BlockIndex: uint64(2),
 		},
 
-		Amount: *v,
+		Gas: *v,
 	}
 	// util.PrintJSON("state", s2)
 

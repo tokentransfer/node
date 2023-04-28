@@ -2,12 +2,10 @@ package block
 
 import (
 	"encoding/hex"
-	"fmt"
 	"log"
 	"testing"
 
 	"github.com/tokentransfer/node/crypto"
-	"github.com/tokentransfer/node/util"
 
 	. "github.com/tokentransfer/check"
 	libblock "github.com/tokentransfer/interfaces/block"
@@ -33,7 +31,7 @@ func (s *BlockSuite) TestBlob(c *C) {
 	// util.PrintJSON(">> block", b)
 }
 
-func generateTransaction(seq uint64, value int64, gas int64) *Transaction {
+func generateTransaction(seq uint64, value int64, gas uint64) *Transaction {
 	_, fromKey, err := as.GenerateFamilySeed("masterpassphrase")
 	if err != nil {
 		panic(err)
@@ -48,17 +46,11 @@ func generateTransaction(seq uint64, value int64, gas int64) *Transaction {
 		panic(err)
 	}
 
-	v, err := util.NewValue(fmt.Sprintf("%d", value))
-	if err != nil {
-		panic(err)
-	}
-
 	tx := &Transaction{
 		TransactionType: libblock.TransactionType(1),
 
 		Account:     from,
 		Sequence:    seq,
-		Amount:      *v,
 		Gas:         gas,
 		Destination: to,
 		Payload: &PayloadInfo{
