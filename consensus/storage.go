@@ -477,6 +477,24 @@ func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost int64, fro
 	}
 }
 
+func (s *StorageService) GetData(hash libcore.Hash) ([]byte, error) {
+	key := core.Key(hash)
+	data, err := s.storage.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	reader := data.Open()
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, reader); err != nil {
+		return nil, err
+	}
+	reader.Close()
+	data.Dispose()
+	glog.Infoln("> get data", key.String(), data.Size())
+
+	return buf.Bytes(), nil
+}
+
 func (s *StorageService) Init(c libcore.Config) error {
 	datadb := &store.LevelService{Name: "data"}
 	err := datadb.Init(c)
