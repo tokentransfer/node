@@ -110,9 +110,10 @@ message PageInfo {
 }
 
 message UserInfo {
-    bytes Key       = 1;
-    bytes Nonce     = 2;
-    DataInfo Data   = 3;
+    string Name     = 1;
+    bytes Key       = 2;
+    bytes Nonce     = 3;
+    DataInfo Data   = 4;
 }
 
 message PayloadInfo {
