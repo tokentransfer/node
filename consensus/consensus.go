@@ -411,7 +411,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 		return false, err
 	}
 	if isNegative {
-		return false, util.ErrorOf("insuffient", "amount", remain.String())
+		return false, util.ErrorOf("insuffient", "gas", remain.String())
 	}
 
 	if tx.Payload != nil && len(tx.Payload.Infos) > 0 {
@@ -587,6 +587,16 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	err = service.addBalance(gasInfo, gasAmount)
 	if err != nil {
 		return nil, err
+	}
+	if tx.Gas > gas {
+		remainAmount, err := util.NewValue(fmt.Sprintf("%d", tx.Gas-gas))
+		if err != nil {
+			return nil, err
+		}
+		err = service.addBalance(destInfo, remainAmount) // temperary active dest
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	r := &block.Receipt{
