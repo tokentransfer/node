@@ -110,7 +110,7 @@ message PageInfo {
 }
 
 message UserInfo {
-    string Name     = 1;
+    bytes Account   = 1;
     bytes Key       = 2;
     bytes Nonce     = 3;
     DataInfo Data   = 4;
