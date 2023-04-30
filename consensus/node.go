@@ -208,6 +208,61 @@ func (n *Node) Init(c libcore.Config) error {
 	return nil
 }
 
+func (n *Node) getContractData(txm map[string]interface{}) (int64, interface{}, error) {
+	as := n.accountService
+	ss := n.storageService
+
+	from := util.ToString(&txm, "from")
+	to := util.ToString(&txm, "to")
+
+	_, fromAccount, err := as.NewAccountFromAddress(from)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	_, toAccount, err := as.NewAccountFromAddress(to)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	format := util.ToString(&txm, "format")
+	usedCost, r, err := ss.GetContractData(fromAccount, toAccount, format)
+	if err != nil {
+		return 0, nil, err
+	}
+	return usedCost, r, nil
+}
+
+func (n *Node) callContract(txm map[string]interface{}) (int64, interface{}, error) {
+	as := n.accountService
+	ss := n.storageService
+
+	from := util.ToString(&txm, "from")
+	to := util.ToString(&txm, "to")
+
+	_, fromAccount, err := as.NewAccountFromAddress(from)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	_, toAccount, err := as.NewAccountFromAddress(to)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	method := util.ToString(&txm, "method")
+	params, err := n.getParams(txm)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	usedCost, r, err := ss.CallContract(fromAccount, toAccount, method, params)
+	if err != nil {
+		return 0, nil, err
+	}
+	return usedCost, r, nil
+}
+
 func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Transaction, error) {
 	as := n.accountService
 
@@ -327,39 +382,11 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 				contractInfo.Method = util.ToString(&cm, "method")
 			}
 			if util.Has(&cm, "params") {
-				if params := util.ToString(&cm, "params"); len(params) > 0 {
-					list := make([][]byte, 0)
-					ps := strings.Split(params, ",")
-					for i := 0; i < len(ps); i++ {
-						items := strings.Split(ps[i], ":")
-						if len(items) == 2 {
-							t, err := core.GetDataTypeByName(items[1])
-							if err != nil {
-								return "", nil, err
-							}
-							data, err := t.FromString(items[0])
-							if err != nil {
-								return "", nil, err
-							}
-							list = append(list, data)
-						} else {
-							return "", nil, util.ErrorOfInvalid("parameter", params)
-						}
-					}
-					contractInfo.Params = list
+				params, err := n.getParams(cm)
+				if err != nil {
+					return "", nil, err
 				}
-				if params := util.ToArray(&cm, "params"); params != nil {
-					list := make([][]byte, 0)
-					for i := 0; i < len(params); i++ {
-						item := params[i]
-						data, err := core.MarshalData(item)
-						if err != nil {
-							return "", nil, err
-						}
-						list = append(list, data)
-					}
-					contractInfo.Params = list
-				}
+				contractInfo.Params = params
 			}
 			contractData, err := core.Marshal(contractInfo)
 			if err != nil {
@@ -495,6 +522,43 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	return blob, tx, nil
 }
 
+func (n *Node) getParams(cm map[string]interface{}) ([][]byte, error) {
+	if params := util.ToString(&cm, "params"); len(params) > 0 {
+		list := make([][]byte, 0)
+		ps := strings.Split(params, ",")
+		for i := 0; i < len(ps); i++ {
+			items := strings.Split(ps[i], ":")
+			if len(items) == 2 {
+				t, err := core.GetDataTypeByName(items[1])
+				if err != nil {
+					return nil, err
+				}
+				data, err := t.FromString(items[0])
+				if err != nil {
+					return nil, err
+				}
+				list = append(list, data)
+			} else {
+				return nil, util.ErrorOfInvalid("parameter", params)
+			}
+		}
+		return list, nil
+	}
+	if params := util.ToArray(&cm, "params"); params != nil {
+		list := make([][]byte, 0)
+		for i := 0; i < len(params); i++ {
+			item := params[i]
+			data, err := core.MarshalData(item)
+			if err != nil {
+				return nil, err
+			}
+			list = append(list, data)
+		}
+		return list, nil
+	}
+	return nil, util.ErrorOfNotFound("params", "map")
+}
+
 func (n *Node) verifyTransaction(tx libblock.Transaction) error {
 	_, _, err := n.cryptoService.Raw(tx, libcrypto.RawBinary)
 	if err != nil {
@@ -624,42 +688,6 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		}
 		return accountEntry.Gas, nil
 
-	case "getData":
-		item := params[0].(map[string]interface{})
-		hashString := util.ToString(&item, "hash")
-		h, err := hex.DecodeString(hashString)
-		if err != nil {
-			return nil, err
-		}
-		data, err := n.storageService.GetData(libcore.Hash(h))
-		if err != nil {
-			return nil, err
-		}
-		return hex.EncodeToString(data), nil
-
-	case "getUserData":
-		item := params[0].(map[string]interface{})
-		addressString := util.ToString(&item, "address")
-		_, a, err := n.accountService.NewAccountFromAddress(addressString)
-		if err != nil {
-			return nil, err
-		}
-		accountString := util.ToString(&item, "account")
-		_, b, err := n.accountService.NewAccountFromAddress(accountString)
-		if err != nil {
-			return nil, err
-		}
-		info, err := n.storageService.GetUserData(a, b)
-		if err != nil {
-			return nil, err
-		}
-		return &map[string]interface{}{
-			"account": b.String(),
-			"key":     hex.EncodeToString(info.Key),
-			"nonce":   hex.EncodeToString(info.Nonce),
-			"hash":    libcore.Hash(info.Data.Hash).String(),
-		}, nil
-
 	case "getTransactionCount":
 		item := params[0].(map[string]interface{})
 		address := util.ToString(&item, "address")
@@ -753,6 +781,92 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			return nil, err
 		}
 		return block, nil
+
+	case "getData":
+		l := len(params)
+		list := make([]interface{}, l)
+		maxCost := int64(1000000)
+		for i := 0; i < l; i++ {
+			item := params[i].(map[string]interface{})
+			hashString := util.ToString(&item, "hash")
+			h, err := hex.DecodeString(hashString)
+			if err != nil {
+				return nil, err
+			}
+			format := util.ToString(&item, "format")
+			usedCost, r, err := n.storageService.GetData(libcore.Hash(h), format)
+			if err != nil {
+				return nil, err
+			}
+			list[i] = r
+
+			maxCost -= usedCost
+			if maxCost < 0 {
+				return nil, util.ErrorOf("too long", "call", "contract")
+			}
+		}
+		return list, nil
+
+	case "getUserData":
+		item := params[0].(map[string]interface{})
+		addressString := util.ToString(&item, "address")
+		_, a, err := n.accountService.NewAccountFromAddress(addressString)
+		if err != nil {
+			return nil, err
+		}
+		accountString := util.ToString(&item, "account")
+		_, b, err := n.accountService.NewAccountFromAddress(accountString)
+		if err != nil {
+			return nil, err
+		}
+		info, err := n.storageService.GetUserData(a, b)
+		if err != nil {
+			return nil, err
+		}
+		return &map[string]interface{}{
+			"account": b.String(),
+			"key":     hex.EncodeToString(info.Key),
+			"nonce":   hex.EncodeToString(info.Nonce),
+			"hash":    libcore.Hash(info.Data.Hash).String(),
+		}, nil
+
+	case "getContractData":
+		l := len(params)
+		list := make([]interface{}, l)
+		maxCost := int64(1000000)
+		for i := 0; i < l; i++ {
+			item := params[i].(map[string]interface{})
+			usedCost, r, err := n.getContractData(item)
+			if err != nil {
+				return nil, err
+			}
+			list[i] = r
+
+			maxCost -= usedCost
+			if maxCost < 0 {
+				return nil, util.ErrorOf("too long", "call", "contract")
+			}
+		}
+		return list, nil
+
+	case "callContract":
+		l := len(params)
+		list := make([]interface{}, l)
+		maxCost := int64(1000000)
+		for i := 0; i < l; i++ {
+			item := params[i].(map[string]interface{})
+			usedCost, r, err := n.callContract(item)
+			if err != nil {
+				return nil, err
+			}
+			list[i] = r
+
+			maxCost -= usedCost
+			if maxCost < 0 {
+				return nil, util.ErrorOf("too long", "call", "contract")
+			}
+		}
+		return list, nil
 
 	case "signTransaction":
 		l := len(params)

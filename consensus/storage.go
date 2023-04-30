@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"sync"
@@ -625,22 +626,74 @@ func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost uint64, fr
 	}
 }
 
-func (s *StorageService) GetData(hash libcore.Hash) ([]byte, error) {
+func (s *StorageService) CallContract(dataAccount libcore.Address, codeAccount libcore.Address, method string, params [][]byte) (int64, interface{}, error) {
+	wasmCode, abiCode, err := s.ReadCode(codeAccount)
+	if err != nil {
+		return 0, nil, err
+	}
+	wasmData, _ := s.ReadData(dataAccount, codeAccount)
+	usedCost, _, resultData, err := vm.RunWasm(int64(1000000), wasmCode, abiCode, wasmData, method, params) // remainCost
+	if err != nil {
+		return 0, nil, err
+	}
+	r, err := core.AsData(resultData)
+	if err != nil {
+		return 0, nil, err
+	}
+	glog.Infoln("> call contract", usedCost, dataAccount.String(), codeAccount.String(), len(resultData), method, r)
+	return usedCost, r, nil
+}
+
+func (s *StorageService) GetContractData(dataAccount libcore.Address, codeAccount libcore.Address, format string) (int64, interface{}, error) {
+	wasmData, _ := s.ReadData(dataAccount, codeAccount)
+	var r interface{}
+	var e error
+	switch format {
+	case "data":
+		r, e = core.AsData(wasmData)
+		if e != nil {
+			return 0, nil, e
+		}
+	case "string":
+		r = string(wasmData)
+	default:
+		r = hex.EncodeToString(wasmData)
+	}
+	glog.Infoln("> get contract data", dataAccount.String(), codeAccount.String(), len(wasmData), r)
+	return int64(len(wasmData)), r, nil
+}
+
+func (s *StorageService) GetData(hash libcore.Hash, format string) (int64, interface{}, error) {
 	key := core.Key(hash)
 	data, err := s.storage.Get(key)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	reader := data.Open()
 	buf := new(bytes.Buffer)
 	if _, err := io.Copy(buf, reader); err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	reader.Close()
 	data.Dispose()
-	glog.Infoln("> get data", key.String(), data.Size())
 
-	return buf.Bytes(), nil
+	contentData := buf.Bytes()
+	var r interface{}
+	var e error
+	switch format {
+	case "data":
+		r, e = core.AsData(contentData)
+		if e != nil {
+			return 0, nil, e
+		}
+	case "string":
+		r = string(contentData)
+	default:
+		r = hex.EncodeToString(contentData)
+	}
+	glog.Infoln("> get data", key.String(), len(contentData), r)
+
+	return int64(len(contentData)), r, nil
 }
 
 func (s *StorageService) Init(c libcore.Config) error {

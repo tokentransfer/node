@@ -649,6 +649,16 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 
 		case core.CORE_CONTRACT_INFO:
 			info := msg.(*pb.ContractInfo)
+
+			dataAccount := tx.Account
+			if len(info.Account) > 0 {
+				_, account, err := as.NewAccountFromBytes(info.Account)
+				if err != nil {
+					return 0, nil, err
+				}
+				dataAccount = account
+			}
+
 			inputs, err := getAccounts(as, info.Inputs)
 			if err != nil {
 				return 0, nil, err
@@ -657,15 +667,15 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if err != nil {
 				return 0, nil, err
 			}
-			usedCost, dataAccount, _, dataHash, dataContent, err := ss.RunContract(cs, remainCost, tx.Account, tx.Destination, info.Method, info.Params, inputs, outputs)
+			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(cs, remainCost, dataAccount, tx.Destination, info.Method, info.Params, inputs, outputs)
 			if err != nil {
 				return cost, nil, err
 			}
-			accountInfo, ok := accountMap[dataAccount.String()]
+			accountInfo, ok := accountMap[retAccount.String()]
 			if ok {
 				accountInfo.Data = &block.DataInfo{
-					Hash:    dataHash,
-					Content: dataContent,
+					Hash:    retHash,
+					Content: retContent,
 				}
 			}
 			cost += uint64(usedCost)
