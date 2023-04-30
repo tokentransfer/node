@@ -284,6 +284,154 @@ func (s *StorageService) ReadData(dataAccount libcore.Address, codeAccount libco
 	return buf.Bytes(), nil
 }
 
+func (s *StorageService) CreateUserData(account libcore.Address, destination libcore.Address, code libcore.Address, info *pb.UserInfo) (libcore.Hash, libcore.Address, error) {
+	var newInfo *pb.UserInfo
+	var dataAccount libcore.Address
+	var contentData []byte
+	if len(info.Data.Content) > 0 {
+		contentData = info.Data.Content
+
+		t := s.storage.Create(account.String())
+		_, err := t.Write(contentData)
+		if err != nil {
+			return nil, nil, err
+		}
+		err = t.Close()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		d, err := t.Data()
+		if err != nil {
+			return nil, nil, err
+		}
+		newInfo = &pb.UserInfo{
+			Account: info.Account,
+			Key:     info.Key,
+			Nonce:   info.Nonce,
+			Data: &pb.DataInfo{
+				Hash: []byte(d.Key()),
+			},
+		}
+		d.Dispose()
+
+		dataAccount = account
+	} else {
+		k := core.Key(info.Data.Hash)
+		if !s.storage.Exists(k) {
+			return nil, nil, util.ErrorOfNotFound("user data", k.String())
+		}
+		newInfo = &pb.UserInfo{
+			Account: info.Account,
+			Key:     info.Key,
+			Nonce:   info.Nonce,
+			Data: &pb.DataInfo{
+				Hash: []byte(k),
+			},
+		}
+
+		dataAccount = destination
+	}
+
+	newData, err := core.Marshal(newInfo)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rootGroup, err := s.storage.Group("/")
+	if err != nil {
+		return nil, nil, err
+	}
+	dataGroup, err := getGroup(rootGroup, "user")
+	if err != nil {
+		return nil, nil, err
+	}
+	accountGroup, err := getGroup(dataGroup, dataAccount.String())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	name := code.String()
+	t := s.storage.Create(name)
+	_, err = t.Write(newData)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = t.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	d, err := t.Data()
+	if err != nil {
+		return nil, nil, err
+	}
+	_, err = accountGroup.AddData(name, d.Key())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = accountGroup.Commit()
+	if err != nil {
+		return nil, nil, err
+	}
+	d.Dispose()
+	t.Dispose()
+	glog.Infoln("> write user", dataAccount.String(), name, d.Key().String(), len(newData), len(contentData))
+
+	return libcore.Hash(d.Key()), dataAccount, nil
+}
+
+func (s *StorageService) GetUserData(userAccount libcore.Address, codeAccount libcore.Address) (*pb.UserInfo, error) {
+	root, err := s.storage.Group("/")
+	if err != nil {
+		return nil, err
+	}
+	group, err := getGroup(root, "user")
+	if err != nil {
+		return nil, err
+	}
+	account, err := getGroup(group, userAccount.String())
+	if err != nil {
+		return nil, err
+	}
+	key, err := account.GetKey(codeAccount.String())
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.storage.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	reader := data.Open()
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, reader); err != nil {
+		return nil, err
+	}
+	reader.Close()
+	data.Dispose()
+
+	meta, msg, err := core.Unmarshal(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	if meta != core.CORE_USER_INFO {
+		return nil, util.ErrorOfUnmatched("data", "user info", core.CORE_USER_INFO, meta)
+	}
+	info := msg.(*pb.UserInfo)
+	contentKey := core.Key(info.Data.Hash)
+	if !s.storage.Exists(key) {
+		return nil, util.ErrorOfNotFound("content", contentKey.String())
+	}
+	contentSize, err := s.storage.Size(contentKey)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.Infoln("> read user", userAccount.String(), codeAccount.String(), key.String(), data.Size(), contentKey.String(), contentSize)
+	return info, nil
+}
+
 func (s *StorageService) CreatePage(name string, account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {

@@ -637,6 +637,29 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		}
 		return hex.EncodeToString(data), nil
 
+	case "getUserData":
+		item := params[0].(map[string]interface{})
+		addressString := util.ToString(&item, "address")
+		_, a, err := n.accountService.NewAccountFromAddress(addressString)
+		if err != nil {
+			return nil, err
+		}
+		accountString := util.ToString(&item, "account")
+		_, b, err := n.accountService.NewAccountFromAddress(accountString)
+		if err != nil {
+			return nil, err
+		}
+		info, err := n.storageService.GetUserData(a, b)
+		if err != nil {
+			return nil, err
+		}
+		return &map[string]interface{}{
+			"account": b.String(),
+			"key":     hex.EncodeToString(info.Key),
+			"nonce":   hex.EncodeToString(info.Nonce),
+			"hash":    libcore.Hash(info.Data.Hash).String(),
+		}, nil
+
 	case "getTransactionCount":
 		item := params[0].(map[string]interface{})
 		address := util.ToString(&item, "address")

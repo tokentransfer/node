@@ -433,6 +433,11 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 				if !(len(info.Code) > 0) {
 					return false, util.ErrorOfInvalid("format", "code info")
 				}
+			case core.CORE_USER_INFO:
+				info := msg.(*pb.UserInfo)
+				if !(len(info.Account) > 0 && info.Data != nil && (len(info.Data.Content) > 0 || len(info.Data.Hash) > 0)) {
+					return false, util.ErrorOfInvalid("format", "user info")
+				}
 			case core.CORE_META_INFO:
 			case core.CORE_TOKEN_INFO:
 			case core.CORE_DATA_INFO:
@@ -690,6 +695,23 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if ok {
 				accountInfo.Code = &block.DataInfo{
 					Hash: codeHash,
+				}
+			}
+
+		case core.CORE_USER_INFO:
+			info := msg.(*pb.UserInfo)
+			_, account, err := as.NewAccountFromBytes(info.Account)
+			if err != nil {
+				return cost, nil, err
+			}
+			userHash, userAccount, err := ss.CreateUserData(tx.Account, tx.Destination, account, info)
+			if err != nil {
+				return cost, nil, err
+			}
+			accountInfo, ok := accountMap[userAccount.String()]
+			if ok {
+				accountInfo.User = &block.DataInfo{
+					Hash: userHash,
 				}
 			}
 
