@@ -92,10 +92,11 @@ message TokenInfo {
 }
 
 message ContractInfo {
-    repeated bytes Inputs   = 1;
-    repeated bytes Outputs  = 2;
-    string Method           = 3;
-    repeated bytes Params   = 4;
+    bytes Account	    = 1;
+    repeated bytes Inputs   = 2;
+    repeated bytes Outputs  = 3;
+    string Method           = 4;
+    repeated bytes Params   = 5;
 }
 
 message CodeInfo {
