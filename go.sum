@@ -158,6 +158,10 @@ github.com/btcsuite/winsvc v1.0.0/go.mod h1:jsenWakMcC0zFBFurPLEAyrnc/teJEM1O46f
 github.com/buger/jsonparser v0.0.0-20181115193947-bf1c66bbce23/go.mod h1:bbYlZJ7hK1yFx9hf58LP0zeX7UjIGs20ufpu3evjr+s=
 github.com/caivega/glog v1.0.1 h1:Tr8SzgxDqQgexKsLiXdxyNcheYqiT3U7s14OZg4CM3E=
 github.com/caivega/glog v1.0.1/go.mod h1:QizKFNfSwJPfUn1vlIkLXE0B+fNX+xFvjMxh7ay5ClE=
+github.com/caivega/wazero v0.0.0-20230409014625-6de94ea0f4ff h1:If+76sWDQwYQYOAGMEEa+k/B41BG3vmsUcDkcNBSffM=
+github.com/caivega/wazero v0.0.0-20230409014625-6de94ea0f4ff/go.mod h1:wYx2gNRg8/WihJfSDxA1TIL8H+GkfLYm+bIfbblu9VQ=
+github.com/caivega/zipfs v0.0.0-20230405100159-e803fdb87a57 h1:C4yYO56xDqnfw3C4WKUUWY1q2oxFBonOdWqUOtZv/Do=
+github.com/caivega/zipfs v0.0.0-20230405100159-e803fdb87a57/go.mod h1:48LW+/Rh1G7aAav1ew1PdlYn52T+LM+ARmSHfDNJvg8=
 github.com/casbin/casbin/v2 v2.1.2/go.mod h1:YcPU1XXisHhLzuxH9coDNf2FbKpjGlbCg3n9yuLkIJQ=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=

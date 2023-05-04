@@ -194,6 +194,6 @@ replace (
 	github.com/marten-seemann/qtls-go1-16 => chainmaker.org/third_party/qtls-go1-16 v1.0.0
 	github.com/marten-seemann/qtls-go1-17 => chainmaker.org/third_party/qtls-go1-17 v1.0.0
 	github.com/marten-seemann/qtls-go1-18 => chainmaker.org/third_party/qtls-go1-18 v1.0.0
-	github.com/spkg/zipfs => ../zipfs //github.com/caivega/zipfs
-	github.com/tetratelabs/wazero => ../wazero //github.com/caivega/wazero
+	github.com/spkg/zipfs => github.com/caivega/zipfs v0.0.0-20230405100159-e803fdb87a57
+	github.com/tetratelabs/wazero => github.com/caivega/wazero v0.0.0-20230409014625-6de94ea0f4ff
 )
