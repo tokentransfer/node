@@ -9,8 +9,6 @@ import (
 )
 
 func main() {
-	// Get the command line args. We shortcut "--version" and "-v" to
-	// just show the version.
 	args := os.Args[1:]
 	for _, arg := range args {
 		if arg == "-v" || arg == "--version" {
@@ -19,9 +17,19 @@ func main() {
 			copy(newArgs[1:], args)
 			args = newArgs
 			break
+		} else if arg == "-h" || arg == "--help" {
+			newArgs := make([]string, len(args)+1)
+			newArgs[0] = "help"
+			copy(newArgs[1:], args)
+			args = newArgs
+			break
 		}
 	}
-	flag.Parse()
+	err := flag.CommandLine.Parse(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parse arguments: %s\n", err.Error())
+		os.Exit(1)
+	}
 
 	cli := &cli.CLI{
 		Args:     args,

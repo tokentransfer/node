@@ -16,6 +16,11 @@ func init() {
 	ui := &cli.BasicUi{Writer: os.Stdout}
 
 	Commands = map[string]cli.CommandFactory{
+		"version": func() (cli.Command, error) {
+			return &cmd.VersionCommand{
+				Ui: ui,
+			}, nil
+		},
 		"info": func() (cli.Command, error) {
 			return &cmd.InfoCommand{
 				Ui: ui,
