@@ -81,7 +81,7 @@ func (suite *WasmSuite) testVMMain(c *C) {
 		uint32(6),
 	})
 	fmt.Println("params: ", strings.Join(rets, ","))
-	usedCost, newWasmData, results, err := RunWasm(cost, wasmCode, abiCode, wasmData, "add", paramData)
+	usedCost, newWasmData, results, err := RunWasm(cost, wasmCode, abiCode, wasmData, "add", paramData, true)
 	c.Assert(err, IsNil)
 	c.Assert(len(results), Equals, 2)
 	c.Assert(results, DeepEquals, []byte("11"))
@@ -102,7 +102,7 @@ func (suite *WasmSuite) testVMLib(c *C) {
 		uint32(3),
 	})
 	fmt.Println("params: ", strings.Join(rets, ","))
-	usedCost, newWasmData, results, err := RunWasm(cost, wasmCode, abiData, wasmData, "add", paramData)
+	usedCost, newWasmData, results, err := RunWasm(cost, wasmCode, abiData, wasmData, "add", paramData, true)
 	c.Assert(err, IsNil)
 	c.Assert(len(results), Equals, 1)
 	c.Assert(results, DeepEquals, []byte("7"))
@@ -123,7 +123,7 @@ func (suite *WasmSuite) testVMDemo(c *C) {
 		uint32(3),
 	})
 	fmt.Println("params: ", strings.Join(rets, ","))
-	usedCost, newWasmData, results, err := RunWasm(cost, wasmCode, abiData, wasmData, "add", paramData)
+	usedCost, newWasmData, results, err := RunWasm(cost, wasmCode, abiData, wasmData, "add", paramData, true)
 	c.Assert(err, IsNil)
 	c.Assert(len(results), Equals, 1)
 	c.Assert(results, DeepEquals, []byte("5"))
@@ -326,7 +326,7 @@ func (suite *WasmSuite) testVMBg(c *C) {
 			fmt.Println("wasm data", wasmData)
 			rets, paramData := getParams(c, params)
 			fmt.Println("params: ", strings.Join(rets, ","))
-			usedCost, newWasmData, retData, err := RunWasm(cost, wasmCode, abiData, wasmData, method, paramData)
+			usedCost, newWasmData, retData, err := RunWasm(cost, wasmCode, abiData, wasmData, method, paramData, true)
 			fmt.Println(cost, usedCost, cost-usedCost)
 			c.Assert(err, IsNil)
 			retValue, retString := getResult(c, retData)

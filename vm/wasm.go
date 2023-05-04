@@ -71,7 +71,7 @@ func (wm *WasmModule) Load(cost *api.Cost, wasmCode []byte) (api.Module, error) 
 	return mod, nil
 }
 
-func (wm *WasmModule) Verify(mod api.Module, abiCode []byte, method string, params [][]byte) (api.Function, error) {
+func (wm *WasmModule) Verify(mod api.Module, abiCode []byte, method string, params [][]byte, isSigner bool) (api.Function, error) {
 	memoryMap, defineMap, err := getModuleMap(abiCode)
 	if err != nil {
 		return nil, err
@@ -111,12 +111,15 @@ func (wm *WasmModule) Verify(mod api.Module, abiCode []byte, method string, para
 	}
 	types := f.Definition().ParamTypes()
 	tLen := len(types)
-	pLen, _, err := getInterface(method, m)
+	isPublic, pLen, _, err := getInterface(method, m)
 	if err != nil {
 		return nil, err
 	}
 	if tLen != pLen {
 		return nil, util.ErrorOfInvalid("parameter", fmt.Sprintf("%d != %d", tLen, pLen))
+	}
+	if !isSigner && !isPublic {
+		return nil, util.ErrorOf("unpermission", "access", method)
 	}
 	return f, nil
 }
@@ -386,9 +389,11 @@ func verifyType(t core.DataType, pt api.ValueType) bool {
 	return t.Primary() && (pt == api.ValueTypeI32 || pt == api.ValueTypeI64 || pt == api.ValueTypeF32 || pt == api.ValueTypeF64)
 }
 
-func getInterface(fn string, m map[string]interface{}) (int, []string, error) {
+func getInterface(fn string, m map[string]interface{}) (bool, int, []string, error) {
 	inputs := util.ToArray(&m, "inputs")
 	outputs := util.ToArray(&m, "outputs")
+
+	isPublic := util.ToBoolean(&m, "public")
 
 	wasmMap := util.ToMap(&m, "wasm")
 	wasmOutputs := util.ToArray(&wasmMap, "outputs")
@@ -396,21 +401,21 @@ func getInterface(fn string, m map[string]interface{}) (int, []string, error) {
 	paramSize := 0
 	paramTypes := make([]string, 0)
 	if len(outputs) > 1 || len(wasmOutputs) > 1 {
-		return 0, nil, util.ErrorOfInvalid("return count", fmt.Sprintf("%d, > 1", len(outputs)))
+		return false, 0, nil, util.ErrorOfInvalid("return count", fmt.Sprintf("%d, > 1", len(outputs)))
 	} else {
 		if len(outputs) == 1 {
 			o := outputs[0]
 			m, ok := o.(map[string]interface{})
 			if !ok {
-				return 0, nil, util.ErrorOfInvalid("return type", fmt.Sprintf("%d", 0))
+				return false, 0, nil, util.ErrorOfInvalid("return type", fmt.Sprintf("%d", 0))
 			} else {
 				t, err := core.GetDataTypeByName(util.ToString(&m, "type"))
 				if err != nil {
-					return 0, nil, err
+					return false, 0, nil, err
 				}
 				if !t.Primary() {
 					if len(wasmOutputs) != 0 {
-						return 0, nil, util.ErrorOfInvalid("wasm return count", fmt.Sprintf("%d", len(wasmOutputs)))
+						return false, 0, nil, util.ErrorOfInvalid("wasm return count", fmt.Sprintf("%d", len(wasmOutputs)))
 					}
 					paramSize++
 					paramTypes = append(paramTypes, "int32")
@@ -422,14 +427,14 @@ func getInterface(fn string, m map[string]interface{}) (int, []string, error) {
 							pn := util.ToString(&wm, "name")
 							pt, err := core.GetDataTypeByName(util.ToString(&wm, "type"))
 							if err != nil {
-								return 0, nil, err
+								return false, 0, nil, err
 							}
 							if t != pt {
-								return 0, nil, util.ErrorOfInvalid("return type", fmt.Sprintf("%s != %s in %s(%s)", t, pt, fn, pn))
+								return false, 0, nil, util.ErrorOfInvalid("return type", fmt.Sprintf("%s != %s in %s(%s)", t, pt, fn, pn))
 							}
 						}
 					} else {
-						return 0, nil, util.ErrorOfInvalid("wasm return count", fmt.Sprintf("%d", len(wasmOutputs)))
+						return false, 0, nil, util.ErrorOfInvalid("wasm return count", fmt.Sprintf("%d", len(wasmOutputs)))
 					}
 				}
 			}
@@ -438,11 +443,11 @@ func getInterface(fn string, m map[string]interface{}) (int, []string, error) {
 	for index, item := range inputs {
 		m, ok := item.(map[string]interface{})
 		if !ok {
-			return 0, nil, util.ErrorOfInvalid("parameter", fmt.Sprintf("%d", index))
+			return false, 0, nil, util.ErrorOfInvalid("parameter", fmt.Sprintf("%d", index))
 		} else {
 			t, err := core.GetDataTypeByName(util.ToString(&m, "type"))
 			if err != nil {
-				return 0, nil, err
+				return false, 0, nil, err
 			}
 			if t.Primary() {
 				paramSize++
@@ -453,7 +458,7 @@ func getInterface(fn string, m map[string]interface{}) (int, []string, error) {
 			}
 		}
 	}
-	return paramSize, paramTypes, nil
+	return isPublic, paramSize, paramTypes, nil
 }
 
 func verifyInterface(fn string, m map[string]interface{}, fd api.FunctionDefinition) error {
@@ -479,7 +484,7 @@ func verifyInterface(fn string, m map[string]interface{}, fd api.FunctionDefinit
 		return util.ErrorOfInvalid("wasm results", fmt.Sprintf("%d != %d", len(wasmOutputs), len(wasmResults)))
 	}
 
-	paramSize, paramTypes, err := getInterface(fn, m)
+	_, paramSize, paramTypes, err := getInterface(fn, m)
 	if err != nil {
 		return err
 	}
@@ -584,7 +589,7 @@ func VerifyWasm(wasmCode []byte, abiCode []byte) error {
 	return nil
 }
 
-func RunWasm(cost int64, wasmCode []byte, abiCode []byte, wasmData []byte, method string, params [][]byte) (int64, []byte, []byte, error) {
+func RunWasm(cost int64, wasmCode []byte, abiCode []byte, wasmData []byte, method string, params [][]byte, isSigner bool) (int64, []byte, []byte, error) {
 	apiCost := api.NewCostWith(cost)
 
 	wm := &WasmModule{}
@@ -594,7 +599,7 @@ func RunWasm(cost int64, wasmCode []byte, abiCode []byte, wasmData []byte, metho
 	}
 	defer wm.Close()
 
-	f, err := wm.Verify(mod, abiCode, method, params)
+	f, err := wm.Verify(mod, abiCode, method, params, isSigner)
 	if err != nil {
 		return -1, nil, nil, err
 	}

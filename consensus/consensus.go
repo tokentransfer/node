@@ -667,7 +667,7 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if err != nil {
 				return 0, nil, err
 			}
-			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(cs, remainCost, dataAccount, tx.Destination, info.Method, info.Params, inputs, outputs)
+			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(cs, remainCost, tx.Account, dataAccount, tx.Destination, info.Method, info.Params, inputs, outputs)
 			if err != nil {
 				return cost, nil, err
 			}
