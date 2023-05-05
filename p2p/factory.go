@@ -16,6 +16,7 @@ import (
 )
 
 // NetFactory provide a way to create net instance.
+// reference from chainmaker.org/chainmaker/chainmaker-go/module/net/net_factory.go
 type NetFactory struct {
 	netType protocol.NetType
 

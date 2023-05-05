@@ -103,7 +103,7 @@ func InitNet(c *config.Config, readyC chan struct{}) (protocol.Net, error) {
 		}
 		listenAddr = fmt.Sprintf("/ip4/%s/tcp/%d", address, c.GetPort())
 	}
-	bootstraps := append(c.GetBootstraps(), c.NetConfig.Seeds...)
+	bootstraps := c.GetBootstraps() // c.NetConfig.Seeds
 
 	// new net
 	var netFactory NetFactory
