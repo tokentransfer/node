@@ -545,6 +545,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		return nil, err
 	}
 	fromInfo.PublicKey = tx.PublicKey
+
 	states = append(states, fromInfo)
 	accountMap[tx.Account.String()] = fromInfo
 
