@@ -65,6 +65,14 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 		if err != nil {
 			return nil, err
 		}
+		rootPublic, err := rootKey.GetPublic()
+		if err != nil {
+			return nil, err
+		}
+		rootPublicKey, err := rootPublic.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
 		rootAccount, err := rootKey.GetAddress()
 		if err != nil {
 			return nil, err
@@ -82,6 +90,8 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 					BlockIndex: uint64(0),
 				},
 				Gas: *v,
+
+				PublicKey: libcore.PublicKey(rootPublicKey),
 			},
 		}
 
@@ -534,6 +544,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	if err != nil {
 		return nil, err
 	}
+	fromInfo.PublicKey = tx.PublicKey
 	states = append(states, fromInfo)
 	accountMap[tx.Account.String()] = fromInfo
 

@@ -70,6 +70,8 @@ type AccountState struct {
 	Token *DataInfo
 	Data  *DataInfo
 	File  *DataInfo
+
+	PublicKey libcore.PublicKey
 }
 
 func (s *AccountState) GetName() string {
@@ -125,6 +127,8 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.Token = fromDataInfo(state.Token)
 	s.Data = fromDataInfo(state.Data)
 	s.File = fromDataInfo(state.File)
+
+	s.PublicKey = libcore.PublicKey(state.PublicKey)
 	return nil
 }
 
@@ -152,6 +156,8 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 		Token: toDataInfo(s.Token, libcrypto.RawBinary),
 		Data:  toDataInfo(s.Data, libcrypto.RawBinary),
 		File:  toDataInfo(s.File, libcrypto.RawBinary),
+
+		PublicKey: []byte(s.PublicKey),
 	})
 }
 
@@ -179,6 +185,8 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 			Token: toDataInfo(s.Token, libcrypto.RawIgnoreSigningFields),
 			Data:  toDataInfo(s.Data, libcrypto.RawIgnoreSigningFields),
 			File:  toDataInfo(s.File, libcrypto.RawIgnoreSigningFields),
+
+			PublicKey: []byte(s.PublicKey),
 		})
 	} else { // ignore variable fields
 		return core.Marshal(&pb.AccountState{
@@ -198,6 +206,8 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 			Token: toDataInfo(s.Token, libcrypto.RawIgnoreVariableFields),
 			Data:  toDataInfo(s.Data, libcrypto.RawIgnoreVariableFields),
 			File:  toDataInfo(s.File, libcrypto.RawIgnoreVariableFields),
+
+			PublicKey: []byte(s.PublicKey),
 		})
 	}
 
