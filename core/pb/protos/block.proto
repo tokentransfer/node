@@ -58,6 +58,8 @@ message AccountState {
     DataInfo Token      = 7;
     DataInfo Data       = 8;
     DataInfo File       = 9;
+
+    bytes PublicKey     = 10;
 }
 
 message DataInfo {
