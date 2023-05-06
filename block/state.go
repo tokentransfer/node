@@ -71,6 +71,7 @@ type AccountState struct {
 	File  *DataInfo
 
 	PublicKey libcore.PublicKey
+	RootHash  libcore.Hash
 }
 
 func (s *AccountState) GetName() string {
@@ -122,6 +123,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.File = fromDataInfo(state.File)
 
 	s.PublicKey = libcore.PublicKey(state.PublicKey)
+	s.RootHash = libcore.Hash(state.RootHash)
 	return nil
 }
 
@@ -150,6 +152,7 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 		File:  toDataInfo(s.File, libcrypto.RawBinary),
 
 		PublicKey: []byte(s.PublicKey),
+		RootHash:  []byte(s.RootHash),
 	})
 }
 
@@ -178,6 +181,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 			File:  toDataInfo(s.File, libcrypto.RawIgnoreSigningFields),
 
 			PublicKey: []byte(s.PublicKey),
+			RootHash:  []byte(s.RootHash),
 		})
 	} else { // ignore variable fields
 		return core.Marshal(&pb.AccountState{
@@ -198,6 +202,7 @@ func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
 			File:  toDataInfo(s.File, libcrypto.RawIgnoreVariableFields),
 
 			PublicKey: []byte(s.PublicKey),
+			RootHash:  []byte(s.RootHash),
 		})
 	}
 

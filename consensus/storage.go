@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"path"
 	"sync"
 
 	"github.com/caivega/glog"
@@ -23,11 +24,21 @@ type StorageService struct {
 	storage core.Storage
 	stackdb *store.StackService
 
-	locker sync.Mutex
+	categories []string
+	locker     sync.Mutex
 }
 
-func NewStorageService(c libcore.Config) (*StorageService, error) {
+func NewStorageService(c libcore.Config, account libcore.Address) (*StorageService, error) {
 	service := &StorageService{
+		categories: func(a libcore.Address) []string {
+			if a != nil {
+				return []string{
+					"account",
+					a.String(),
+				}
+			}
+			return []string{}
+		}(account),
 		locker: sync.Mutex{},
 	}
 	err := service.Init(c)
@@ -666,7 +677,14 @@ func (s *StorageService) UpdateGas(theAccount libcore.Address, value util.Value)
 }
 
 func (s *StorageService) Init(c libcore.Config) error {
-	datadb := &store.LevelService{Name: "data"}
+	dataDir := c.GetDataDir()
+	if len(s.categories) > 0 {
+		list := append([]string{dataDir}, s.categories...)
+		dataDir = path.Join(list...)
+	}
+	dbPath := path.Join(dataDir, "data")
+
+	datadb := &store.LevelService{Path: dbPath}
 	err := datadb.Init(c)
 	if err != nil {
 		return err

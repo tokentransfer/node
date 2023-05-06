@@ -2,6 +2,7 @@ package merkle
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/tokentransfer/go-MerklePatriciaTree/mpt"
 
@@ -125,8 +126,6 @@ func (t *MerkleTree) ListData(f func(key []byte, value []byte) error) error {
 }
 
 type MerkleService struct {
-	index  string
-	name   string
 	config libcore.Config
 
 	im *MerkleTree // index -> hash
@@ -134,13 +133,23 @@ type MerkleService struct {
 	tm *MerkleTree // transaction
 	sm *MerkleTree // state
 
-	crypto libcrypto.CryptoService
+	crypto     libcrypto.CryptoService
+	categories []string
 }
 
-func NewMerkleService(c libcore.Config, cs libcrypto.CryptoService) (libstore.MerkleService, error) {
+func NewMerkleService(c libcore.Config, cs libcrypto.CryptoService, account libcore.Address) (libstore.MerkleService, error) {
 	service := &MerkleService{
 		config: c,
 		crypto: cs,
+		categories: func(a libcore.Address) []string {
+			if a != nil {
+				return []string{
+					"account",
+					a.String(),
+				}
+			}
+			return []string{}
+		}(account),
 	}
 	err := service.Init(c)
 	if err != nil {
@@ -156,7 +165,14 @@ func NewMerkleService(c libcore.Config, cs libcrypto.CryptoService) (libstore.Me
 func (service *MerkleService) Init(c libcore.Config) error {
 	service.config = c
 
-	indexdb := &store.LevelService{Name: "index"}
+	dataDir := service.config.GetDataDir()
+	if len(service.categories) > 0 {
+		list := append([]string{dataDir}, service.categories...)
+		dataDir = path.Join(list...)
+	}
+	dbPath := path.Join(dataDir, "index")
+
+	indexdb := &store.LevelService{Path: dbPath}
 	err := indexdb.Init(c)
 	if err != nil {
 		return err
@@ -167,7 +183,8 @@ func (service *MerkleService) Init(c libcore.Config) error {
 	}
 	service.im = NewMerkleTree(service.crypto, indexdb)
 
-	blockdb := &store.LevelService{Name: "block"}
+	dbPath = path.Join(dataDir, "block")
+	blockdb := &store.LevelService{Path: dbPath}
 	err = blockdb.Init(c)
 	if err != nil {
 		return err
@@ -178,7 +195,8 @@ func (service *MerkleService) Init(c libcore.Config) error {
 	}
 	service.bm = NewMerkleTree(service.crypto, blockdb)
 
-	txdb := &store.LevelService{Name: "transaction"}
+	dbPath = path.Join(dataDir, "transaction")
+	txdb := &store.LevelService{Path: dbPath}
 	err = txdb.Init(c)
 	if err != nil {
 		return err
@@ -189,7 +207,8 @@ func (service *MerkleService) Init(c libcore.Config) error {
 	}
 	service.tm = NewMerkleTree(service.crypto, txdb)
 
-	statedb := &store.LevelService{Name: "receipt"}
+	dbPath = path.Join(dataDir, "receipt")
+	statedb := &store.LevelService{Path: dbPath}
 	err = statedb.Init(c)
 	if err != nil {
 		return err

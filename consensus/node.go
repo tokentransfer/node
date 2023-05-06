@@ -186,11 +186,11 @@ func (n *Node) Init(c libcore.Config) error {
 		Status: PeerConsensused,
 	}
 
-	merkleService, err := merkle.NewMerkleService(n.config, n.cryptoService)
+	merkleService, err := merkle.NewMerkleService(n.config, n.cryptoService, nil)
 	if err != nil {
 		return err
 	}
-	storageService, err := NewStorageService(n.config)
+	storageService, err := NewStorageService(n.config, nil)
 	if err != nil {
 		return err
 	}

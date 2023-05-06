@@ -32,17 +32,17 @@ func (service *LevelService) Close() error {
 }
 
 func (service *LevelService) open() error {
-	if service.config != nil {
-		dataDir := service.config.GetDataDir()
-		dbPath := path.Join(dataDir, service.Name)
-		db, err := serviceForLevelDB(dbPath)
+	if len(service.Path) > 0 {
+		db, err := serviceForLevelDB(service.Path)
 		if err != nil {
 			return err
 		}
 		service.db = db
 	} else {
-		if len(service.Path) > 0 {
-			db, err := serviceForLevelDB(service.Path)
+		if service.config != nil {
+			dataDir := service.config.GetDataDir()
+			dbPath := path.Join(dataDir, service.Name)
+			db, err := serviceForLevelDB(dbPath)
 			if err != nil {
 				return err
 			}
