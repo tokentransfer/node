@@ -478,7 +478,7 @@ func (s *StorageService) CreatePage(name string, account libcore.Address, data [
 	return libcore.Hash(s.storage.Root()), libcore.Hash(d.Key()), nil
 }
 
-func (s *StorageService) ReadPageByName(name string) ([]byte, error) {
+func (s *StorageService) ReadPageByNameOrAddress(nameOrAddress string) ([]byte, error) {
 	rootGroup, err := s.storage.Group("/")
 	if err != nil {
 		return nil, err
@@ -487,7 +487,7 @@ func (s *StorageService) ReadPageByName(name string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	pageKey, err := pageGroup.GetKey(name)
+	pageKey, err := pageGroup.GetKey(nameOrAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +502,7 @@ func (s *StorageService) ReadPageByName(name string) ([]byte, error) {
 	}
 	pageReader.Close()
 	pageData.Dispose()
-	glog.Infoln("> read page", name, pageKey.String(), pageData.Size())
+	glog.Infoln("> read page", nameOrAddress, pageKey.String(), pageData.Size())
 
 	return buf.Bytes(), nil
 }

@@ -1575,7 +1575,27 @@ func (n *Node) LoadPageByName(name string) (*zipfs.FileSystem, error) {
 	if len(name) == 0 {
 		return nil, util.ErrorOfInvalid("name", name)
 	}
-	data, err := n.storageService.ReadPageByName(name)
+	_, account, _ := n.accountService.NewAccountFromAddress(name)
+	if account != nil {
+		return nil, util.ErrorOfInvalid("name", name)
+	}
+	data, err := n.storageService.ReadPageByNameOrAddress(name)
+	if err != nil {
+		return nil, err
+	}
+	reader := bytes.NewReader(data)
+	fs, err := zipfs.NewFromReaderAt(reader, int64(len(data)), nil)
+	if err != nil {
+		return nil, err
+	}
+	return fs, nil
+}
+
+func (n *Node) LoadPageByNameOrAddress(nameOrAddress string) (*zipfs.FileSystem, error) {
+	if len(nameOrAddress) == 0 {
+		return nil, util.ErrorOfInvalid("name", nameOrAddress)
+	}
+	data, err := n.storageService.ReadPageByNameOrAddress(nameOrAddress)
 	if err != nil {
 		return nil, err
 	}

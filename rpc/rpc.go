@@ -107,7 +107,8 @@ func (service *RPCService) Start() error {
 	http.HandleFunc("/v1/jsonrpc", service.rpcService)
 
 	loadMap := make(map[string]func(name string) (*zipfs.FileSystem, error))
-	loadMap["page"] = service.node.LoadPageByAddress
+	loadMap["address"] = service.node.LoadPageByAddress
+	loadMap["page"] = service.node.LoadPageByNameOrAddress
 	loadMap["lib"] = service.node.LoadPageByName
 	http.Handle("/", zipfs.FileServerWith(loadMap))
 	if service.testMode {
