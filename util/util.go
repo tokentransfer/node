@@ -100,6 +100,19 @@ func (v Value) ZeroClone() Value {
 	return Value{"0"}
 }
 
+func (v Value) Add(a Value) (Value, error) {
+	ai, err := decimal.NewFromString(v.value)
+	if err != nil {
+		return Value{"0"}, err
+	}
+	bi, err := decimal.NewFromString(a.value)
+	if err != nil {
+		return Value{"0"}, err
+	}
+	ci := ai.Add(bi)
+	return Value{ci.String()}, nil
+}
+
 func (v Value) Subtract(a Value) (Value, error) {
 	ai, err := decimal.NewFromString(v.value)
 	if err != nil {
@@ -113,7 +126,7 @@ func (v Value) Subtract(a Value) (Value, error) {
 	return Value{ci.String()}, nil
 }
 
-func (v Value) Add(a Value) (Value, error) {
+func (v Value) Mul(a Value) (Value, error) {
 	ai, err := decimal.NewFromString(v.value)
 	if err != nil {
 		return Value{"0"}, err
@@ -122,7 +135,20 @@ func (v Value) Add(a Value) (Value, error) {
 	if err != nil {
 		return Value{"0"}, err
 	}
-	ci := ai.Add(bi)
+	ci := ai.Mul(bi)
+	return Value{ci.String()}, nil
+}
+
+func (v Value) Div(a Value) (Value, error) {
+	ai, err := decimal.NewFromString(v.value)
+	if err != nil {
+		return Value{"0"}, err
+	}
+	bi, err := decimal.NewFromString(a.value)
+	if err != nil {
+		return Value{"0"}, err
+	}
+	ci := ai.Div(bi)
 	return Value{ci.String()}, nil
 }
 

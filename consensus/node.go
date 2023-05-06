@@ -226,7 +226,7 @@ func (n *Node) getContractData(txm map[string]interface{}) (int64, interface{}, 
 	}
 
 	format := util.ToString(&txm, "format")
-	usedCost, r, err := ss.GetContractData(fromAccount, toAccount, format)
+	usedCost, r, err := ss.GetContractData(fromAccount, fromAccount, toAccount, format)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -256,7 +256,7 @@ func (n *Node) callContract(txm map[string]interface{}) (int64, interface{}, err
 		return 0, nil, err
 	}
 
-	usedCost, r, err := ss.CallContract(fromAccount, toAccount, method, params)
+	usedCost, r, err := ss.CallContract(fromAccount, fromAccount, toAccount, method, params)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -682,11 +682,11 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		accountEntry, err := n.consensusService.GetAccountInfo(a)
+		gas, err := n.storageService.GetGas(a)
 		if err != nil {
 			return nil, err
 		}
-		return accountEntry.Gas, nil
+		return gas.String(), nil
 
 	case "getTransactionCount":
 		item := params[0].(map[string]interface{})
@@ -819,7 +819,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		info, err := n.storageService.GetUserData(a, b)
+		info, err := n.storageService.ReadUser(a, a, b)
 		if err != nil {
 			return nil, err
 		}
@@ -1579,7 +1579,7 @@ func (n *Node) LoadPageByName(name string) (*zipfs.FileSystem, error) {
 	if account != nil {
 		return nil, util.ErrorOfInvalid("name", name)
 	}
-	data, err := n.storageService.ReadPageByNameOrAddress(name)
+	data, err := n.storageService.ReadPageByName(name)
 	if err != nil {
 		return nil, err
 	}
@@ -1595,9 +1595,18 @@ func (n *Node) LoadPageByNameOrAddress(nameOrAddress string) (*zipfs.FileSystem,
 	if len(nameOrAddress) == 0 {
 		return nil, util.ErrorOfInvalid("name", nameOrAddress)
 	}
-	data, err := n.storageService.ReadPageByNameOrAddress(nameOrAddress)
+	var data []byte
+	_, account, err := n.accountService.NewAccountFromAddress(nameOrAddress)
 	if err != nil {
-		return nil, err
+		data, err = n.storageService.ReadPageByAddress(account)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		data, err = n.storageService.ReadPageByName(nameOrAddress)
+		if err != nil {
+			return nil, err
+		}
 	}
 	reader := bytes.NewReader(data)
 	fs, err := zipfs.NewFromReaderAt(reader, int64(len(data)), nil)

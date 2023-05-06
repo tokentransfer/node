@@ -77,10 +77,6 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 		if err != nil {
 			return nil, err
 		}
-		v, err := util.NewValue("100000000000000")
-		if err != nil {
-			return nil, err
-		}
 		states := []libblock.State{
 			&block.AccountState{
 				State: block.State{
@@ -89,7 +85,6 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 					Sequence:   uint64(0),
 					BlockIndex: uint64(0),
 				},
-				Gas: *v,
 
 				PublicKey: libcore.PublicKey(rootPublicKey),
 			},
@@ -412,7 +407,11 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	if err != nil {
 		return false, err
 	}
-	remain, err := info.Gas.Subtract(*gasValue)
+	fromValue, err := service.StorageService.GetGas(account)
+	if err != nil {
+		return false, err
+	}
+	remain, err := fromValue.Subtract(*gasValue)
 	if err != nil {
 		return false, err
 	}
@@ -461,62 +460,74 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	return true, nil
 }
 
-func (service *ConsensusService) getAccountInfo(account libcore.Address, sequence uint64) (*block.AccountState, error) {
+func (service *ConsensusService) getAccountInfo(account libcore.Address, sequence uint64) (*block.AccountState, *block.AccountState, error) {
 	lastInfo, _ := service.GetAccountInfo(account)
 	if lastInfo != nil {
 		s, err := block.CloneState(lastInfo)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		h, err := service.HashState(s)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		info := s.(*block.AccountState)
+		if sequence < info.Sequence {
+			sequence = info.Sequence
+		}
 		info.Sequence = sequence
 		info.Previous = h
-		info.Version = lastInfo.Version + 1
-		return info, nil
+		info.Version = lastInfo.Version
+		return lastInfo, info, nil
 	} else {
-		zero, err := util.NewValue("0")
-		if err != nil {
-			return nil, err
-		}
 		info := &block.AccountState{
 			State: block.State{
 				StateType: block.ACCOUNT_STATE,
 				Account:   account,
 				Sequence:  sequence,
 			},
-			Gas: *zero,
 		}
-		return info, nil
+		return nil, info, nil
 	}
 }
 
-func (service *ConsensusService) addBalance(info *block.AccountState, value *util.Value) error {
-	newValue, err := info.Gas.Add(*value)
+func (service *ConsensusService) addBalance(info *block.AccountState, value util.Value) (*util.Value, error) {
+	oldValue, err := service.StorageService.GetGas(info.Account)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	info.Gas = newValue
-	return nil
+	newValue, err := oldValue.Add(value)
+	if err != nil {
+		return nil, err
+	}
+	err = service.StorageService.UpdateGas(info.Account, newValue)
+	if err != nil {
+		return nil, err
+	}
+	return &newValue, nil
 }
 
-func (service *ConsensusService) removeBalance(info *block.AccountState, value *util.Value) error {
-	newValue, err := info.Gas.Subtract(*value)
+func (service *ConsensusService) removeBalance(info *block.AccountState, value util.Value) (*util.Value, error) {
+	oldValue, err := service.StorageService.GetGas(info.Account)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	newValue, err := oldValue.Subtract(value)
+	if err != nil {
+		return nil, err
 	}
 	isNegative, err := newValue.IsNegative()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if isNegative {
-		return util.ErrorOf("insuffient gas", "nagative", "balance")
+		return nil, util.ErrorOf("insuffient gas", "nagative", "balance")
 	}
-	info.Gas = newValue
-	return nil
+	err = service.StorageService.UpdateGas(info.Account, newValue)
+	if err != nil {
+		return nil, err
+	}
+	return &newValue, nil
 }
 
 func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (libblock.TransactionWithData, error) {
@@ -530,6 +541,8 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 
 	sequenceMap := map[string]uint64{}
 	accountMap := map[string]*block.AccountState{}
+	lastMap := map[string]*block.AccountState{}
+	accounts := make([]string, 0)
 
 	fromAccount := tx.GetAccount()
 	fromSequence := libstore.GetSequence(ms, fromAccount) + 1 // sequence of from from account, +1
@@ -538,39 +551,39 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	}
 	sequenceMap[fromAccount.String()] = fromSequence
 
-	states := make([]libblock.State, 0)
-
-	fromInfo, err := service.getAccountInfo(fromAccount, fromSequence)
+	lastFromInfo, fromInfo, err := service.getAccountInfo(fromAccount, fromSequence)
 	if err != nil {
 		return nil, err
 	}
 	fromInfo.PublicKey = tx.PublicKey
-
-	states = append(states, fromInfo)
 	accountMap[tx.Account.String()] = fromInfo
+	lastMap[tx.Account.String()] = lastFromInfo
+	accounts = append(accounts, tx.Account.String())
 
 	destAccount := tx.Destination
 	destSequence := libstore.GetSequence(ms, destAccount) // sequence of destination account, keep unchanged
-	destInfo, err := service.getAccountInfo(destAccount, destSequence)
+	lastDestInfo, destInfo, err := service.getAccountInfo(destAccount, destSequence)
 	if err != nil {
 		return nil, err
 	}
 	isSame := (fromAccount.String() == destAccount.String())
 	if !isSame {
 		sequenceMap[destAccount.String()] = destSequence
-		states = append(states, destInfo)
 		accountMap[destAccount.String()] = destInfo
+		lastMap[destAccount.String()] = lastDestInfo
+		accounts = append(accounts, destAccount.String())
 	}
 
 	gasAccount := config.GetGasAccount()
 	gasSequence := libstore.GetSequence(ms, gasAccount)
-	gasInfo, err := service.getAccountInfo(gasAccount, gasSequence) // sequence of gas account, keep unchanged
+	lastGasInfo, gasInfo, err := service.getAccountInfo(gasAccount, gasSequence) // sequence of gas account, keep unchanged
 	if err != nil {
 		return nil, err
 	}
 	sequenceMap[gasAccount.String()] = gasSequence
-	states = append(states, gasInfo)
 	accountMap[gasAccount.String()] = gasInfo
+	lastMap[gasAccount.String()] = lastGasInfo
+	accounts = append(accounts, gasAccount.String())
 
 	gas := uint64(0) //gasPrice gasLimit
 	if tx.Payload != nil && len(tx.Payload.Infos) > 0 {
@@ -578,13 +591,13 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		for _, info := range tx.Payload.Infos {
 			dataCost += uint64(len(info.Content)) // 1:1
 		}
-		wasmCost, payloadStates, err := service.ProcessPayload(tx.Gas-dataCost, tx, tx.Payload, accountMap)
+		wasmCost, payloadStates, err := service.ProcessPayload(tx.Gas-dataCost, tx, tx.Payload, accountMap, lastMap)
 		if err != nil {
 			return nil, err
 		}
 		gas += dataCost
 		gas += wasmCost
-		states = append(states, payloadStates...)
+		accounts = append(accounts, payloadStates...)
 	}
 	if gas < 10 {
 		gas = 10
@@ -597,22 +610,48 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	if err != nil {
 		return nil, err
 	}
-	err = service.removeBalance(fromInfo, gasAmount)
+	_, err = service.removeBalance(fromInfo, *gasAmount)
 	if err != nil {
 		return nil, err
 	}
-	err = service.addBalance(gasInfo, gasAmount)
+	_, err = service.addBalance(gasInfo, *gasAmount)
 	if err != nil {
 		return nil, err
 	}
-	if tx.Gas > gas {
-		remainAmount, err := util.NewValue(fmt.Sprintf("%d", tx.Gas-gas))
-		if err != nil {
-			return nil, err
+
+	stateMap := make(map[string]string)
+	stateList := make([]string, 0)
+	for _, a := range accounts {
+		_, ok := stateMap[a]
+		if !ok {
+			stateMap[a] = a
+			stateList = append(stateList, a)
 		}
-		err = service.addBalance(destInfo, remainAmount) // temperary active dest
-		if err != nil {
-			return nil, err
+	}
+
+	states := make([]libblock.State, 0)
+	for _, a := range stateList {
+		lastInfo := lastMap[a]
+		info := accountMap[a]
+		if lastInfo == nil || info == nil {
+			return nil, util.ErrorOfInvalid("account info", a)
+		} else {
+			if lastInfo == nil {
+				states = append(states, info)
+			} else {
+				lastHash, err := service.HashState(lastInfo)
+				if err != nil {
+					return nil, err
+				}
+				hash, err := service.HashState(info)
+				if err != nil {
+					return nil, err
+				}
+				if lastHash.String() != hash.String() {
+					info.Version = info.Version + 1
+					states = append(states, info)
+				}
+			}
 		}
 	}
 
@@ -628,12 +667,12 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	}, nil
 }
 
-func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Transaction, info *block.PayloadInfo, accountMap map[string]*block.AccountState) (uint64, []libblock.State, error) {
+func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Transaction, info *block.PayloadInfo, accountMap map[string]*block.AccountState, lastMap map[string]*block.AccountState) (uint64, []string, error) {
 	cs := service.CryptoService
 	as := service.AccountService
 	ss := service.StorageService
 
-	states := make([]libblock.State, 0)
+	accounts := make([]string, 0)
 	cost := uint64(0)
 	for _, payload := range info.Infos {
 		meta, msg, err := core.Unmarshal(payload.Content)
@@ -652,11 +691,11 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if err != nil {
 				return cost, nil, err
 			}
-			usedCost, payloadStates, err := service.ProcessPayload(remainCost-cost, tx, payloadInfo, accountMap)
+			usedCost, payloadStates, err := service.ProcessPayload(remainCost-cost, tx, payloadInfo, accountMap, lastMap)
 			if err != nil {
 				return 0, nil, err
 			}
-			states = append(states, payloadStates...)
+			accounts = append(accounts, payloadStates...)
 			cost += usedCost
 
 		case core.CORE_CONTRACT_INFO:
@@ -684,18 +723,27 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 				return cost, nil, err
 			}
 			accountInfo, ok := accountMap[retAccount.String()]
-			if ok {
-				accountInfo.Data = &block.DataInfo{
-					Hash:    retHash,
-					Content: retContent,
+			if !ok {
+				lastInfo, info, err := service.getAccountInfo(retAccount, 0)
+				if err != nil {
+					return cost, nil, err
 				}
+				accountMap[retAccount.String()] = info
+				lastMap[retAccount.String()] = lastInfo
+				accounts = append(accounts, retAccount.String())
+
+				accountInfo = info
+			}
+			accountInfo.Data = &block.DataInfo{
+				Hash:    retHash,
+				Content: retContent,
 			}
 			cost += uint64(usedCost)
 
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)
 			if len(info.Data) > 0 {
-				_, pageHash, err := ss.CreatePage(info.Name, tx.Destination, info.Data)
+				_, pageHash, err := ss.WritePage(info.Name, tx.Destination, info.Data)
 				if err != nil {
 					return cost, nil, err
 				}
@@ -726,7 +774,7 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if err != nil {
 				return cost, nil, err
 			}
-			userHash, userAccount, err := ss.CreateUserData(tx.Account, tx.Destination, account, info)
+			userHash, userAccount, err := ss.WriteUser(tx.Account, tx.Destination, account, info)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -745,7 +793,7 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 		}
 	}
 
-	return cost, states, nil
+	return cost, accounts, nil
 }
 
 func getAccounts(as libaccount.AccountService, list [][]byte) ([]libcore.Address, error) {
