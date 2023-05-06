@@ -205,7 +205,7 @@ func (s *StorageService) writeData(rootGroup core.Group, category string, dir st
 func (s *StorageService) readData(rootGroup core.Group, category string, dir string, name string) (core.Key, core.Key, core.Key, []byte, error) {
 	var categoryGroup core.Group
 	if len(category) > 0 {
-		group, err := rootGroup.Group(name)
+		group, err := rootGroup.Group(category)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}

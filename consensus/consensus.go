@@ -77,6 +77,14 @@ func (service *ConsensusService) GenerateBlock(list []libblock.TransactionWithDa
 		if err != nil {
 			return nil, err
 		}
+		v, err := util.NewValue("100000000000000")
+		if err != nil {
+			return nil, err
+		}
+		err = ss.UpdateGas(rootAccount, *v)
+		if err != nil {
+			return nil, err
+		}
 		states := []libblock.State{
 			&block.AccountState{
 				State: block.State{

@@ -89,19 +89,7 @@ func dumpGroup(c *C, s core.Storage, g core.Group, log core.Printer) {
 	}
 }
 
-func (suite *NodeSuite) TestTransaction(c *C) {
-	blobData, err := util.ReadFile("./data/tx.blob")
-	c.Assert(err, IsNil)
-	fmt.Println(len(blobData), string(blobData))
-	data, err := hex.DecodeString(string(blobData))
-	c.Assert(err, IsNil)
-
-	tx := &block.Transaction{}
-	err = tx.UnmarshalBinary(data)
-	c.Assert(err, IsNil)
-}
-
-func (suite *NodeSuite) TestProcess(c *C) {
+func (suite *NodeSuite) load(c *C) *Node {
 	config, err := config.NewConfig("../config.json")
 	c.Assert(err, IsNil)
 	// config.SetMode("debug")
@@ -131,6 +119,40 @@ func (suite *NodeSuite) TestProcess(c *C) {
 		}
 		fmt.Printf("=== generate block %d, %s, %d\n", block.GetIndex(), block.GetHash().String(), len(block.GetTransactions()))
 	}
+	return n
+}
+
+func (suite *NodeSuite) TestGas(c *C) {
+	n := suite.load(c)
+
+	_, rootKey, err := n.accountService.GenerateFamilySeed("masterpassphrase")
+	c.Assert(err, IsNil)
+	rootAccount, err := rootKey.GetAddress()
+	c.Assert(err, IsNil)
+
+	o, err := n.Call("getBalance", []interface{}{
+		map[string]interface{}{
+			"address": rootAccount.String(),
+		},
+	})
+	c.Assert(err, IsNil)
+	util.PrintJSON("getBalance", o)
+}
+
+func (suite *NodeSuite) testTransaction(c *C) {
+	blobData, err := util.ReadFile("./data/tx.blob")
+	c.Assert(err, IsNil)
+	fmt.Println(len(blobData), string(blobData))
+	data, err := hex.DecodeString(string(blobData))
+	c.Assert(err, IsNil)
+
+	tx := &block.Transaction{}
+	err = tx.UnmarshalBinary(data)
+	c.Assert(err, IsNil)
+}
+
+func (suite *NodeSuite) testProcess(c *C) {
+	n := suite.load(c)
 
 	dump(c, n.storageService.storage, "before")
 
