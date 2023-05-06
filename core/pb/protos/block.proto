@@ -59,6 +59,7 @@ message AccountState {
     DataInfo File       = 8;
 
     bytes PublicKey     = 9;
+    bytes RootHash	= 10;
 }
 
 message DataInfo {
