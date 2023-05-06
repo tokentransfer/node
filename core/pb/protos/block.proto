@@ -50,16 +50,15 @@ message AccountState {
     State State     = 1;
 
     string Name	    = 2;
-    string Gas      = 3;
 
-    DataInfo User       = 4;
-    DataInfo Code       = 5;
-    DataInfo Page       = 6;
-    DataInfo Token      = 7;
-    DataInfo Data       = 8;
-    DataInfo File       = 9;
+    DataInfo User       = 3;
+    DataInfo Code       = 4;
+    DataInfo Page       = 5;
+    DataInfo Token      = 6;
+    DataInfo Data       = 7;
+    DataInfo File       = 8;
 
-    bytes PublicKey     = 10;
+    bytes PublicKey     = 9;
 }
 
 message DataInfo {
