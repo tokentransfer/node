@@ -122,7 +122,12 @@ func (suite *NodeSuite) load(c *C) *Node {
 	return n
 }
 
-func (suite *NodeSuite) TestGas(c *C) {
+func (suite *NodeSuite) close(c *C, n *Node) {
+	err := n.Stop()
+	c.Assert(err, IsNil)
+}
+
+func (suite *NodeSuite) testGas(c *C) {
 	n := suite.load(c)
 
 	_, rootKey, err := n.accountService.GenerateFamilySeed("masterpassphrase")
@@ -137,9 +142,11 @@ func (suite *NodeSuite) TestGas(c *C) {
 	})
 	c.Assert(err, IsNil)
 	util.PrintJSON("getBalance", o)
+
+	suite.close(c, n)
 }
 
-func (suite *NodeSuite) testTransaction(c *C) {
+func (suite *NodeSuite) TestTransaction(c *C) {
 	blobData, err := util.ReadFile("./data/tx.blob")
 	c.Assert(err, IsNil)
 	fmt.Println(len(blobData), string(blobData))
@@ -151,7 +158,7 @@ func (suite *NodeSuite) testTransaction(c *C) {
 	c.Assert(err, IsNil)
 }
 
-func (suite *NodeSuite) testProcess(c *C) {
+func (suite *NodeSuite) TestProcess(c *C) {
 	n := suite.load(c)
 
 	dump(c, n.storageService.storage, "before")
@@ -185,4 +192,6 @@ func (suite *NodeSuite) testProcess(c *C) {
 	// c.Assert(err, IsNil)
 
 	dump(c, n.storageService.storage, "after")
+
+	suite.close(c, n)
 }

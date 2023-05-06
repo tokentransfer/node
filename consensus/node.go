@@ -1693,19 +1693,20 @@ func (n *Node) Stop() error {
 	if err := n.storageService.Close(); err != nil {
 		return err
 	}
-	if err := n.net.CancelSubscribeWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY); err != nil {
-		return err
+	if n.net != nil {
+		if err := n.net.CancelSubscribeWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY); err != nil {
+			return err
+		}
+		if err := n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_MESSAGE); err != nil {
+			return err
+		}
+		if err := n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_DATA); err != nil {
+			return err
+		}
+		if err := n.net.Stop(); err != nil {
+			return err
+		}
 	}
-	if err := n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_MESSAGE); err != nil {
-		return err
-	}
-	if err := n.net.CancelDirectMsgHandle(n.config.GetChainId(), TOPIC_PEER_DATA); err != nil {
-		return err
-	}
-	if err := n.net.Stop(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
