@@ -682,7 +682,19 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		gas, err := n.storageService.GetGas(a)
+		if util.Has(&item, "root") {
+			root := util.ToString(&item, "root")
+			_, r, err := as.NewAccountFromAddress(root)
+			if err != nil {
+				return nil, err
+			}
+			gas, err := n.storageService.GetGas(r, a)
+			if err != nil {
+				return nil, err
+			}
+			return gas.String(), nil
+		}
+		gas, err := n.storageService.GetGas(nil, a)
 		if err != nil {
 			return nil, err
 		}
@@ -1060,7 +1072,7 @@ func (n *Node) GenerateBlock() (libblock.Block, error) {
 	list := n.transactions
 	n.transactions = make([]libblock.TransactionWithData, 0)
 
-	return n.consensusService.GenerateBlock(list)
+	return n.consensusService.GenerateBlock(nil, list)
 }
 
 func (n *Node) VerifyBlock(b libblock.Block) (ok bool, err error) {

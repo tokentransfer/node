@@ -26,6 +26,7 @@ type chunkStorage struct {
 	version   int64
 }
 
+// reference from https://github.com/indyjo/cafs/blob/master/ram/ramstorage.go
 func NewStorage(maxBytes int64) (core.Storage, error) {
 	db := &store.MemoryService{
 		Name: "memory",

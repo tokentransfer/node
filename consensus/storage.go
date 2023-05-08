@@ -656,8 +656,8 @@ func (s *StorageService) WriteState(rootAccount libcore.Address, theAccount libc
 	return rootHash, dataHash, nil
 }
 
-func (s *StorageService) GetGas(theAccount libcore.Address) (*util.Value, error) {
-	data, err := s.ReadState(nil, theAccount, "gas")
+func (s *StorageService) GetGas(rootAccount libcore.Address, theAccount libcore.Address) (*util.Value, error) {
+	data, err := s.ReadState(rootAccount, theAccount, "gas")
 	if err != nil {
 		return nil, err
 	}
@@ -668,8 +668,8 @@ func (s *StorageService) GetGas(theAccount libcore.Address) (*util.Value, error)
 	return value, nil
 }
 
-func (s *StorageService) UpdateGas(theAccount libcore.Address, value util.Value) error {
-	_, _, err := s.WriteState(nil, theAccount, "gas", []byte(value.String()))
+func (s *StorageService) UpdateGas(rootAccount libcore.Address, theAccount libcore.Address, value util.Value) error {
+	_, _, err := s.WriteState(rootAccount, theAccount, "gas", []byte(value.String()))
 	if err != nil {
 		return err
 	}

@@ -11,6 +11,7 @@ import (
 	libcore "github.com/tokentransfer/interfaces/core"
 )
 
+// reference from github.com/tokentransfer/chain/block/block.go
 type Block struct {
 	Hash libcore.Hash
 
