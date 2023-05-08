@@ -54,9 +54,8 @@ const (
 	CORE_PAGE_INFO     = DataType(147)
 	CORE_CODE_INFO     = DataType(148)
 	CORE_USER_INFO     = DataType(149)
+	CORE_LINK_INFO     = DataType(150)
 )
-
-var SYSTEM_CODE = "TEST"
 
 func init() {
 	DataType(CORE_DATA_BOOLEAN).Create("boolean", true)
@@ -159,6 +158,8 @@ func GetInfo(data []byte) string {
 			return "code_info"
 		case CORE_USER_INFO:
 			return "user_info"
+		case CORE_LINK_INFO:
+			return "link_info"
 		default:
 			return "unknown"
 		}
@@ -334,6 +335,19 @@ func MarshalData(data interface{}) ([]byte, error) {
 			m.Map[k] = &pb.Data{Bytes: data}
 		}
 		return Marshal(m)
+	case *map[string]interface{}:
+		m := &pb.DataMap{Map: make(map[string]*pb.Data)}
+		for k, v := range *data {
+			data, err := MarshalData(v)
+			if err != nil {
+				return nil, err
+			}
+			if m.Map == nil {
+				m.Map = make(map[string]*pb.Data)
+			}
+			m.Map[k] = &pb.Data{Bytes: data}
+		}
+		return Marshal(m)
 	case proto.Message:
 		return Marshal(data)
 	default:
@@ -469,6 +483,8 @@ func Marshal(message proto.Message) ([]byte, error) {
 		meta = CORE_CODE_INFO
 	case *pb.UserInfo:
 		meta = CORE_USER_INFO
+	case *pb.LinkInfo:
+		meta = CORE_LINK_INFO
 
 	default:
 		err := util.ErrorOfInvalid("type", "data")
@@ -540,6 +556,8 @@ func Unmarshal(data []byte) (DataType, proto.Message, error) {
 		msg = &pb.CodeInfo{}
 	case CORE_USER_INFO:
 		msg = &pb.UserInfo{}
+	case CORE_LINK_INFO:
+		msg = &pb.LinkInfo{}
 
 	default:
 		err := util.ErrorOfInvalid("format", "data")

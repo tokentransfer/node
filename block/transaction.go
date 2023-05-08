@@ -17,13 +17,16 @@ type Transaction struct {
 
 	TransactionType libblock.TransactionType
 
-	Account     libcore.Address
-	Sequence    uint64
-	Gas         uint64
-	Destination libcore.Address
-	Payload     *PayloadInfo
-	PublicKey   libcore.PublicKey
-	Signature   libcore.Signature
+	From     libcore.Address
+	Sequence uint64
+	To       libcore.Address
+
+	Account libcore.Address
+	Gas     uint64
+	Payload *PayloadInfo
+
+	PublicKey libcore.PublicKey
+	Signature libcore.Signature
 }
 
 func (tx *Transaction) GetIndex() uint64 {
@@ -39,6 +42,9 @@ func (tx *Transaction) SetHash(h libcore.Hash) {
 }
 
 func byteToAddress(b []byte) (libcore.Address, error) {
+	if b == nil {
+		return nil, nil
+	}
 	_, a, err := as.NewAccountFromBytes(b)
 	if err != nil {
 		return nil, err
@@ -60,20 +66,23 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 
 	tx.TransactionType = libblock.TransactionType(t.TransactionType)
 
+	tx.From, err = byteToAddress(t.From)
+	if err != nil {
+		return err
+	}
+	tx.Sequence = t.Sequence
+	tx.To, err = byteToAddress(t.To)
+	if err != nil {
+		return err
+	}
+
 	tx.Account, err = byteToAddress(t.Account)
 	if err != nil {
 		return err
 	}
-
-	tx.Sequence = t.Sequence
 	tx.Gas = t.Gas
-
-	tx.Destination, err = byteToAddress(t.Destination)
-	if err != nil {
-		return err
-	}
-
 	tx.Payload = fromPayloadInfo(t.Payload)
+
 	tx.PublicKey = libcore.PublicKey(t.PublicKey)
 	tx.Signature = libcore.Signature(t.Signature)
 
@@ -81,15 +90,23 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 }
 
 func addressToByte(a libcore.Address) ([]byte, error) {
+	if a == nil {
+		return nil, nil
+	}
 	return a.MarshalBinary()
 }
 
 func (tx *Transaction) MarshalBinary() ([]byte, error) {
-	fromData, err := addressToByte(tx.Account)
+	fromData, err := addressToByte(tx.From)
 	if err != nil {
 		return nil, err
 	}
-	toData, err := addressToByte(tx.Destination)
+	toData, err := addressToByte(tx.To)
+	if err != nil {
+		return nil, err
+	}
+
+	accountData, err := addressToByte(tx.Account)
 	if err != nil {
 		return nil, err
 	}
@@ -97,44 +114,58 @@ func (tx *Transaction) MarshalBinary() ([]byte, error) {
 	t := &pb.Transaction{
 		TransactionType: uint32(tx.TransactionType),
 
-		Account:     fromData,
-		Sequence:    tx.Sequence,
-		Gas:         tx.Gas,
-		Destination: toData,
-		Payload:     toPayloadInfo(tx.Payload, libcrypto.RawBinary),
-		PublicKey:   []byte(tx.PublicKey),
-		Signature:   []byte(tx.Signature),
+		From:     fromData,
+		Sequence: tx.Sequence,
+		To:       toData,
+
+		Account: accountData,
+		Gas:     tx.Gas,
+		Payload: toPayloadInfo(tx.Payload, libcrypto.RawBinary),
+
+		PublicKey: []byte(tx.PublicKey),
+		Signature: []byte(tx.Signature),
 	}
 	return core.Marshal(t)
 }
 
 func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
 	if ignoreSigningFields {
-		fromAccount, err := addressToByte(tx.Account)
+		fromAccount, err := addressToByte(tx.From)
 		if err != nil {
 			return nil, err
 		}
-		toAccount, err := addressToByte(tx.Destination)
+		toAccount, err := addressToByte(tx.To)
+		if err != nil {
+			return nil, err
+		}
+		account, err := addressToByte(tx.Account)
 		if err != nil {
 			return nil, err
 		}
 		t := &pb.Transaction{
 			TransactionType: uint32(tx.TransactionType),
 
-			Account:     fromAccount,
-			Sequence:    tx.Sequence,
-			Gas:         tx.Gas,
-			Destination: toAccount,
-			Payload:     toPayloadInfo(tx.Payload, libcrypto.RawIgnoreSigningFields),
-			PublicKey:   []byte(tx.PublicKey),
+			From:     fromAccount,
+			Sequence: tx.Sequence,
+			To:       toAccount,
+
+			Account: account,
+			Gas:     tx.Gas,
+			Payload: toPayloadInfo(tx.Payload, libcrypto.RawIgnoreSigningFields),
+
+			PublicKey: []byte(tx.PublicKey),
 		}
 		return core.Marshal(t)
 	} else { //ignore variable fields
-		fromAccount, err := addressToByte(tx.Account)
+		fromAccount, err := addressToByte(tx.From)
 		if err != nil {
 			return nil, err
 		}
-		toAccount, err := addressToByte(tx.Destination)
+		toAccount, err := addressToByte(tx.To)
+		if err != nil {
+			return nil, err
+		}
+		account, err := addressToByte(tx.Account)
 		if err != nil {
 			return nil, err
 		}
@@ -142,13 +173,16 @@ func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
 		t := &pb.Transaction{
 			TransactionType: uint32(tx.TransactionType),
 
-			Account:     fromAccount,
-			Sequence:    tx.Sequence,
-			Gas:         tx.Gas,
-			Destination: toAccount,
-			Payload:     toPayloadInfo(tx.Payload, libcrypto.RawIgnoreVariableFields),
-			PublicKey:   []byte(tx.PublicKey),
-			Signature:   []byte(tx.Signature),
+			From:     fromAccount,
+			Sequence: tx.Sequence,
+			To:       toAccount,
+
+			Account: account,
+			Gas:     tx.Gas,
+			Payload: toPayloadInfo(tx.Payload, libcrypto.RawIgnoreVariableFields),
+
+			PublicKey: []byte(tx.PublicKey),
+			Signature: []byte(tx.Signature),
 		}
 		return core.Marshal(t)
 	}

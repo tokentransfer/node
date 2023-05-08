@@ -385,7 +385,6 @@ func (service *ConsensusService) GetAccountInfo(account libcore.Address) (*block
 
 func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool, error) {
 	cs := service.CryptoService
-	as := service.AccountService
 	ms := service.MerkleService
 
 	ok, err := cs.Verify(t)
@@ -400,42 +399,40 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 		return false, util.ErrorOfInvalid("data", "transaction")
 	}
 
-	account := tx.Account
-	sequence := libstore.GetSequence(ms, account) + 1
+	fromAccount := tx.From
+	sequence := libstore.GetSequence(ms, fromAccount) + 1
 	if tx.Sequence != sequence {
 		return false, util.ErrorOfInvalid("sequence", fmt.Sprintf("%d != %d", tx.Sequence, sequence))
 	}
 
-	info, err := service.GetAccountInfo(account)
+	info, err := service.GetAccountInfo(fromAccount)
 	if err != nil || info == nil {
-		return false, util.ErrorOfNotFound("account", account.String())
+		return false, util.ErrorOfNotFound("account", fromAccount.String())
 	}
 
 	if tx.Gas < 10 {
 		return false, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < 10", tx.Gas))
 	}
 
-	isSame := (account.String() == tx.Destination.String())
-	if !isSame {
-		gasValue, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
-		if err != nil {
-			return false, err
-		}
-		fromValue, err := service.StorageService.GetGas(nil, account)
-		if err != nil {
-			return false, err
-		}
-		remain, err := fromValue.Subtract(*gasValue)
-		if err != nil {
-			return false, err
-		}
-		isNegative, err := remain.IsNegative()
-		if err != nil {
-			return false, err
-		}
-		if isNegative {
-			return false, util.ErrorOf("insuffient", "gas", remain.String())
-		}
+	account := tx.Account
+	gasValue, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
+	if err != nil {
+		return false, err
+	}
+	fromValue, err := service.StorageService.GetGas(account, fromAccount)
+	if err != nil {
+		return false, err
+	}
+	remain, err := fromValue.Subtract(*gasValue)
+	if err != nil {
+		return false, err
+	}
+	isNegative, err := remain.IsNegative()
+	if err != nil {
+		return false, err
+	}
+	if isNegative {
+		return false, util.ErrorOf("insuffient", "gas", remain.String())
 	}
 	if tx.Payload != nil && len(tx.Payload.Infos) > 0 {
 		for _, payload := range tx.Payload.Infos {
@@ -449,15 +446,6 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 				info := msg.(*pb.ContractInfo)
 				if !(len(info.Method) > 0) {
 					return false, util.ErrorOfInvalid("format", "contract info")
-				}
-				if isSame && len(info.Account) > 0 {
-					_, a, err := as.NewAccountFromBytes(info.Account)
-					if err != nil {
-						return false, err
-					}
-					if a.String() != account.String() {
-						return false, util.ErrorOfInvalid("account", "contract info")
-					}
 				}
 			case core.CORE_PAGE_INFO:
 				info := msg.(*pb.PageInfo)
@@ -627,13 +615,13 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		return nil, util.ErrorOf("error", "sequence", fmt.Sprintf("%d != %d", tx.Sequence, fromSequence))
 	}
 
-	destAccount := tx.Destination
-	existDest, _, err := service.getAccountEntry(destAccount, accountMap)
+	toAccount := tx.To
+	existDest, _, err := service.getAccountEntry(toAccount, accountMap)
 	if err != nil {
 		return nil, err
 	}
 	if !existDest {
-		accounts = append(accounts, destAccount.String())
+		accounts = append(accounts, toAccount.String())
 	}
 
 	gasAccount := config.GetGasAccount()
@@ -777,7 +765,7 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if err != nil {
 				return 0, nil, err
 			}
-			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(cs, remainCost, tx.Account, dataAccount, tx.Destination, info.Method, info.Params, inputs, outputs)
+			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(cs, remainCost, tx.Account, dataAccount, tx.To, info.Method, info.Params, inputs, outputs)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -796,13 +784,13 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)
-			_, pageHash, err := ss.WritePage(info.Name, tx.Destination, info.Data)
+			_, pageHash, err := ss.WritePage(info.Name, tx.To, info.Data)
 			if err != nil {
 				return cost, nil, err
 			}
-			accountEntry, ok := accountMap[tx.Destination.String()]
+			accountEntry, ok := accountMap[tx.To.String()]
 			if !ok {
-				return cost, nil, util.ErrorOfNotFound("account entry", tx.Destination.String())
+				return cost, nil, util.ErrorOfNotFound("account entry", tx.To.String())
 			}
 			accountEntry.info.Page = &block.DataInfo{
 				Hash: pageHash,
@@ -810,13 +798,13 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 
 		case core.CORE_CODE_INFO:
 			info := msg.(*pb.CodeInfo)
-			_, codeHash, err := ss.CreateContract(tx.Destination, info.Code, info.Abi)
+			_, codeHash, err := ss.CreateContract(tx.To, info.Code, info.Abi)
 			if err != nil {
 				return cost, nil, err
 			}
-			accountEntry, ok := accountMap[tx.Destination.String()]
+			accountEntry, ok := accountMap[tx.To.String()]
 			if !ok {
-				return cost, nil, util.ErrorOfNotFound("account entry", tx.Destination.String())
+				return cost, nil, util.ErrorOfNotFound("account entry", tx.To.String())
 			}
 			accountEntry.info.Code = &block.DataInfo{
 				Hash: codeHash,
@@ -828,7 +816,7 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if err != nil {
 				return cost, nil, err
 			}
-			userHash, userAccount, err := ss.WriteUser(tx.Account, tx.Destination, account, info)
+			userHash, userAccount, err := ss.WriteUser(tx.Account, tx.To, account, info)
 			if err != nil {
 				return cost, nil, err
 			}

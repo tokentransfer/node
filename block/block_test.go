@@ -49,10 +49,10 @@ func generateTransaction(seq uint64, value int64, gas uint64) *Transaction {
 	tx := &Transaction{
 		TransactionType: libblock.TransactionType(1),
 
-		Account:     from,
-		Sequence:    seq,
-		Gas:         gas,
-		Destination: to,
+		Account:  from,
+		Sequence: seq,
+		Gas:      gas,
+		To:       to,
 		Payload: &PayloadInfo{
 			Infos: []*DataInfo{
 				{

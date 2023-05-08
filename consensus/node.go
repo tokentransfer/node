@@ -271,6 +271,18 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	to := util.ToString(&txm, "to")
 	gas := util.ToUint64(&txm, "gas")
 
+	var account libcore.Address
+	if util.Has(&txm, "account") {
+		accountString := util.ToString(&txm, "account")
+		_, a, err := as.NewAccountFromAddress(accountString)
+		if err != nil {
+			return "", nil, err
+		}
+		account = a
+	} else {
+		account = nil
+	}
+
 	_, fromKey, err := as.NewKeyFromSecret(secret)
 	if err != nil {
 		return "", nil, err
@@ -288,13 +300,16 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 		return "", nil, err
 	}
 	seq := n.getNextSequence(fromAccount)
+
 	tx := &block.Transaction{
 		TransactionType: block.TRANSACTION,
 
-		Account:     fromAccount,
-		Sequence:    seq,
-		Gas:         gas,
-		Destination: toAccount,
+		From:     fromAccount,
+		Sequence: seq,
+		To:       toAccount,
+
+		Account: account,
+		Gas:     gas,
 	}
 
 	payloadInfo := &block.PayloadInfo{}

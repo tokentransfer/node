@@ -7,6 +7,7 @@ import (
 
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
+	"github.com/tokentransfer/interfaces/crypto"
 )
 
 type Receipt struct {
@@ -16,6 +17,7 @@ type Receipt struct {
 	TransactionResult libblock.TransactionResult
 
 	States []libblock.State
+	Datas  []*DataInfo
 }
 
 func (r *Receipt) GetHash() libcore.Hash {
@@ -31,7 +33,6 @@ func (r *Receipt) UnmarshalBinary(data []byte) error {
 	if err != nil {
 		return err
 	}
-
 	if meta != core.CORE_RECEIPT {
 		return util.ErrorOfInvalid("data", "receipt")
 	}
@@ -45,13 +46,30 @@ func (r *Receipt) UnmarshalBinary(data []byte) error {
 	states := make([]libblock.State, l)
 	for i := 0; i < l; i++ {
 		data := list[i]
-		state, err := ReadState(data)
+		s, err := ReadState(data)
 		if err != nil {
 			return err
 		}
-		states[i] = state
+		states[i] = s
 	}
 	r.States = states
+
+	list = receipt.GetDatas()
+	l = len(list)
+	datas := make([]*DataInfo, l)
+	for i := 0; i < l; i++ {
+		data := list[i]
+		t, msg, err := core.Unmarshal(data)
+		if err != nil {
+			return err
+		}
+		if t != core.CORE_DATA_INFO {
+			return util.ErrorOfInvalid("data", "info")
+		}
+		info := msg.(*pb.DataInfo)
+		datas[i] = fromDataInfo(info)
+	}
+	r.Datas = datas
 
 	return nil
 }
@@ -60,18 +78,32 @@ func (r *Receipt) MarshalBinary() ([]byte, error) {
 	l := len(r.States)
 	states := make([][]byte, l)
 	for i := 0; i < l; i++ {
-		state := r.States[i]
-		data, err := state.MarshalBinary()
+		s := r.States[i]
+		data, err := s.MarshalBinary()
 		if err != nil {
 			return nil, err
 		}
 		states[i] = data
+	}
+	l = len(r.Datas)
+	datas := make([][]byte, l)
+	for i := 0; i < l; i++ {
+		info := r.Datas[i]
+		if info != nil {
+			pbInfo := toDataInfo(info, crypto.RawBinary)
+			data, err := core.Marshal(pbInfo)
+			if err != nil {
+				return nil, err
+			}
+			datas[i] = data
+		}
 	}
 	receipt := &pb.Receipt{
 		TransactionResult: uint32(r.TransactionResult),
 		TransactionIndex:  r.TransactionIndex,
 		BlockIndex:        r.BlockIndex,
 		States:            states,
+		Datas:             datas,
 	}
 	return core.Marshal(receipt)
 }
@@ -80,16 +112,45 @@ func (r *Receipt) Raw(ignoreSigningFields bool) ([]byte, error) {
 	l := len(r.States)
 	states := make([][]byte, l)
 	for i := 0; i < l; i++ {
-		state := r.States[i]
-		data, err := state.Raw(ignoreSigningFields)
+		s := r.States[i]
+		data, err := s.Raw(ignoreSigningFields)
 		if err != nil {
 			return nil, err
 		}
 		states[i] = data
 	}
+	l = len(r.Datas)
+	datas := make([][]byte, l)
+	if ignoreSigningFields {
+		for i := 0; i < l; i++ {
+			info := r.Datas[i]
+			if info != nil {
+				pbInfo := toDataInfo(info, crypto.RawIgnoreSigningFields)
+				data, err := core.Marshal(pbInfo)
+				if err != nil {
+					return nil, err
+				}
+				datas[i] = data
+			}
+		}
+	} else {
+		for i := 0; i < l; i++ {
+			info := r.Datas[i]
+			if info != nil {
+				pbInfo := toDataInfo(info, crypto.RawIgnoreVariableFields)
+				data, err := core.Marshal(pbInfo)
+				if err != nil {
+					return nil, err
+				}
+				datas[i] = data
+			}
+		}
+	}
+
 	receipt := &pb.Receipt{
 		TransactionResult: uint32(r.TransactionResult),
 		States:            states,
+		Datas:             datas,
 	}
 	return core.Marshal(receipt)
 }
