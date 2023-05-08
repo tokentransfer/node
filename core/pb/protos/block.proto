@@ -17,15 +17,17 @@ message Block {
 
 message Transaction {
     uint32 TransactionType  = 1;
-    
-    bytes Account       = 2;
-    uint64 Sequence     = 3;
-    uint64 Gas          = 4;
-    bytes Destination   = 5;
-    PayloadInfo Payload = 6;
+   
+    bytes From		= 2;
+    uint64 Sequence	= 3;
+    bytes To		= 4;
+ 
+    bytes Account       = 5;
+    uint64 Gas          = 6;
+    PayloadInfo Payload = 7;
 
-    bytes PublicKey     = 7;
-    bytes Signature     = 8;
+    bytes PublicKey     = 8;
+    bytes Signature     = 9;
 }
 
 message Receipt {
@@ -34,6 +36,7 @@ message Receipt {
     uint32 TransactionResult = 3;
 
     repeated bytes States    = 4;
+    repeated bytes Datas     = 5;
 }
 
 message State {
@@ -60,6 +63,12 @@ message AccountState {
 
     bytes PublicKey     = 9;
     bytes RootHash	= 10;
+}
+
+message LinkInfo {
+    bytes Hash		   = 1;
+    repeated bytes List    = 2;
+    map<string, bytes> Map = 3;
 }
 
 message DataInfo {
