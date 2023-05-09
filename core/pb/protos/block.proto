@@ -4,15 +4,16 @@ package pb;
 option go_package = ".;pb";
 
 message Block {
-    uint64 BlockIndex       = 1;
-    bytes ParentHash        = 2;
-    bytes RootHash          = 3;
-    bytes TransactionHash   = 4;
-    bytes StateHash         = 5;
-    int64 Timestamp         = 6;
+    bytes Account	    = 1;
+    uint64 BlockIndex       = 2;
+    bytes ParentHash        = 3;
+    bytes RootHash          = 4;
+    bytes TransactionHash   = 5;
+    bytes StateHash         = 6;
+    int64 Timestamp         = 7;
 
-    repeated TransactionWithData  Transactions  = 7;
-    repeated bytes States                       = 8;
+    repeated TransactionWithData  Transactions  = 8;
+    repeated bytes States                       = 9;
 }
 
 message Transaction {
