@@ -1,8 +1,6 @@
 package block
 
 import (
-	"log"
-
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/util"
@@ -15,6 +13,7 @@ import (
 type Block struct {
 	Hash libcore.Hash
 
+	Account         libcore.Address
 	BlockIndex      uint64
 	ParentHash      libcore.Hash
 	RootHash        libcore.Hash
@@ -24,6 +23,10 @@ type Block struct {
 
 	Transactions []libblock.TransactionWithData
 	States       []libblock.State
+}
+
+func (b *Block) GetAccount() libcore.Address {
+	return b.Account
 }
 
 func (b *Block) GetIndex() uint64 {
@@ -43,11 +46,16 @@ func (b *Block) UnmarshalBinary(data []byte) error {
 	if err != nil {
 		return err
 	}
-
 	if meta != core.CORE_BLOCK {
 		return util.ErrorOfInvalid("data", "block")
 	}
 	block := msg.(*pb.Block)
+
+	a, err := byteToAddress(block.Account)
+	if err != nil {
+		return err
+	}
+	b.Account = a
 	b.BlockIndex = block.BlockIndex
 	b.ParentHash = libcore.Hash(block.ParentHash)
 	b.RootHash = libcore.Hash(block.RootHash)
@@ -60,13 +68,11 @@ func (b *Block) UnmarshalBinary(data []byte) error {
 	for i := 0; i < l; i++ {
 		data, err := core.Marshal(block.Transactions[i])
 		if err != nil {
-			log.Println(err)
 			return err
 		}
 		tx := &TransactionWithData{}
 		err = tx.UnmarshalBinary(data)
 		if err != nil {
-			log.Println(err)
 			return err
 		}
 		transactions[i] = tx
@@ -79,7 +85,6 @@ func (b *Block) UnmarshalBinary(data []byte) error {
 		data := block.States[i]
 		state, err := ReadState(data)
 		if err != nil {
-			log.Println(err)
 			return err
 		}
 		states[i] = state
@@ -90,7 +95,12 @@ func (b *Block) UnmarshalBinary(data []byte) error {
 }
 
 func (b *Block) MarshalBinary() ([]byte, error) {
+	a, err := addressToByte(b.Account)
+	if err != nil {
+		return nil, err
+	}
 	block := &pb.Block{
+		Account:         a,
 		BlockIndex:      b.BlockIndex,
 		ParentHash:      []byte(b.ParentHash),
 		RootHash:        []byte(b.RootHash),
@@ -131,7 +141,12 @@ func (b *Block) MarshalBinary() ([]byte, error) {
 }
 
 func (b *Block) Raw(ignoreSigningFields bool) ([]byte, error) {
+	a, err := addressToByte(b.Account)
+	if err != nil {
+		return nil, err
+	}
 	block := &pb.Block{
+		Account:         a,
 		BlockIndex:      b.BlockIndex,
 		ParentHash:      []byte(b.ParentHash),
 		RootHash:        []byte(b.RootHash),

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/caivega/glog"
+	libcore "github.com/tokentransfer/interfaces/core"
 	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/config"
@@ -98,10 +99,12 @@ func (suite *NodeSuite) load(c *C) *Node {
 	err = n.Init(config)
 	c.Assert(err, IsNil)
 
-	n.Load()
+	var rootAccount libcore.Address = nil
 
-	if n.GetBlockNumber() < 0 {
-		block, err := n.GenerateBlock()
+	n.Load(rootAccount)
+
+	if n.GetBlockNumber(rootAccount) < 0 {
+		block, err := n.GenerateBlock(rootAccount)
 		if err != nil {
 			panic(err)
 		}
@@ -109,11 +112,11 @@ func (suite *NodeSuite) load(c *C) *Node {
 		if err != nil {
 			panic(err)
 		}
-		_, err = n.VerifyBlock(block)
+		_, err = n.VerifyBlock(rootAccount, block)
 		if err != nil {
 			panic(err)
 		}
-		err = n.AddBlock(block)
+		err = n.AddBlock(rootAccount, block)
 		if err != nil {
 			panic(err)
 		}
@@ -161,7 +164,10 @@ func (suite *NodeSuite) TestTransaction(c *C) {
 func (suite *NodeSuite) TestProcess(c *C) {
 	n := suite.load(c)
 
-	dump(c, n.storageService.storage, "before")
+	var rootAccount libcore.Address = nil
+	s := n.storageService.GetChunkService(rootAccount)
+	storage := s.GetStorage()
+	dump(c, storage, "before")
 
 	blobData, err := util.ReadFile("./data/tx.blob")
 	c.Assert(err, IsNil)
@@ -173,16 +179,16 @@ func (suite *NodeSuite) TestProcess(c *C) {
 	err = tx.UnmarshalBinary(data)
 	c.Assert(err, IsNil)
 
-	err = n.verifyTransaction(tx)
+	err = n.verifyTransaction(rootAccount, tx)
 	c.Assert(err, IsNil)
-	_, _, err = n.processTransaction(tx)
+	_, _, err = n.processTransaction(rootAccount, tx)
 	c.Assert(err, IsNil)
 
-	block, err := n.GenerateBlock()
+	block, err := n.GenerateBlock(rootAccount)
 	c.Assert(err, IsNil)
 	h, err := n.consensusService.HashBlock(block)
 	c.Assert(err, IsNil)
-	_, err = n.consensusService.VerifyBlock(block)
+	_, err = n.VerifyBlock(rootAccount, block)
 	c.Assert(err, IsNil)
 	glog.Infof("=== generate block %d, %s, %d\n", block.GetIndex(), h.String(), len(block.GetTransactions()))
 	util.PrintJSON(">> hash", h)
@@ -191,7 +197,7 @@ func (suite *NodeSuite) TestProcess(c *C) {
 	// err = n.consensusService.AddBlock(block)
 	// c.Assert(err, IsNil)
 
-	dump(c, n.storageService.storage, "after")
+	dump(c, storage, "after")
 
 	suite.close(c, n)
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/big"
 	"os"
 	"path"
@@ -26,7 +25,6 @@ import (
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/crypto"
-	"github.com/tokentransfer/node/merkle"
 	"github.com/tokentransfer/node/p2p"
 	"github.com/tokentransfer/node/util"
 
@@ -34,7 +32,6 @@ import (
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
 	libcrypto "github.com/tokentransfer/interfaces/crypto"
-	libstore "github.com/tokentransfer/interfaces/store"
 )
 
 type Status int
@@ -116,6 +113,12 @@ func (p *Peer) GetAddress(n *Node) string {
 	return p.address
 }
 
+type transactionEntry struct {
+	ValidatedBlock libblock.Block
+	txlist         []libblock.TransactionWithData
+	txmap          map[string]libblock.TransactionWithData
+}
+
 type Node struct {
 	Consensused bool
 
@@ -123,11 +126,10 @@ type Node struct {
 
 	cryptoService    libcrypto.CryptoService
 	accountService   libaccount.AccountService
-	merkleService    libstore.MerkleService
 	consensusService *ConsensusService
 	storageService   *StorageService
 
-	transactions      []libblock.TransactionWithData
+	transactionMap    map[libcore.Address]*transactionEntry
 	transactionLocker *sync.Mutex
 
 	net protocol.Net
@@ -160,6 +162,7 @@ func NewNode() *Node {
 
 		ready: ready,
 
+		transactionMap:    make(map[libcore.Address]*transactionEntry),
 		transactionLocker: &sync.Mutex{},
 
 		accountService: account.NewAccountService(),
@@ -186,34 +189,30 @@ func (n *Node) Init(c libcore.Config) error {
 		Status: PeerConsensused,
 	}
 
-	merkleService, err := merkle.NewMerkleService(n.config, n.cryptoService, nil)
-	if err != nil {
-		return err
-	}
-	storageService, err := NewStorageService(n.config, nil)
+	storageService, err := NewStorageService(n.config, n.cryptoService, n.accountService)
 	if err != nil {
 		return err
 	}
 	consensusService := &ConsensusService{
 		CryptoService:  n.cryptoService,
-		MerkleService:  merkleService,
 		Config:         n.config,
 		AccountService: n.accountService,
 		StorageService: storageService,
 	}
-	n.merkleService = merkleService
 	n.consensusService = consensusService
 	n.storageService = storageService
 
 	return nil
 }
 
-func (n *Node) getContractData(txm map[string]interface{}) (int64, interface{}, error) {
+func (n *Node) getContractData(rootAccount libcore.Address, txm map[string]interface{}) (int64, interface{}, error) {
 	as := n.accountService
 	ss := n.storageService
 
 	from := util.ToString(&txm, "from")
 	to := util.ToString(&txm, "to")
+
+	cc := ss.GetChunkService(rootAccount)
 
 	_, fromAccount, err := as.NewAccountFromAddress(from)
 	if err != nil {
@@ -226,14 +225,14 @@ func (n *Node) getContractData(txm map[string]interface{}) (int64, interface{}, 
 	}
 
 	format := util.ToString(&txm, "format")
-	usedCost, r, err := ss.GetContractData(fromAccount, fromAccount, toAccount, format)
+	usedCost, r, err := cc.GetContractData(fromAccount, fromAccount, toAccount, format)
 	if err != nil {
 		return 0, nil, err
 	}
 	return usedCost, r, nil
 }
 
-func (n *Node) callContract(txm map[string]interface{}) (int64, interface{}, error) {
+func (n *Node) callContract(rootAccount libcore.Address, txm map[string]interface{}) (int64, interface{}, error) {
 	as := n.accountService
 	ss := n.storageService
 
@@ -256,14 +255,14 @@ func (n *Node) callContract(txm map[string]interface{}) (int64, interface{}, err
 		return 0, nil, err
 	}
 
-	usedCost, r, err := ss.CallContract(fromAccount, fromAccount, toAccount, method, params)
+	usedCost, r, err := ss.GetChunkService(rootAccount).CallContract(fromAccount, fromAccount, toAccount, method, params)
 	if err != nil {
 		return 0, nil, err
 	}
 	return usedCost, r, nil
 }
 
-func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Transaction, error) {
+func (n *Node) signTransaction(rootAccount libcore.Address, txm map[string]interface{}) (string, *block.Transaction, error) {
 	as := n.accountService
 
 	from := util.ToString(&txm, "from")
@@ -299,7 +298,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	if err != nil {
 		return "", nil, err
 	}
-	seq := n.getNextSequence(fromAccount)
+	seq := n.getNextSequence(rootAccount, fromAccount)
 
 	tx := &block.Transaction{
 		TransactionType: block.TRANSACTION,
@@ -529,7 +528,7 @@ func (n *Node) signTransaction(txm map[string]interface{}) (string, *block.Trans
 	if err != nil {
 		return "", nil, err
 	}
-	err = n.verifyTransaction(tx)
+	err = n.verifyTransaction(rootAccount, tx)
 	if err != nil {
 		return "", nil, err
 	}
@@ -574,42 +573,45 @@ func (n *Node) getParams(cm map[string]interface{}) ([][]byte, error) {
 	return nil, util.ErrorOfNotFound("params", "map")
 }
 
-func (n *Node) verifyTransaction(tx libblock.Transaction) error {
+func (n *Node) verifyTransaction(rootAccount libcore.Address, tx libblock.Transaction) error {
 	_, _, err := n.cryptoService.Raw(tx, libcrypto.RawBinary)
 	if err != nil {
 		return err
 	}
-	_, err = n.consensusService.VerifyTransaction(tx)
+	_, err = n.consensusService.VerifyTransaction(rootAccount, tx)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (n *Node) sendTransaction(tx libblock.Transaction) (libblock.TransactionWithData, error) {
-	err := n.verifyTransaction(tx)
+func (n *Node) sendTransaction(rootAccount libcore.Address, tx libblock.Transaction) (libblock.TransactionWithData, error) {
+	err := n.verifyTransaction(rootAccount, tx)
 	if err != nil {
 		return nil, err
 	}
 	hash := tx.GetHash()
 	glog.Infoln("verify transaction", hash.String())
 
-	txWithData, _, err := n.processTransaction(tx)
+	txWithData, _, err := n.processTransaction(rootAccount, tx)
 	if err != nil {
 		return nil, err
 	}
 	return txWithData, nil
 }
 
-func (n *Node) processTransaction(tx libblock.Transaction) (libblock.TransactionWithData, libblock.Transaction, error) {
+func (n *Node) processTransaction(rootAccount libcore.Address, tx libblock.Transaction) (libblock.TransactionWithData, libblock.Transaction, error) {
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
+
+	ss := n.storageService
+	cc := ss.GetChunkService(rootAccount)
 
 	h, _, err := n.cryptoService.Raw(tx, libcrypto.RawBinary)
 	if err != nil {
 		return nil, nil, err
 	}
-	ok, err := n.consensusService.VerifyTransaction(tx)
+	ok, err := n.consensusService.VerifyTransaction(rootAccount, tx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -617,18 +619,18 @@ func (n *Node) processTransaction(tx libblock.Transaction) (libblock.Transaction
 		return nil, nil, util.ErrorOfInvalid("verify", "transaction")
 	}
 
-	err = n.storageService.CreateSandbox()
+	err = cc.CreateSandbox()
 	if err != nil {
 		return nil, nil, err
 	}
-	defer n.storageService.CancelSandbox()
-	txWithData, err := n.consensusService.ProcessTransaction(tx)
+	defer cc.CancelSandbox()
+	txWithData, err := n.consensusService.ProcessTransaction(rootAccount, tx)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// util.PrintJSON("txWithData", txWithData)
-	_, ok = n.AddTransaction(txWithData)
+	_, ok = n.AddTransaction(rootAccount, txWithData)
 	if ok {
 		glog.Infoln(">>> receive transaction", h.String())
 	} else {
@@ -638,302 +640,396 @@ func (n *Node) processTransaction(tx libblock.Transaction) (libblock.Transaction
 	return txWithData, tx, nil
 }
 
-func (n *Node) getNextSequence(address libcore.Address) uint64 {
-	accountEntry, err := n.consensusService.GetAccountInfo(address)
+func (n *Node) getNextSequence(rootAccount libcore.Address, address libcore.Address) uint64 {
+	accountEntry, err := n.consensusService.GetAccountInfo(rootAccount, address)
 	if err != nil {
 		return uint64(1)
 	}
 	return accountEntry.Sequence + 1
 }
 
-func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
-	as := n.accountService
+func (n *Node) getRootAccount(item map[string]interface{}) (libcore.Address, error) {
+	if item != nil && util.Has(&item, "root") {
+		root := util.ToString(&item, "root")
+		_, r, err := n.accountService.NewAccountFromAddress(root)
+		if err != nil {
+			return nil, err
+		}
+		return r, nil
+	}
+	return nil, nil
+}
 
-	switch method {
-	case "blockNumber":
-		result := n.consensusService.GetBlockNumber()
-		return result, nil
-
-	case "createWallet":
-		item := params[0].(map[string]interface{})
-		t := util.ToString(&item, "type")
-		p := util.ToString(&item, "password")
-		tt, k, err := n.accountService.GenerateFamilySeed(t + "." + p)
-		if err != nil {
-			return nil, err
-		}
-		a, err := k.GetAddress()
-		if err != nil {
-			return nil, err
-		}
-		address := a.String()
-		pub, err := k.GetPublic()
-		if err != nil {
-			return nil, err
-		}
-		publicString, err := pub.MarshalText()
-		if err != nil {
-			return nil, err
-		}
-		priv, err := k.GetPrivate()
-		if err != nil {
-			return nil, err
-		}
-		privateString, err := priv.MarshalText()
-		if err != nil {
-			return nil, err
-		}
-		return &map[string]interface{}{
-			"type":    tt.String(),
-			"address": address,
-			"private": string(privateString),
-			"public":  string(publicString),
-		}, nil
-
-	case "getBalance":
-		item := params[0].(map[string]interface{})
-		address := util.ToString(&item, "address")
-		_, a, err := as.NewAccountFromAddress(address)
-		if err != nil {
-			return nil, err
-		}
-		if util.Has(&item, "root") {
-			root := util.ToString(&item, "root")
-			_, r, err := as.NewAccountFromAddress(root)
+func (n *Node) _call(params []interface{}, f func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error)) (interface{}, error) {
+	l := len(params)
+	if l > 0 {
+		list := make([]interface{}, l)
+		for i := 0; i < l; i++ {
+			item, ok := params[i].(map[string]interface{})
+			if !ok {
+				return nil, util.ErrorOfInvalid("map", "parameter")
+			}
+			rootAccount, err := n.getRootAccount(item)
 			if err != nil {
 				return nil, err
 			}
-			gas, err := n.storageService.GetGas(r, a)
+			result, err := f(rootAccount, item)
+			if err != nil {
+				return nil, err
+			}
+			list[i] = result
+		}
+		if l == 1 { // for one, just return the result instead of the array
+			return list[0], nil
+		}
+		return list, nil
+	}
+	result, err := f(nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
+	as := n.accountService
+	ss := n.storageService
+
+	switch method {
+	case "blockNumber":
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			return n.GetBlockNumber(rootAccount), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+
+	case "createWallet":
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			t := util.ToString(&item, "type")
+			p := util.ToString(&item, "password")
+			tt, k, err := as.GenerateFamilySeed(t + "." + p)
+			if err != nil {
+				return nil, err
+			}
+			a, err := k.GetAddress()
+			if err != nil {
+				return nil, err
+			}
+			address := a.String()
+			pub, err := k.GetPublic()
+			if err != nil {
+				return nil, err
+			}
+			publicString, err := pub.MarshalText()
+			if err != nil {
+				return nil, err
+			}
+			priv, err := k.GetPrivate()
+			if err != nil {
+				return nil, err
+			}
+			privateString, err := priv.MarshalText()
+			if err != nil {
+				return nil, err
+			}
+			return &map[string]interface{}{
+				"type":    tt.String(),
+				"address": address,
+				"private": string(privateString),
+				"public":  string(publicString),
+			}, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+
+	case "getBalance":
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			address := util.ToString(&item, "address")
+			_, a, err := as.NewAccountFromAddress(address)
+			if err != nil {
+				return nil, err
+			}
+			gas, err := ss.GetChunkService(rootAccount).GetGas(rootAccount, a)
 			if err != nil {
 				return nil, err
 			}
 			return gas.String(), nil
-		}
-		gas, err := n.storageService.GetGas(nil, a)
+		})
 		if err != nil {
 			return nil, err
 		}
-		return gas.String(), nil
+		return result, nil
 
 	case "getTransactionCount":
-		item := params[0].(map[string]interface{})
-		address := util.ToString(&item, "address")
-		_, a, err := as.NewAccountFromAddress(address)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			address := util.ToString(&item, "address")
+			_, a, err := as.NewAccountFromAddress(address)
+			if err != nil {
+				return nil, err
+			}
+			seq := n.getNextSequence(rootAccount, a)
+			return seq, nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		seq := n.getNextSequence(a)
-		return seq, nil
+		return result, nil
 
 	case "getTransactionReceipt":
-		item := params[0].(map[string]interface{})
-		hashString := util.ToString(&item, "hash")
-		h, err := hex.DecodeString(hashString)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			hashString := util.ToString(&item, "hash")
+			h, err := hex.DecodeString(hashString)
+			if err != nil {
+				return nil, err
+			}
+			txWithData, err := ss.GetMerkleService(rootAccount).GetTransactionByHash(libcore.Hash(h))
+			if err != nil {
+				return nil, err
+			}
+			receipt := txWithData.GetReceipt()
+			_, err = n.consensusService.HashReceipt(receipt)
+			if err != nil {
+				return nil, err
+			}
+			return receipt, nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		txWithData, err := n.merkleService.GetTransactionByHash(libcore.Hash(h))
-		if err != nil {
-			return nil, err
-		}
-		receipt := txWithData.GetReceipt()
-		_, err = n.consensusService.HashReceipt(receipt)
-		if err != nil {
-			return nil, err
-		}
-		return receipt, nil
+		return result, nil
 
 	case "getTransactionByHash":
-		item := params[0].(map[string]interface{})
-		hashString := util.ToString(&item, "hash")
-		h, err := hex.DecodeString(hashString)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			hashString := util.ToString(&item, "hash")
+			h, err := hex.DecodeString(hashString)
+			if err != nil {
+				return nil, err
+			}
+			txWithData, err := ss.GetMerkleService(rootAccount).GetTransactionByHash(libcore.Hash(h))
+			if err != nil {
+				return nil, err
+			}
+			_, err = n.consensusService.HashTransaction(txWithData)
+			if err != nil {
+				return nil, err
+			}
+			return txWithData, nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		txWithData, err := n.merkleService.GetTransactionByHash(libcore.Hash(h))
-		if err != nil {
-			return nil, err
-		}
-		_, err = n.consensusService.HashTransaction(txWithData)
-		if err != nil {
-			return nil, err
-		}
-		return txWithData, nil
+		return result, nil
 
 	case "getTransactionByIndex":
-		item := params[0].(map[string]interface{})
-		address := util.ToString(&item, "address")
-		_, a, err := as.NewAccountFromAddress(address)
-		if err != nil {
-			return nil, err
-		}
-		index := util.AsUint64(&item, "index")
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			address := util.ToString(&item, "address")
+			_, a, err := as.NewAccountFromAddress(address)
+			if err != nil {
+				return nil, err
+			}
+			index := util.AsUint64(&item, "index")
 
-		txWithData, err := n.merkleService.GetTransactionByIndex(a, index)
+			txWithData, err := ss.GetMerkleService(rootAccount).GetTransactionByIndex(a, index)
+			if err != nil {
+				return nil, err
+			}
+			_, err = n.consensusService.HashTransaction(txWithData)
+			if err != nil {
+				return nil, err
+			}
+			return txWithData, nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		_, err = n.consensusService.HashTransaction(txWithData)
-		if err != nil {
-			return nil, err
-		}
-		return txWithData, nil
+		return result, nil
 
 	case "getBlockByHash":
-		item := params[0].(map[string]interface{})
-		hashString := util.ToString(&item, "hash")
-		h, err := hex.DecodeString(hashString)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			hashString := util.ToString(&item, "hash")
+			h, err := hex.DecodeString(hashString)
+			if err != nil {
+				return nil, err
+			}
+			block, err := ss.GetMerkleService(rootAccount).GetBlockByHash(libcore.Hash(h))
+			if err != nil {
+				return nil, err
+			}
+			_, err = n.consensusService.HashBlock(block)
+			if err != nil {
+				return nil, err
+			}
+			return block, nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		block, err := n.merkleService.GetBlockByHash(libcore.Hash(h))
-		if err != nil {
-			return nil, err
-		}
-		_, err = n.consensusService.HashBlock(block)
-		if err != nil {
-			return nil, err
-		}
-		return block, nil
+		return result, nil
 
 	case "getBlockByNumber":
-		item := params[0].(map[string]interface{})
-		index := util.AsUint64(&item, "num")
-		block, err := n.merkleService.GetBlockByIndex(index)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			index := util.AsUint64(&item, "num")
+			block, err := ss.GetMerkleService(rootAccount).GetBlockByIndex(index)
+			if err != nil {
+				return nil, err
+			}
+			_, err = n.consensusService.HashBlock(block)
+			if err != nil {
+				return nil, err
+			}
+			return block, nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		_, err = n.consensusService.HashBlock(block)
+		return result, nil
+
+	case "getNodeInfo":
+		address := n.self.GetAddress(n)
+		publicData, err := n.self.Key.MarshalText()
 		if err != nil {
 			return nil, err
 		}
-		return block, nil
+		return &map[string]interface{}{
+			"address": address,
+			"public":  string(publicData),
+			"node":    n.config.GetNodeId(),
+		}, nil
 
 	case "getData":
-		l := len(params)
-		list := make([]interface{}, l)
 		maxCost := int64(1000000)
-		for i := 0; i < l; i++ {
-			item := params[i].(map[string]interface{})
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
 			hashString := util.ToString(&item, "hash")
 			h, err := hex.DecodeString(hashString)
 			if err != nil {
 				return nil, err
 			}
 			format := util.ToString(&item, "format")
-			usedCost, r, err := n.storageService.GetData(libcore.Hash(h), format)
+			usedCost, r, err := ss.GetChunkService(rootAccount).GetData(libcore.Hash(h), format)
 			if err != nil {
 				return nil, err
 			}
-			list[i] = r
 
 			maxCost -= usedCost
 			if maxCost < 0 {
 				return nil, util.ErrorOf("too long", "call", "contract")
 			}
+
+			return r, nil
+		})
+		if err != nil {
+			return nil, err
 		}
-		return list, nil
+		return result, nil
 
 	case "getUserData":
-		item := params[0].(map[string]interface{})
-		addressString := util.ToString(&item, "address")
-		_, a, err := n.accountService.NewAccountFromAddress(addressString)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			addressString := util.ToString(&item, "address")
+			_, a, err := as.NewAccountFromAddress(addressString)
+			if err != nil {
+				return nil, err
+			}
+			accountString := util.ToString(&item, "account")
+			_, b, err := as.NewAccountFromAddress(accountString)
+			if err != nil {
+				return nil, err
+			}
+			info, err := ss.GetChunkService(rootAccount).ReadUser(a, a, b)
+			if err != nil {
+				return nil, err
+			}
+			return &map[string]interface{}{
+				"account": b.String(),
+				"key":     hex.EncodeToString(info.Key),
+				"nonce":   hex.EncodeToString(info.Nonce),
+				"hash":    libcore.Hash(info.Data.Hash).String(),
+			}, nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		accountString := util.ToString(&item, "account")
-		_, b, err := n.accountService.NewAccountFromAddress(accountString)
-		if err != nil {
-			return nil, err
-		}
-		info, err := n.storageService.ReadUser(a, a, b)
-		if err != nil {
-			return nil, err
-		}
-		return &map[string]interface{}{
-			"account": b.String(),
-			"key":     hex.EncodeToString(info.Key),
-			"nonce":   hex.EncodeToString(info.Nonce),
-			"hash":    libcore.Hash(info.Data.Hash).String(),
-		}, nil
+		return result, nil
 
 	case "getContractData":
-		l := len(params)
-		list := make([]interface{}, l)
 		maxCost := int64(1000000)
-		for i := 0; i < l; i++ {
-			item := params[i].(map[string]interface{})
-			usedCost, r, err := n.getContractData(item)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			usedCost, r, err := n.getContractData(rootAccount, item)
 			if err != nil {
 				return nil, err
 			}
-			list[i] = r
 
 			maxCost -= usedCost
 			if maxCost < 0 {
 				return nil, util.ErrorOf("too long", "call", "contract")
 			}
+
+			return r, nil
+		})
+		if err != nil {
+			return nil, err
 		}
-		return list, nil
+		return result, nil
 
 	case "callContract":
-		l := len(params)
-		list := make([]interface{}, l)
 		maxCost := int64(1000000)
-		for i := 0; i < l; i++ {
-			item := params[i].(map[string]interface{})
-			usedCost, r, err := n.callContract(item)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			usedCost, r, err := n.callContract(rootAccount, item)
 			if err != nil {
 				return nil, err
 			}
-			list[i] = r
 
 			maxCost -= usedCost
 			if maxCost < 0 {
 				return nil, util.ErrorOf("too long", "call", "contract")
 			}
+
+			return r, nil
+		})
+		if err != nil {
+			return nil, err
 		}
-		return list, nil
+		return result, nil
 
 	case "signTransaction":
-		l := len(params)
-		list := make([]string, l)
-		for i := 0; i < l; i++ {
-			item := params[i].(map[string]interface{})
-			blob, tx, err := n.signTransaction(item)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			blob, tx, err := n.signTransaction(rootAccount, item)
 			if err != nil {
 				return nil, err
 			}
 			hash := tx.GetHash()
-			list[i] = blob
 			glog.Infoln("sign transaction", hash.String(), len(blob))
+			return hash, nil
+		})
+		if err != nil {
+			return nil, err
 		}
-		return list, nil
+		return result, nil
 
 	case "sendTransaction":
-		l := len(params)
-		list := make([]string, l)
-		for i := 0; i < l; i++ {
-			item := params[i].(map[string]interface{})
-			_, tx, err := n.signTransaction(item)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			_, tx, err := n.signTransaction(rootAccount, item)
 			if err != nil {
 				return nil, err
 			}
-			_, err = n.sendTransaction(tx)
+			_, err = n.sendTransaction(rootAccount, tx)
 			if err != nil {
 				return nil, err
 			}
 
 			hash := tx.GetHash()
-			list[i] = hash.String()
+			return hash, nil
+		})
+		if err != nil {
+			return nil, err
 		}
-		return list, nil
+		return result, nil
 
 	case "sendRawTransaction":
-		l := len(params)
-		list := make([]string, l)
-		for i := 0; i < l; i++ {
-			item := params[i].(map[string]interface{})
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
 			blob := util.ToString(&item, "blob")
 
 			data, err := hex.DecodeString(blob)
@@ -945,7 +1041,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			_, err = n.sendTransaction(tx)
+			_, err = n.sendTransaction(rootAccount, tx)
 			if err != nil {
 				if util.IsTest() || util.IsDebug() {
 					blobDir := "./consensus/data"
@@ -982,39 +1078,21 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			}
 
 			hash := tx.GetHash()
-			list[i] = hash.String()
+			return hash, nil
+		})
+		if err != nil {
+			return nil, err
 		}
-		return list, nil
+		return result, nil
 
 	case "getStateByHash":
-		item := params[0].(map[string]interface{})
-		hashString := util.ToString(&item, "hash")
-		h, err := hex.DecodeString(hashString)
-		if err != nil {
-			return nil, err
-		}
-		s, err := n.merkleService.GetStateByHash(libcore.Hash(h))
-		if err != nil {
-			return nil, err
-		}
-		_, err = n.consensusService.HashState(s)
-		if err != nil {
-			return nil, err
-		}
-		return s, nil
-
-	case "getStateByAddress":
-		item := params[0].(map[string]interface{})
-		stateTypeName := util.ToString(&item, "type")
-		address := util.ToString(&item, "address")
-		stateType := libblock.GetStateTypeByName(stateTypeName)
-		switch stateType {
-		case block.ACCOUNT_STATE:
-			_, a, err := as.NewAccountFromAddress(address)
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			hashString := util.ToString(&item, "hash")
+			h, err := hex.DecodeString(hashString)
 			if err != nil {
 				return nil, err
 			}
-			s, err := n.consensusService.GetAccountInfo(a)
+			s, err := ss.GetMerkleService(rootAccount).GetStateByHash(libcore.Hash(h))
 			if err != nil {
 				return nil, err
 			}
@@ -1023,118 +1101,505 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 				return nil, err
 			}
 			return s, nil
-		default:
-			return nil, util.ErrorOfUnknown("state", fmt.Sprintf("%d(%s)", stateType, stateTypeName))
+		})
+		if err != nil {
+			return nil, err
 		}
+		return result, nil
+
+	case "getStateByAddress":
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			stateTypeName := util.ToString(&item, "type")
+			address := util.ToString(&item, "address")
+			stateType := libblock.GetStateTypeByName(stateTypeName)
+			switch stateType {
+			case block.ACCOUNT_STATE:
+				_, a, err := as.NewAccountFromAddress(address)
+				if err != nil {
+					return nil, err
+				}
+				s, err := n.consensusService.GetAccountInfo(rootAccount, a)
+				if err != nil {
+					return nil, err
+				}
+				_, err = n.consensusService.HashState(s)
+				if err != nil {
+					return nil, err
+				}
+				return s, nil
+			default:
+				return nil, util.ErrorOfUnknown("state", fmt.Sprintf("%d(%s)", stateType, stateTypeName))
+			}
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
 
 	case "dump":
-		n.storageService.Dump(chunk.LogPrinter{})
-		return n.storageService.storage.Root().String(), nil
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			if util.IsTest() || util.IsDebug() {
+				ss.GetChunkService(rootAccount).Dump(chunk.LogPrinter{})
+			}
+			return ss.GetChunkService(rootAccount).RootHash(), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
 
 	default:
 		return nil, util.ErrorOfNotFound("method", method)
 	}
 }
 
-func (n *Node) AddTransaction(txWithData libblock.TransactionWithData) (libcore.Hash, bool) {
-	h, err := n.consensusService.HashTransaction(txWithData)
+func (n *Node) getTransactionEntry(rootAccount libcore.Address) *transactionEntry {
+	entry, ok := n.transactionMap[rootAccount]
+	if !ok {
+		entry = &transactionEntry{
+			txlist: make([]libblock.TransactionWithData, 0),
+			txmap:  make(map[string]libblock.TransactionWithData),
+		}
+		n.transactionMap[rootAccount] = entry
+	}
+	return entry
+}
+
+func (n *Node) AddTransaction(rootAccount libcore.Address, txWithData libblock.TransactionWithData) (libcore.Hash, bool) {
+	n.transactionLocker.Lock()
+	defer n.transactionLocker.Unlock()
+
+	_, err := n.consensusService.HashTransaction(txWithData)
 	if err != nil {
 		return nil, false
 	}
 
-	for i := 0; i < len(n.transactions); i++ {
-		txWithData := n.transactions[i]
-		hi := txWithData.GetTransaction().GetHash()
-		if bytes.Equal(h, hi) {
-			return nil, false
-		}
+	entry := n.getTransactionEntry(rootAccount)
+
+	h := txWithData.GetTransaction().GetHash()
+	_, ok := entry.txmap[h.String()]
+	if ok {
+		return nil, false
 	}
 
-	n.transactions = append(n.transactions, txWithData)
+	entry.txlist = append(entry.txlist, txWithData)
+	entry.txmap[h.String()] = txWithData
 	return h, true
 }
 
-func (n *Node) ClearTransaction(b libblock.Block) {
+func (n *Node) ClearTransaction(rootAccount libcore.Address, b libblock.Block) {
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
 
-	m := make(map[string]bool)
-	list := b.GetTransactions()
-	for i := 0; i < len(list); i++ {
-		txWithData := list[i]
-		h := txWithData.GetTransaction().GetHash()
-		m[h.String()] = true
-	}
+	entry := n.getTransactionEntry(rootAccount)
 
-	transactions := make([]libblock.TransactionWithData, 0)
-	for i := 0; i < len(n.transactions); i++ {
-		txWithData := n.transactions[i]
+	txlist := make([]libblock.TransactionWithData, 0)
+	txmap := make(map[string]libblock.TransactionWithData)
+	for i := 0; i < len(entry.txlist); i++ {
+		txWithData := entry.txlist[i]
 		h := txWithData.GetTransaction().GetHash()
-		exists, ok := m[h.String()]
-		if ok && exists {
+		_, ok := entry.txmap[h.String()]
+		if ok {
 			glog.Infoln(">>> drop block transaction", h.String())
 		} else {
-			transactions = append(transactions, txWithData)
+			txlist = append(txlist, txWithData)
+			txmap[h.String()] = txWithData
 		}
 	}
-	n.transactions = transactions
+	entry.txlist = txlist
+	entry.txmap = txmap
 }
 
-func (n *Node) GenerateBlock() (libblock.Block, error) {
+func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.TransactionWithData, entry *transactionEntry) (libblock.Block, error) {
+	config := n.config
+	cs := n.cryptoService
+	ss := n.storageService
+	cc := ss.GetChunkService(rootAccount)
+	ms := ss.GetMerkleService(rootAccount)
+
+	v := entry.ValidatedBlock
+
+	var b *block.Block
+	if v == nil { //genesis
+		if len(list) > 0 {
+			return nil, util.ErrorOfInvalid("transactions", "genesis block")
+		}
+		var states []libblock.State
+		if rootAccount != nil {
+			v, err := util.NewValue("100000000000000")
+			if err != nil {
+				return nil, err
+			}
+			err = cc.UpdateGas(rootAccount, rootAccount, *v)
+			if err != nil {
+				return nil, err
+			}
+			gasAccount := config.GetGasAccount()
+			err = cc.UpdateGas(rootAccount, gasAccount, v.ZeroClone())
+			if err != nil {
+				return nil, err
+			}
+			states = []libblock.State{
+				&block.AccountState{
+					State: block.State{
+						StateType:  block.ACCOUNT_STATE,
+						Account:    rootAccount,
+						Sequence:   uint64(0),
+						BlockIndex: uint64(0),
+					},
+				},
+			}
+		} else {
+			states = make([]libblock.State, 0)
+		}
+
+		for i := 0; i < len(states); i++ {
+			state := states[i]
+			err := ms.PutState(state)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		b = &block.Block{
+			Account:    rootAccount,
+			BlockIndex: uint64(0),
+			ParentHash: libcrypto.ZeroHash(cs),
+
+			Transactions:    []libblock.TransactionWithData{},
+			TransactionHash: ms.GetTransactionRoot(),
+
+			States:    states,
+			StateHash: ms.GetStateRoot(),
+
+			RootHash: cc.RootHash(),
+
+			Timestamp: time.Now().UnixNano(),
+		}
+
+		err := ms.Cancel()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		glog.Infof("=== package %d transactions in block %d\n", len(list), v.GetIndex()+1)
+
+		stateMap := map[string][]uint64{}
+		for i := 0; i < len(list); i++ {
+			txWithData := list[i]
+
+			r := txWithData.GetReceipt()
+			r.SetTransactionIndex(uint32(i))
+			r.SetBlockIndex(v.GetIndex() + 1)
+			states := r.GetStates()
+			for j := 0; j < len(states); j++ {
+				s := states[j]
+				s.SetBlockIndex(v.GetIndex() + 1)
+
+				keys := s.GetStateKey()
+				for k := 0; k < len(keys); k++ {
+					key := fmt.Sprintf("%d-%s", s.GetStateType(), keys[k])
+					index := s.GetIndex()
+					stateMap[key] = []uint64{uint64(i), index}
+				}
+			}
+
+			err := ms.PutTransaction(txWithData)
+			if err != nil {
+				return nil, err
+			}
+
+			glog.Infof("=== %d %s\n", i, txWithData.GetTransaction().GetHash().String())
+		}
+
+		states := make([]libblock.State, 0)
+		hashMap := make(map[string]libblock.State)
+		for i := 0; i < len(list); i++ {
+			txWithData := list[i]
+
+			r := txWithData.GetReceipt()
+			rs := r.GetStates()
+			for j := 0; j < len(rs); j++ {
+				s := rs[j]
+
+				keys := s.GetStateKey()
+				for k := 0; k < len(keys); k++ {
+					key := fmt.Sprintf("%d-%s", s.GetStateType(), keys[k])
+					item, sok := stateMap[key]
+					_, hok := hashMap[s.GetHash().String()]
+					if sok && !hok && item[0] == uint64(i) && item[1] == s.GetIndex() {
+						states = append(states, s)
+						hashMap[s.GetHash().String()] = s
+					}
+				}
+			}
+		}
+
+		for i := 0; i < len(states); i++ {
+			state := states[i]
+			err := ms.PutState(state)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		b = &block.Block{
+			Account:    rootAccount,
+			BlockIndex: v.GetIndex() + 1,
+			ParentHash: v.GetHash(),
+
+			Transactions:    list,
+			TransactionHash: ms.GetTransactionRoot(),
+
+			States:    states,
+			StateHash: ms.GetStateRoot(),
+
+			RootHash: cc.RootHash(),
+
+			Timestamp: time.Now().UnixNano(),
+		}
+
+		err := ms.Cancel()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	_, _, err := cs.Raw(b, libcrypto.RawBinary)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+func (n *Node) AddBlock(rootAccount libcore.Address, b libblock.Block) error {
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
 
-	list := n.transactions
-	n.transactions = make([]libblock.TransactionWithData, 0)
+	entry := n.getTransactionEntry(rootAccount)
 
-	return n.consensusService.GenerateBlock(nil, list)
+	ss := n.storageService
+	cc := ss.GetChunkService(rootAccount)
+	ms := ss.GetMerkleService(rootAccount)
+
+	err := cc.CommitSandbox()
+	if err != nil {
+		return err
+	}
+	err = ms.PutBlock(b)
+	if err != nil {
+		return err
+	}
+	err = ms.Commit()
+	if err != nil {
+		return err
+	}
+	entry.ValidatedBlock = b
+
+	return nil
 }
 
-func (n *Node) VerifyBlock(b libblock.Block) (ok bool, err error) {
-	return n.consensusService.VerifyBlock(b)
+func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bool, err error) {
+	n.transactionLocker.Lock()
+	defer n.transactionLocker.Unlock()
+
+	entry := n.getTransactionEntry(rootAccount)
+
+	cs := n.cryptoService
+	ss := n.storageService
+	cc := ss.GetChunkService(rootAccount)
+	ms := ss.GetMerkleService(rootAccount)
+
+	ok = true
+	err = nil
+
+	defer func() {
+		if !ok || err != nil {
+			cc.CancelSandbox()
+			ms.Cancel()
+		}
+	}()
+
+	err = cc.CreateSandbox()
+	if err != nil {
+		return
+	}
+
+	transactions := b.GetTransactions()
+	l := len(transactions)
+	for i := 0; i < l; i++ {
+		txWithData := transactions[i]
+		tx := txWithData.GetTransaction()
+
+		ok, err = n.consensusService.VerifyTransaction(rootAccount, tx)
+		if err != nil {
+			return
+		}
+		if !ok {
+			err = util.ErrorOfInvalid("transaction", tx.GetHash().String())
+			return
+		}
+
+		err = cc.CreateSandbox()
+		if err != nil {
+			return
+		}
+		newWithData, e := n.consensusService.ProcessTransaction(rootAccount, tx)
+		if e != nil {
+			err = cc.CancelSandbox()
+			if err != nil {
+				glog.Error(err)
+			}
+			ok = false
+			err = e
+			return
+		}
+		err = cc.CommitSandbox()
+		if err != nil {
+			return
+		}
+
+		arh, _, e := cs.Raw(txWithData.GetReceipt(), libcrypto.RawBinary)
+		if e != nil {
+			ok = false
+			err = e
+			return
+		}
+		brh, _, e := cs.Raw(newWithData.GetReceipt(), libcrypto.RawBinary)
+		if e != nil {
+			ok = false
+			err = e
+			return
+		}
+		if arh.String() != brh.String() {
+			ok = false
+			err = util.ErrorOfUnmatched("raw hash", "transaction receipt", arh.String(), brh.String())
+			return
+		}
+
+		err = ms.PutTransaction(txWithData)
+		if err != nil {
+			ok = false
+			return
+		}
+	}
+
+	if entry.ValidatedBlock != nil {
+		if b.GetIndex() != (entry.ValidatedBlock.GetIndex() + 1) {
+			ok = false
+			err = util.ErrorOfUnmatched("index", "block", (entry.ValidatedBlock.GetIndex() + 1), b.GetIndex())
+			return
+		}
+		if b.GetParentHash().String() != entry.ValidatedBlock.GetHash().String() {
+			ok = false
+			err = util.ErrorOfUnmatched("parent hash", "block", entry.ValidatedBlock.GetHash().String(), b.GetParentHash().String())
+			return
+		}
+	} else {
+		if b.GetIndex() != 0 {
+			ok = false
+			err = util.ErrorOfInvalid("index", "block")
+			return
+		}
+		if !b.GetParentHash().IsZero() {
+			ok = false
+			err = util.ErrorOfInvalid("parent hash", "block")
+			return
+		}
+	}
+
+	states := b.GetStates()
+	l = len(states)
+	for i := 0; i < l; i++ {
+		state := states[i]
+		err = ms.PutState(state)
+		if err != nil {
+			ok = false
+			return
+		}
+	}
+
+	transactionHash := ms.GetTransactionRoot()
+	stateHash := ms.GetStateRoot()
+	if b.GetTransactionHash().String() != transactionHash.String() {
+		ok = false
+		err = util.ErrorOfUnmatched("hash", "transaction", b.GetTransactionHash().String(), transactionHash.String())
+		return
+	}
+	if b.GetStateHash().String() != stateHash.String() {
+		ok = false
+		err = util.ErrorOfUnmatched("hash", "state", b.GetStateHash().String(), stateHash.String())
+		return
+	}
+	return
 }
 
-func (n *Node) AddBlock(b libblock.Block) error {
-	return n.consensusService.AddBlock(b)
+func (n *Node) GenerateBlock(rootAccount libcore.Address) (libblock.Block, error) {
+	n.transactionLocker.Lock()
+	defer n.transactionLocker.Unlock()
+
+	entry := n.getTransactionEntry(rootAccount)
+
+	list := entry.txlist
+	entry.txlist = make([]libblock.TransactionWithData, 0)
+	entry.txmap = make(map[string]libblock.TransactionWithData)
+
+	return n._generateBlock(rootAccount, list, entry)
 }
 
 func (n *Node) generate() {
 	n.ready.Wait()
 
 	for {
-		if len(n.transactions) > 0 {
-			block, err := n.GenerateBlock()
-			if err != nil {
-				glog.Error(err)
-			} else {
-				h, err := n.consensusService.HashBlock(block)
+		hasTx := false
+		for rootAccount, entry := range n.transactionMap {
+			if len(entry.txlist) > 0 {
+				hasTx = hasTx || true
+
+				block, err := n.GenerateBlock(rootAccount)
 				if err != nil {
 					glog.Error(err)
 				} else {
-					glog.Infof("=== generate block %d, %s, %d\n", block.GetIndex(), h.String(), len(block.GetTransactions()))
-
-					_, err = n.consensusService.VerifyBlock(block)
+					h, err := n.consensusService.HashBlock(block)
 					if err != nil {
 						glog.Error(err)
 					} else {
-						err = n.consensusService.AddBlock(block)
+						glog.Infof("=== %s: generate block %d, %s, %d\n", util.GetString(rootAccount), block.GetIndex(), h.String(), len(block.GetTransactions()))
+
+						_, err = n.VerifyBlock(rootAccount, block)
 						if err != nil {
 							glog.Error(err)
 						} else {
-							data, err := block.MarshalBinary()
+							err = n.AddBlock(rootAccount, block)
 							if err != nil {
 								glog.Error(err)
 							} else {
-								n.broadcast(data)
+								data, err := block.MarshalBinary()
+								if err != nil {
+									glog.Error(err)
+								} else {
+									n.broadcast(data)
+								}
 							}
 						}
 					}
 				}
 			}
-		} else {
-			glog.Infof("=== block %d, %s, prepare %d, %d\n", n.GetBlockNumber(), n.GetBlockHash(), n.GetBlockNumber()+1, len(n.transactions))
+		}
+		if !hasTx {
+			entry := n.getTransactionEntry(nil)
+			glog.Infof("=== block %d, %s, prepare %d, %d\n", n.GetBlockNumber(nil), n.GetBlockHash(nil), n.GetBlockNumber(nil)+1, len(entry.txlist))
+
 			for i := 0; i < int(n.config.GetBlockDuration()*5); i++ {
-				if len(n.transactions) == 0 {
+				hasTx := false
+				for _, entry := range n.transactionMap {
+					if len(entry.txlist) > 0 {
+						hasTx = true
+						break
+					}
+				}
+				if !hasTx {
 					time.Sleep(200 * time.Millisecond)
 				} else {
 					break
@@ -1163,7 +1628,7 @@ func (n *Node) connect() {
 	for {
 		list := n.ListPeer()
 
-		glog.Infoln("===", 0, n.self.GetIndex(n), n.self.GetAddress(n), n.self.Id, n.self.Status, n.GetBlockNumber(), n.self.PeerCount)
+		glog.Infoln("===", 0, n.self.GetIndex(n), n.self.GetAddress(n), n.self.Id, n.self.Status, n.GetBlockNumber(nil), n.self.PeerCount)
 		for i := 0; i < len(list); i++ {
 			p := list[i]
 			glog.Infoln("==>", i+1, p.GetIndex(n), p.GetAddress(n), p.Id, p.Status, p.BlockNumber, p.PeerCount)
@@ -1191,7 +1656,7 @@ func (n *Node) SendRequestInfo(p *Peer) {
 func (n *Node) PrepareConsensus() bool {
 	list := n.ListPeer()
 	count := int64(0)
-	currentBlock := n.GetBlockNumber()
+	currentBlock := n.GetBlockNumber(nil)
 	currentCount := n.self.PeerCount
 	for i := 0; i < len(list); i++ {
 		p := list[i]
@@ -1227,12 +1692,12 @@ func (n *Node) discoveryPeer(p *Peer) {
 		case PeerKnown:
 			n.Consensused = n.PrepareConsensus()
 		}
-		if p.Status >= PeerKnown && n.GetBlockNumber() > p.BlockNumber {
-			glog.Infoln("===", n.GetBlockNumber(), lastSendBlock, lastSendTime, p.address, p.Id, p.Status, p.BlockNumber, p.PeerCount)
+		if p.Status >= PeerKnown && n.GetBlockNumber(nil) > p.BlockNumber {
+			glog.Infoln("===", n.GetBlockNumber(nil), lastSendBlock, lastSendTime, p.address, p.Id, p.Status, p.BlockNumber, p.PeerCount)
 			if lastSendBlock >= 0 && lastSendBlock == (p.BlockNumber+1) && (time.Since(lastSendTime) < (time.Duration(int64(config.GetBlockDuration()) * int64(time.Second)))) {
 				time.Sleep(3 * time.Second)
 			} else {
-				block, err := n.merkleService.GetBlockByIndex(uint64(p.BlockNumber + 1))
+				block, err := n.storageService.GetMerkleService(nil).GetBlockByIndex(uint64(p.BlockNumber + 1))
 				if err != nil {
 					glog.Error(err)
 				} else {
@@ -1268,41 +1733,42 @@ func (n *Node) discoveryPeer(p *Peer) {
 	}
 }
 
-func (n *Node) Load() error {
+func (n *Node) Load(rootAccount libcore.Address) error {
+	n.transactionLocker.Lock()
+	defer n.transactionLocker.Unlock()
+
+	entry := n.getTransactionEntry(rootAccount)
+
+	ss := n.storageService
+	ms := ss.GetMerkleService(rootAccount)
+
 	current := uint64(0)
 	for {
-		b, err := n.merkleService.GetBlockByIndex(current)
+		b, err := ms.GetBlockByIndex(current)
 		if err != nil {
 			glog.Error(err)
 			break
 		}
 		_, err = n.consensusService.HashBlock(b)
 		if err != nil {
-			glog.Error(err)
-			break
+			return err
 		}
-
-		if n.consensusService.ValidatedBlock != nil {
-			if b.GetIndex() != (n.consensusService.ValidatedBlock.GetIndex() + 1) {
-				glog.Error(util.ErrorOfInvalid("block index", fmt.Sprintf("%d != %d", b.GetIndex(), (n.consensusService.ValidatedBlock.GetIndex()+1))))
-				break
+		if entry.ValidatedBlock != nil {
+			if b.GetIndex() != (entry.ValidatedBlock.GetIndex() + 1) {
+				return util.ErrorOfInvalid("block index", fmt.Sprintf("%d != %d", b.GetIndex(), (entry.ValidatedBlock.GetIndex()+1)))
 			}
-			if !b.GetParentHash().Equals(n.consensusService.ValidatedBlock.GetHash()) {
-				glog.Error(util.ErrorOfInvalid("block hash", fmt.Sprintf("%s != %s", b.GetParentHash().String(), n.consensusService.ValidatedBlock.GetHash().String())))
-				break
+			if !b.GetParentHash().Equals(entry.ValidatedBlock.GetHash()) {
+				return util.ErrorOfInvalid("block hash", fmt.Sprintf("%s != %s", b.GetParentHash().String(), entry.ValidatedBlock.GetHash().String()))
 			}
 		} else {
 			if b.GetIndex() != 0 {
-				glog.Error(util.ErrorOfInvalid("genesis block", fmt.Sprintf("%d, %s", b.GetIndex(), b.GetHash().String())))
-				break
+				return util.ErrorOfInvalid("genesis block", fmt.Sprintf("%d, %s", b.GetIndex(), b.GetHash().String()))
 			}
 			if !b.GetParentHash().IsZero() {
-				glog.Error(util.ErrorOfInvalid("the parent hash of the genesis block", b.GetParentHash().String()))
-				break
+				return util.ErrorOfInvalid("the parent hash of the genesis block", b.GetParentHash().String())
 			}
 		}
-
-		n.consensusService.ValidatedBlock = b
+		entry.ValidatedBlock = b
 
 		allData, err := b.MarshalBinary()
 		if err != nil {
@@ -1326,27 +1792,33 @@ func (n *Node) Load() error {
 	return nil
 }
 
-func (n *Node) Dump(printer core.Printer) {
-	n.storageService.Dump(printer)
+func (n *Node) Dump(rootAccount libcore.Address, printer core.Printer) {
+	ss := n.storageService
+	cc := ss.GetChunkService(rootAccount)
+
+	cc.Dump(printer)
 }
 
-func (n *Node) GetBlockNumber() int64 {
-	if n.consensusService != nil {
-		return n.consensusService.GetBlockNumber()
+func (n *Node) GetBlockNumber(rootAccount libcore.Address) int64 {
+	entry := n.getTransactionEntry(rootAccount)
+	if entry.ValidatedBlock != nil {
+		return int64(entry.ValidatedBlock.GetIndex())
 	}
 	return -1
 }
 
-func (n *Node) GetBlockHash() string {
-	if n.consensusService != nil {
-		return n.consensusService.GetBlockHash()
+func (n *Node) GetBlockHash(rootAccount libcore.Address) string {
+	entry := n.getTransactionEntry(rootAccount)
+	if entry.ValidatedBlock != nil {
+		return entry.ValidatedBlock.GetHash().String()
 	}
 	return ""
 }
 
-func (n *Node) GetBlock() libblock.Block {
-	if n.consensusService != nil {
-		return n.consensusService.GetBlock()
+func (n *Node) GetBlock(rootAccount libcore.Address) libblock.Block {
+	entry := n.getTransactionEntry(rootAccount)
+	if entry.ValidatedBlock != nil {
+		return entry.ValidatedBlock
 	}
 	return nil
 }
@@ -1392,48 +1864,27 @@ func (n *Node) receive() {
 					if err != nil {
 						glog.Error(err)
 					} else {
-						if int64(b.GetIndex()) <= n.consensusService.GetBlockNumber() {
-							glog.Infoln("<<< drop message block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+						rootAccount := b.GetAccount()
+						if int64(b.GetIndex()) <= n.GetBlockNumber(rootAccount) {
+							glog.Infoln("<<< drop message block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
 						} else {
-							glog.Infoln("<<< receive message block", b.GetIndex(), h.String(), len(b.GetTransactions()))
-							_, err = n.consensusService.VerifyBlock(b)
+							glog.Infoln("<<< receive message block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
+							_, err = n.VerifyBlock(rootAccount, b)
 							if err != nil {
 								glog.Error(err)
 							} else {
-								glog.Infoln("<<< verify message block", b.GetIndex(), h.String(), len(b.GetTransactions()))
-								err = n.consensusService.AddBlock(b)
+								glog.Infoln("<<< verify message block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
+								err = n.AddBlock(rootAccount, b)
 								if err != nil {
 									glog.Error(err)
 								} else {
-									glog.Infoln("<<< add message block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+									glog.Infoln("<<< add message block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
 								}
 							}
 						}
 					}
 				}
 				n.SendPeerInfo(fromPeer)
-
-			case core.CORE_TRANSACTION:
-				tx := &block.Transaction{}
-				err := tx.UnmarshalBinary(data)
-				if err != nil {
-					log.Println(err)
-				} else {
-					txWithData, _, err := n.processTransaction(tx)
-					if err != nil {
-						glog.Error(err)
-					} else {
-						hash := tx.GetHash().String()
-						// util.PrintJSON("txWithData", txWithData)
-						_, ok := n.AddTransaction(txWithData)
-						if ok {
-							glog.Infoln(">>> transaction", hash)
-						} else {
-							glog.Infoln(">>> drop transaction", hash)
-						}
-						glog.Infoln("<<< receive transaction", hash)
-					}
-				}
 
 			default:
 				glog.Errorln("<<< error message")
@@ -1549,21 +2000,22 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 				if err != nil {
 					glog.Error(err)
 				} else {
-					if int64(b.GetIndex()) <= n.consensusService.GetBlockNumber() {
-						glog.Infoln("<<< drop data block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+					rootAccount := b.GetAccount()
+					if int64(b.GetIndex()) <= n.GetBlockNumber(rootAccount) {
+						glog.Infoln("<<< drop data block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
 					} else {
-						glog.Infoln("<<< receive data block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+						glog.Infoln("<<< receive data block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
 
-						_, err = n.consensusService.VerifyBlock(b)
+						_, err = n.VerifyBlock(rootAccount, b)
 						if err != nil {
 							glog.Error(err)
 						} else {
-							glog.Infoln("<<< verify data block", b.GetIndex(), h.String(), len(b.GetTransactions()))
-							err = n.consensusService.AddBlock(b)
+							glog.Infoln("<<< verify data block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
+							err = n.AddBlock(rootAccount, b)
 							if err != nil {
 								glog.Error(err)
 							} else {
-								glog.Infoln("<<< add data block", b.GetIndex(), h.String(), len(b.GetTransactions()))
+								glog.Infoln("<<< add data block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
 							}
 						}
 					}
@@ -1578,7 +2030,7 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 func (n *Node) SendPeerInfo(toPeer *Peer) {
 	peers, _ := n.net.ChainNodesInfo(n.config.GetChainId())
 	peerData, err := core.Marshal(&pb.PeerInfo{
-		BlockNumber: n.GetBlockNumber(),
+		BlockNumber: n.GetBlockNumber(nil),
 		PeerCount:   int64(len(peers)),
 	})
 	if err != nil {
@@ -1606,7 +2058,7 @@ func (n *Node) LoadPageByName(name string) (*zipfs.FileSystem, error) {
 	if account != nil {
 		return nil, util.ErrorOfInvalid("name", name)
 	}
-	data, err := n.storageService.ReadPageByName(name)
+	data, err := n.storageService.GetChunkService(nil).ReadPageByName(name)
 	if err != nil {
 		return nil, err
 	}
@@ -1625,12 +2077,12 @@ func (n *Node) LoadPageByNameOrAddress(nameOrAddress string) (*zipfs.FileSystem,
 	var data []byte
 	_, account, err := n.accountService.NewAccountFromAddress(nameOrAddress)
 	if err != nil {
-		data, err = n.storageService.ReadPageByAddress(account)
+		data, err = n.storageService.GetChunkService(nil).ReadPageByAddress(account)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		data, err = n.storageService.ReadPageByName(nameOrAddress)
+		data, err = n.storageService.GetChunkService(nil).ReadPageByName(nameOrAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -1648,7 +2100,7 @@ func (n *Node) LoadPageByAddress(address string) (*zipfs.FileSystem, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := n.storageService.ReadPageByAddress(account)
+	data, err := n.storageService.GetChunkService(nil).ReadPageByAddress(account)
 	if err != nil {
 		return nil, err
 	}
@@ -1696,7 +2148,7 @@ func (n *Node) start() error {
 }
 
 func (n *Node) Start() error {
-	if err := n.Load(); err != nil {
+	if err := n.Load(nil); err != nil {
 		return err
 	}
 	if err := n.start(); err != nil {
@@ -1714,9 +2166,6 @@ func (n *Node) Start() error {
 }
 
 func (n *Node) Stop() error {
-	if err := n.merkleService.Close(); err != nil {
-		return err
-	}
 	if err := n.storageService.Close(); err != nil {
 		return err
 	}
@@ -1748,7 +2197,7 @@ func (n *Node) discovery() {
 
 			peerData, err := core.Marshal(&pb.PeerInfo{
 				PublicKey:   pubKeyData,
-				BlockNumber: n.GetBlockNumber(),
+				BlockNumber: n.GetBlockNumber(nil),
 				PeerCount:   int64(len(peers)),
 			})
 			if err != nil {

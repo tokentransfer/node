@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mitchellh/cli"
+	"github.com/tokentransfer/node/account"
 	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/consensus"
 )
@@ -25,16 +26,19 @@ Usage: node genesis [options]
 	Provides debugging information for operators
 Options:
   -config                  Path to a JSON file to read configuration from.
+  -account				   The account
 `
 	return strings.TrimSpace(helpText)
 }
 
 func (i *GenesisCommand) Run(args []string) int {
 	var configFile string
+	var accountString string
 
 	cmdFlags := flag.NewFlagSet("info", flag.ContinueOnError)
 	cmdFlags.Usage = func() { i.Ui.Output(i.Help()) }
 	cmdFlags.StringVar(&configFile, "config", "./config.json", "json file to read config from")
+	cmdFlags.StringVar(&accountString, "account", "", "the account")
 	if err := cmdFlags.Parse(i.args); err != nil {
 		return 1
 	}
@@ -43,20 +47,26 @@ func (i *GenesisCommand) Run(args []string) int {
 	if err != nil {
 		panic(err)
 	}
-
+	as := account.NewAccountService()
+	_, a, err := as.NewAccountFromAddress(accountString)
+	if err != nil {
+		panic(err)
+	}
 	n := consensus.NewNode()
 	err = n.Init(config)
 	if err != nil {
 		panic(err)
 	}
-
-	n.Load()
-	if n.GetBlockNumber() >= 0 {
-		i.Ui.Error(fmt.Sprintf("=== load block %d, %s, %d\n", n.GetBlockNumber(), n.GetBlockHash(), len(n.GetBlock().GetTransactions())))
+	err = n.Load(a)
+	if err != nil {
+		panic(err)
+	}
+	if n.GetBlockNumber(a) >= 0 {
+		i.Ui.Error(fmt.Sprintf("=== load block %d, %s, %d\n", n.GetBlockNumber(a), n.GetBlockHash(a), len(n.GetBlock(a).GetTransactions())))
 		return 1
 	}
 
-	block, err := n.GenerateBlock()
+	block, err := n.GenerateBlock(a)
 	if err != nil {
 		panic(err)
 	}
@@ -64,11 +74,11 @@ func (i *GenesisCommand) Run(args []string) int {
 	if err != nil {
 		panic(err)
 	}
-	_, err = n.VerifyBlock(block)
+	_, err = n.VerifyBlock(a, block)
 	if err != nil {
 		panic(err)
 	}
-	err = n.AddBlock(block)
+	err = n.AddBlock(a, block)
 	if err != nil {
 		panic(err)
 	}

@@ -12,6 +12,8 @@ import (
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/tjfoc/gmsm/sm3"
+
+	libcore "github.com/tokentransfer/interfaces/core"
 )
 
 var (
@@ -254,4 +256,11 @@ func Exists(p string) (bool, bool) {
 		return os.IsExist(err), false
 	}
 	return true, info.IsDir()
+}
+
+func GetString(a libcore.Address) string {
+	if a != nil {
+		return a.String()
+	}
+	return ""
 }

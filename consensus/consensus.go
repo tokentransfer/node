@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/caivega/glog"
 	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
@@ -21,6 +20,9 @@ type accountEntry struct {
 	lastInfo *block.AccountState
 	info     *block.AccountState
 
+	lastData *block.DataInfo
+	data     *block.DataInfo
+
 	lastGas *util.Value
 	gas     *util.Value
 
@@ -30,346 +32,14 @@ type accountEntry struct {
 
 type ConsensusService struct {
 	CryptoService  libcrypto.CryptoService
-	MerkleService  libstore.MerkleService
 	Config         libcore.Config
 	AccountService libaccount.AccountService
 	StorageService *StorageService
-
-	ValidatedBlock libblock.Block
 }
 
-func (service *ConsensusService) GetBlockNumber() int64 {
-	if service.ValidatedBlock != nil {
-		return int64(service.ValidatedBlock.GetIndex())
-	}
-	return -1
-}
-
-func (service *ConsensusService) GetBlockHash() string {
-	if service.ValidatedBlock != nil {
-		return service.ValidatedBlock.GetHash().String()
-	}
-	return ""
-}
-
-func (service *ConsensusService) GetBlock() libblock.Block {
-	if service.ValidatedBlock != nil {
-		return service.ValidatedBlock
-	}
-	return nil
-}
-
-func (service *ConsensusService) GenerateBlock(rootAccount libcore.Address, list []libblock.TransactionWithData) (libblock.Block, error) {
-	cs := service.CryptoService
-	ms := service.MerkleService
+func (service *ConsensusService) GetAccountInfo(rootAccount libcore.Address, account libcore.Address) (*block.AccountState, error) {
 	ss := service.StorageService
-
-	v := service.ValidatedBlock
-
-	var b *block.Block
-	if service.ValidatedBlock == nil { //genesis
-		if len(list) > 0 {
-			return nil, util.ErrorOfInvalid("transactions", "genesis block")
-		}
-		var states []libblock.State
-		if rootAccount != nil {
-			v, err := util.NewValue("100000000000000")
-			if err != nil {
-				return nil, err
-			}
-			err = ss.UpdateGas(rootAccount, rootAccount, *v)
-			if err != nil {
-				return nil, err
-			}
-			gasAccount := service.Config.GetGasAccount()
-			err = ss.UpdateGas(nil, gasAccount, v.ZeroClone())
-			if err != nil {
-				return nil, err
-			}
-			states = []libblock.State{
-				&block.AccountState{
-					State: block.State{
-						StateType:  block.ACCOUNT_STATE,
-						Account:    rootAccount,
-						Sequence:   uint64(0),
-						BlockIndex: uint64(0),
-					},
-				},
-			}
-		} else {
-			states = make([]libblock.State, 0)
-		}
-
-		for i := 0; i < len(states); i++ {
-			state := states[i]
-			err := ms.PutState(state)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		b = &block.Block{
-			BlockIndex: uint64(0),
-			ParentHash: libcrypto.ZeroHash(cs),
-
-			Transactions:    []libblock.TransactionWithData{},
-			TransactionHash: ms.GetTransactionRoot(),
-
-			States:    states,
-			StateHash: ms.GetStateRoot(),
-
-			RootHash: libcore.Hash(ss.storage.Root()),
-
-			Timestamp: time.Now().UnixNano(),
-		}
-
-		err := ms.Cancel()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		glog.Infof("=== package %d transactions in block %d\n", len(list), v.GetIndex()+1)
-
-		stateMap := map[string][]uint64{}
-		for i := 0; i < len(list); i++ {
-			txWithData := list[i]
-
-			r := txWithData.GetReceipt()
-			r.SetTransactionIndex(uint32(i))
-			r.SetBlockIndex(v.GetIndex() + 1)
-			states := r.GetStates()
-			for j := 0; j < len(states); j++ {
-				s := states[j]
-				s.SetBlockIndex(v.GetIndex() + 1)
-
-				keys := s.GetStateKey()
-				for k := 0; k < len(keys); k++ {
-					key := fmt.Sprintf("%d-%s", s.GetStateType(), keys[k])
-					index := s.GetIndex()
-					stateMap[key] = []uint64{uint64(i), index}
-				}
-			}
-
-			err := ms.PutTransaction(txWithData)
-			if err != nil {
-				return nil, err
-			}
-
-			glog.Infof("=== %d %s\n", i, txWithData.GetTransaction().GetHash().String())
-		}
-
-		states := make([]libblock.State, 0)
-		hashMap := make(map[string]libblock.State)
-		for i := 0; i < len(list); i++ {
-			txWithData := list[i]
-
-			r := txWithData.GetReceipt()
-			rs := r.GetStates()
-			for j := 0; j < len(rs); j++ {
-				s := rs[j]
-
-				keys := s.GetStateKey()
-				for k := 0; k < len(keys); k++ {
-					key := fmt.Sprintf("%d-%s", s.GetStateType(), keys[k])
-					item, sok := stateMap[key]
-					_, hok := hashMap[s.GetHash().String()]
-					if sok && !hok && item[0] == uint64(i) && item[1] == s.GetIndex() {
-						states = append(states, s)
-						hashMap[s.GetHash().String()] = s
-					}
-				}
-			}
-		}
-
-		for i := 0; i < len(states); i++ {
-			state := states[i]
-			err := ms.PutState(state)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		b = &block.Block{
-			BlockIndex: v.GetIndex() + 1,
-			ParentHash: v.GetHash(),
-
-			Transactions:    list,
-			TransactionHash: ms.GetTransactionRoot(),
-
-			States:    states,
-			StateHash: ms.GetStateRoot(),
-
-			RootHash: libcore.Hash(ss.storage.Root()),
-
-			Timestamp: time.Now().UnixNano(),
-		}
-
-		err := ms.Cancel()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	_, _, err := cs.Raw(b, libcrypto.RawBinary)
-	if err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-func (service *ConsensusService) AddBlock(b libblock.Block) error {
-	ms := service.MerkleService
-	ss := service.StorageService
-
-	err := ss.CommitSandbox()
-	if err != nil {
-		return err
-	}
-	err = ms.PutBlock(b)
-	if err != nil {
-		return err
-	}
-	err = ms.Commit()
-	if err != nil {
-		return err
-	}
-	service.ValidatedBlock = b
-
-	return nil
-}
-
-func (service *ConsensusService) VerifyBlock(b libblock.Block) (ok bool, err error) {
-	ms := service.MerkleService
-	cs := service.CryptoService
-	ss := service.StorageService
-
-	ok = true
-	err = nil
-
-	defer func() {
-		if !ok || err != nil {
-			ss.CancelSandbox()
-			ms.Cancel()
-		}
-	}()
-
-	err = ss.CreateSandbox()
-	if err != nil {
-		return
-	}
-
-	transactions := b.GetTransactions()
-	l := len(transactions)
-	for i := 0; i < l; i++ {
-		txWithData := transactions[i]
-		tx := txWithData.GetTransaction()
-
-		ok, err = service.VerifyTransaction(tx)
-		if err != nil {
-			return
-		}
-		if !ok {
-			err = util.ErrorOfInvalid("transaction", tx.GetHash().String())
-			return
-		}
-
-		err = ss.CreateSandbox()
-		if err != nil {
-			return
-		}
-		newWithData, e := service.ProcessTransaction(tx)
-		if e != nil {
-			err = ss.CancelSandbox()
-			if err != nil {
-				glog.Error(err)
-			}
-			ok = false
-			err = e
-			return
-		}
-		err = ss.CommitSandbox()
-		if err != nil {
-			return
-		}
-
-		arh, _, e := cs.Raw(txWithData.GetReceipt(), libcrypto.RawBinary)
-		if e != nil {
-			ok = false
-			err = e
-			return
-		}
-		brh, _, e := cs.Raw(newWithData.GetReceipt(), libcrypto.RawBinary)
-		if e != nil {
-			ok = false
-			err = e
-			return
-		}
-		if arh.String() != brh.String() {
-			ok = false
-			err = util.ErrorOfUnmatched("raw hash", "transaction receipt", arh.String(), brh.String())
-			return
-		}
-
-		err = ms.PutTransaction(txWithData)
-		if err != nil {
-			ok = false
-			return
-		}
-	}
-
-	if service.ValidatedBlock != nil {
-		if b.GetIndex() != (service.ValidatedBlock.GetIndex() + 1) {
-			ok = false
-			err = util.ErrorOfUnmatched("index", "block", (service.ValidatedBlock.GetIndex() + 1), b.GetIndex())
-			return
-		}
-		if b.GetParentHash().String() != service.ValidatedBlock.GetHash().String() {
-			ok = false
-			err = util.ErrorOfUnmatched("parent hash", "block", service.ValidatedBlock.GetHash().String(), b.GetParentHash().String())
-			return
-		}
-	} else {
-		if b.GetIndex() != 0 {
-			ok = false
-			err = util.ErrorOfInvalid("index", "block")
-			return
-		}
-		if !b.GetParentHash().IsZero() {
-			ok = false
-			err = util.ErrorOfInvalid("parent hash", "block")
-			return
-		}
-	}
-
-	states := b.GetStates()
-	l = len(states)
-	for i := 0; i < l; i++ {
-		state := states[i]
-		err = ms.PutState(state)
-		if err != nil {
-			ok = false
-			return
-		}
-	}
-
-	transactionHash := ms.GetTransactionRoot()
-	stateHash := ms.GetStateRoot()
-	if b.GetTransactionHash().String() != transactionHash.String() {
-		ok = false
-		err = util.ErrorOfUnmatched("hash", "transaction", b.GetTransactionHash().String(), transactionHash.String())
-		return
-	}
-	if b.GetStateHash().String() != stateHash.String() {
-		ok = false
-		err = util.ErrorOfUnmatched("hash", "state", b.GetStateHash().String(), stateHash.String())
-		return
-	}
-	return
-}
-
-func (service *ConsensusService) GetAccountInfo(account libcore.Address) (*block.AccountState, error) {
-	ms := service.MerkleService
+	ms := ss.GetMerkleService(rootAccount)
 
 	accountKey := account.String()
 	state, err := ms.GetStateByTypeAndKey(block.ACCOUNT_STATE, accountKey)
@@ -383,9 +53,11 @@ func (service *ConsensusService) GetAccountInfo(account libcore.Address) (*block
 	return info, nil
 }
 
-func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool, error) {
+func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, t libblock.Transaction) (bool, error) {
 	cs := service.CryptoService
-	ms := service.MerkleService
+	ss := service.StorageService
+	ms := ss.GetMerkleService(rootAccount)
+	cc := ss.GetChunkService(rootAccount)
 
 	ok, err := cs.Verify(t)
 	if err != nil {
@@ -405,7 +77,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 		return false, util.ErrorOfInvalid("sequence", fmt.Sprintf("%d != %d", tx.Sequence, sequence))
 	}
 
-	info, err := service.GetAccountInfo(fromAccount)
+	info, err := service.GetAccountInfo(rootAccount, fromAccount)
 	if err != nil || info == nil {
 		return false, util.ErrorOfNotFound("account", fromAccount.String())
 	}
@@ -419,7 +91,7 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	if err != nil {
 		return false, err
 	}
-	fromValue, err := service.StorageService.GetGas(account, fromAccount)
+	fromValue, err := cc.GetGas(account, fromAccount)
 	if err != nil {
 		return false, err
 	}
@@ -475,8 +147,8 @@ func (service *ConsensusService) VerifyTransaction(t libblock.Transaction) (bool
 	return true, nil
 }
 
-func (service *ConsensusService) getAccountInfo(account libcore.Address, sequence uint64) (*block.AccountState, *block.AccountState, error) {
-	lastInfo, _ := service.GetAccountInfo(account)
+func (service *ConsensusService) getAccountInfo(rootAccount libcore.Address, account libcore.Address, sequence uint64) (*block.AccountState, *block.AccountState, error) {
+	lastInfo, _ := service.GetAccountInfo(rootAccount, account)
 	if lastInfo != nil {
 		s, err := block.CloneState(lastInfo)
 		if err != nil {
@@ -504,18 +176,6 @@ func (service *ConsensusService) getAccountInfo(account libcore.Address, sequenc
 		}
 		return nil, info, nil
 	}
-}
-
-func (service *ConsensusService) getAccountGas(account libcore.Address) (*util.Value, *util.Value, error) {
-	value, err := service.StorageService.GetGas(nil, account)
-	if err != nil {
-		return nil, nil, err
-	}
-	localValue, err := service.StorageService.GetGas(account, account)
-	if err != nil {
-		return nil, nil, err
-	}
-	return value, localValue, nil
 }
 
 func (service *ConsensusService) addBalance(oldValue *util.Value, value util.Value) (*util.Value, error) {
@@ -563,17 +223,19 @@ func (service *ConsensusService) removeBalance(oldValue *util.Value, value util.
 	return &newValue, nil
 }
 
-func (service *ConsensusService) getAccountEntry(account libcore.Address, accountMap map[string]*accountEntry) (bool, *accountEntry, error) {
-	ms := service.MerkleService
+func (service *ConsensusService) getAccountEntry(rootAccount libcore.Address, account libcore.Address, accountMap map[string]*accountEntry) (bool, *accountEntry, error) {
+	ss := service.StorageService
+	ms := ss.GetMerkleService(rootAccount)
+	cc := ss.GetChunkService(rootAccount)
 
 	entry, ok := accountMap[account.String()]
 	if !ok {
 		sequence := libstore.GetSequence(ms, account)
-		lastInfo, info, err := service.getAccountInfo(account, sequence)
+		lastInfo, info, err := service.getAccountInfo(rootAccount, account, sequence)
 		if err != nil {
 			return false, nil, err
 		}
-		lastGas, lastLocalGas, err := service.getAccountGas(account)
+		lastGas, lastLocalGas, err := cc.GetAccountGas(rootAccount, account)
 		if err != nil {
 			return false, nil, err
 		}
@@ -589,7 +251,7 @@ func (service *ConsensusService) getAccountEntry(account libcore.Address, accoun
 	return ok, entry, nil
 }
 
-func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (libblock.TransactionWithData, error) {
+func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address, t libblock.Transaction) (libblock.TransactionWithData, error) {
 	config := service.Config
 
 	tx, ok := t.(*block.Transaction)
@@ -601,7 +263,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	accounts := make([]string, 0)
 
 	fromAccount := tx.GetAccount()
-	ok, fromEntry, err := service.getAccountEntry(fromAccount, accountMap)
+	ok, fromEntry, err := service.getAccountEntry(rootAccount, fromAccount, accountMap)
 	if err != nil {
 		return nil, err
 	}
@@ -616,7 +278,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	}
 
 	toAccount := tx.To
-	existDest, _, err := service.getAccountEntry(toAccount, accountMap)
+	existDest, _, err := service.getAccountEntry(rootAccount, toAccount, accountMap)
 	if err != nil {
 		return nil, err
 	}
@@ -625,7 +287,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	}
 
 	gasAccount := config.GetGasAccount()
-	existGas, gasEntry, err := service.getAccountEntry(gasAccount, accountMap)
+	existGas, gasEntry, err := service.getAccountEntry(rootAccount, gasAccount, accountMap)
 	if err != nil {
 		return nil, err
 	}
@@ -639,7 +301,7 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		for _, info := range tx.Payload.Infos {
 			dataCost += uint64(len(info.Content)) // 1:1
 		}
-		wasmCost, payloadStates, err := service.ProcessPayload(tx.Gas-dataCost, tx, tx.Payload, accountMap)
+		wasmCost, payloadStates, err := service.ProcessPayload(rootAccount, tx.Gas-dataCost, tx, tx.Payload, accountMap)
 		if err != nil {
 			return nil, err
 		}
@@ -677,7 +339,9 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 		}
 	}
 
+	dataMap := make(map[string]*block.DataInfo)
 	states := make([]libblock.State, 0)
+	datas := make([]*block.DataInfo, 0)
 	for _, a := range stateList {
 		entry := accountMap[a]
 		if entry.lastInfo == nil || entry.info == nil {
@@ -700,11 +364,23 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 				}
 			}
 		}
+		if entry.data != nil {
+			info := entry.data
+			if len(info.Hash) == 0 {
+				return nil, util.ErrorOfEmpty("data hash", "account entry")
+			}
+			_, ok := dataMap[info.Hash.String()]
+			if !ok {
+				dataMap[info.Hash.String()] = info
+				datas = append(datas, info)
+			}
+		}
 	}
 
 	r := &block.Receipt{
 		TransactionResult: 0,
 		States:            states,
+		Datas:             datas,
 	}
 
 	return &block.TransactionWithData{
@@ -714,10 +390,11 @@ func (service *ConsensusService) ProcessTransaction(t libblock.Transaction) (lib
 	}, nil
 }
 
-func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Transaction, info *block.PayloadInfo, accountMap map[string]*accountEntry) (uint64, []string, error) {
+func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, remainCost uint64, tx *block.Transaction, info *block.PayloadInfo, accountMap map[string]*accountEntry) (uint64, []string, error) {
 	cs := service.CryptoService
 	as := service.AccountService
 	ss := service.StorageService
+	cc := ss.GetChunkService(rootAccount)
 
 	accounts := make([]string, 0)
 	cost := uint64(0)
@@ -738,7 +415,7 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if err != nil {
 				return cost, nil, err
 			}
-			usedCost, payloadStates, err := service.ProcessPayload(remainCost-cost, tx, payloadInfo, accountMap)
+			usedCost, payloadStates, err := service.ProcessPayload(rootAccount, remainCost-cost, tx, payloadInfo, accountMap)
 			if err != nil {
 				return 0, nil, err
 			}
@@ -765,11 +442,11 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if err != nil {
 				return 0, nil, err
 			}
-			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(cs, remainCost, tx.Account, dataAccount, tx.To, info.Method, info.Params, inputs, outputs)
+			usedCost, retAccount, _, retHash, retContent, err := cc.RunContract(cs, remainCost, tx.Account, dataAccount, tx.To, info.Method, info.Params, inputs, outputs)
 			if err != nil {
 				return cost, nil, err
 			}
-			ok, retEntry, err := service.getAccountEntry(retAccount, accountMap)
+			ok, retEntry, err := service.getAccountEntry(rootAccount, retAccount, accountMap)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -784,7 +461,7 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)
-			_, pageHash, err := ss.WritePage(info.Name, tx.To, info.Data)
+			_, pageHash, err := cc.WritePage(info.Name, tx.To, info.Data)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -798,7 +475,7 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 
 		case core.CORE_CODE_INFO:
 			info := msg.(*pb.CodeInfo)
-			_, codeHash, err := ss.CreateContract(tx.To, info.Code, info.Abi)
+			_, codeHash, err := cc.CreateContract(tx.To, info.Code, info.Abi)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -816,7 +493,7 @@ func (service *ConsensusService) ProcessPayload(remainCost uint64, tx *block.Tra
 			if err != nil {
 				return cost, nil, err
 			}
-			userHash, userAccount, err := ss.WriteUser(tx.Account, tx.To, account, info)
+			userHash, userAccount, err := cc.WriteUser(tx.Account, tx.To, account, info)
 			if err != nil {
 				return cost, nil, err
 			}
