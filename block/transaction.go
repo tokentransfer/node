@@ -41,7 +41,7 @@ func (tx *Transaction) SetHash(h libcore.Hash) {
 	tx.Hash = h
 }
 
-func byteToAddress(b []byte) (libcore.Address, error) {
+func ByteToAddress(b []byte) (libcore.Address, error) {
 	if b == nil {
 		return nil, nil
 	}
@@ -66,17 +66,17 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 
 	tx.TransactionType = libblock.TransactionType(t.TransactionType)
 
-	tx.From, err = byteToAddress(t.From)
+	tx.From, err = ByteToAddress(t.From)
 	if err != nil {
 		return err
 	}
 	tx.Sequence = t.Sequence
-	tx.To, err = byteToAddress(t.To)
+	tx.To, err = ByteToAddress(t.To)
 	if err != nil {
 		return err
 	}
 
-	tx.Account, err = byteToAddress(t.Account)
+	tx.Account, err = ByteToAddress(t.Account)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-func addressToByte(a libcore.Address) ([]byte, error) {
+func AddressToByte(a libcore.Address) ([]byte, error) {
 	if a == nil {
 		return nil, nil
 	}
@@ -97,16 +97,16 @@ func addressToByte(a libcore.Address) ([]byte, error) {
 }
 
 func (tx *Transaction) MarshalBinary() ([]byte, error) {
-	fromData, err := addressToByte(tx.From)
+	fromData, err := AddressToByte(tx.From)
 	if err != nil {
 		return nil, err
 	}
-	toData, err := addressToByte(tx.To)
+	toData, err := AddressToByte(tx.To)
 	if err != nil {
 		return nil, err
 	}
 
-	accountData, err := addressToByte(tx.Account)
+	accountData, err := AddressToByte(tx.Account)
 	if err != nil {
 		return nil, err
 	}
@@ -130,15 +130,15 @@ func (tx *Transaction) MarshalBinary() ([]byte, error) {
 
 func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
 	if ignoreSigningFields {
-		fromAccount, err := addressToByte(tx.From)
+		fromAccount, err := AddressToByte(tx.From)
 		if err != nil {
 			return nil, err
 		}
-		toAccount, err := addressToByte(tx.To)
+		toAccount, err := AddressToByte(tx.To)
 		if err != nil {
 			return nil, err
 		}
-		account, err := addressToByte(tx.Account)
+		account, err := AddressToByte(tx.Account)
 		if err != nil {
 			return nil, err
 		}
@@ -157,15 +157,15 @@ func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
 		}
 		return core.Marshal(t)
 	} else { //ignore variable fields
-		fromAccount, err := addressToByte(tx.From)
+		fromAccount, err := AddressToByte(tx.From)
 		if err != nil {
 			return nil, err
 		}
-		toAccount, err := addressToByte(tx.To)
+		toAccount, err := AddressToByte(tx.To)
 		if err != nil {
 			return nil, err
 		}
-		account, err := addressToByte(tx.Account)
+		account, err := AddressToByte(tx.Account)
 		if err != nil {
 			return nil, err
 		}

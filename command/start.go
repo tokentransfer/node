@@ -94,6 +94,14 @@ func (c *StartCommand) Run(args []string) int {
 		return 1
 	}
 
+	if len(config.GetSecret()) == 0 {
+		secret, err := c.Ui.AskSecret("The secret:")
+		if err != nil {
+			panic(err)
+		}
+		config.SetSecret(secret)
+	}
+
 	// Setup the log outputs
 	c.setupLoggers(config)
 

@@ -51,7 +51,7 @@ func (b *Block) UnmarshalBinary(data []byte) error {
 	}
 	block := msg.(*pb.Block)
 
-	a, err := byteToAddress(block.Account)
+	a, err := ByteToAddress(block.Account)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (b *Block) UnmarshalBinary(data []byte) error {
 }
 
 func (b *Block) MarshalBinary() ([]byte, error) {
-	a, err := addressToByte(b.Account)
+	a, err := AddressToByte(b.Account)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (b *Block) MarshalBinary() ([]byte, error) {
 }
 
 func (b *Block) Raw(ignoreSigningFields bool) ([]byte, error) {
-	a, err := addressToByte(b.Account)
+	a, err := AddressToByte(b.Account)
 	if err != nil {
 		return nil, err
 	}

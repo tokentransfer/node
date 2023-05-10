@@ -64,19 +64,38 @@ const (
 	TOPIC_PEER_MESSAGE   = "peer_message"
 )
 
-type Peer struct {
-	Id          string
-	Key         libaccount.PublicKey
+type peerEntry struct {
 	BlockNumber int64
 	PeerCount   int64
 	Status      Status
 
+	lastSendBlock int64
+	lastSendTime  time.Time
+}
+
+type Peer struct {
+	Id  string
+	Key libaccount.PublicKey
+
 	address string
 	index   uint64
+	peermap map[libcore.Address]*peerEntry
 }
 
 func (p *Peer) GetPublicKey() libaccount.PublicKey {
 	return p.Key
+}
+
+func (p *Peer) getPeerEntry(rootAccount libcore.Address) *peerEntry {
+	entry, ok := p.peermap[rootAccount]
+	if !ok {
+		entry = &peerEntry{
+			lastSendBlock: int64(-1),
+			lastSendTime:  time.Now(),
+		}
+		p.peermap[rootAccount] = entry
+	}
+	return entry
 }
 
 func (p *Peer) GetIndex(n *Node) uint64 {
@@ -114,14 +133,14 @@ func (p *Peer) GetAddress(n *Node) string {
 }
 
 type transactionEntry struct {
+	Consensused    bool
 	ValidatedBlock libblock.Block
-	txlist         []libblock.TransactionWithData
-	txmap          map[string]libblock.TransactionWithData
+
+	txlist []libblock.TransactionWithData
+	txmap  map[string]libblock.TransactionWithData
 }
 
 type Node struct {
-	Consensused bool
-
 	messageId uint64
 
 	cryptoService    libcrypto.CryptoService
@@ -136,8 +155,6 @@ type Node struct {
 
 	outs chan *pb.Message
 	ins  chan *pb.Message
-
-	ready *sync.WaitGroup
 
 	config *config.Config
 	key    libaccount.Key
@@ -159,8 +176,6 @@ func NewNode() *Node {
 
 		peers:      map[uint64]*Peer{},
 		peerLocker: &sync.RWMutex{},
-
-		ready: ready,
 
 		transactionMap:    make(map[libcore.Address]*transactionEntry),
 		transactionLocker: &sync.Mutex{},
@@ -185,8 +200,8 @@ func (n *Node) Init(c libcore.Config) error {
 		return err
 	}
 	n.self = &Peer{
-		Key:    pubKey,
-		Status: PeerConsensused,
+		Key:     pubKey,
+		peermap: make(map[libcore.Address]*peerEntry),
 	}
 
 	storageService, err := NewStorageService(n.config, n.cryptoService, n.accountService)
@@ -1397,6 +1412,9 @@ func (n *Node) AddBlock(rootAccount libcore.Address, b libblock.Block) error {
 	}
 	entry.ValidatedBlock = b
 
+	e := n.self.getPeerEntry(rootAccount)
+	e.BlockNumber = int64(b.GetIndex())
+
 	return nil
 }
 
@@ -1549,12 +1567,10 @@ func (n *Node) GenerateBlock(rootAccount libcore.Address) (libblock.Block, error
 }
 
 func (n *Node) generate() {
-	n.ready.Wait()
-
 	for {
 		hasTx := false
 		for rootAccount, entry := range n.transactionMap {
-			if len(entry.txlist) > 0 {
+			if entry.Consensused && len(entry.txlist) > 0 {
 				hasTx = hasTx || true
 
 				block, err := n.GenerateBlock(rootAccount)
@@ -1588,8 +1604,11 @@ func (n *Node) generate() {
 			}
 		}
 		if !hasTx {
-			entry := n.getTransactionEntry(nil)
-			glog.Infof("=== block %d, %s, prepare %d, %d\n", n.GetBlockNumber(nil), n.GetBlockHash(nil), n.GetBlockNumber(nil)+1, len(entry.txlist))
+			for rootAccount, entry := range n.transactionMap {
+				if entry.Consensused {
+					glog.Infof("=== block %d, %s, prepare %d, %d\n", n.GetBlockNumber(rootAccount), n.GetBlockHash(rootAccount), n.GetBlockNumber(rootAccount)+1, len(entry.txlist))
+				}
+			}
 
 			for i := 0; i < int(n.config.GetBlockDuration()*5); i++ {
 				hasTx := false
@@ -1624,21 +1643,21 @@ func (n *Node) broadcast(data []byte) {
 
 func (n *Node) connect() {
 	config := n.config
-	lastConsensused := n.Consensused
 	for {
-		list := n.ListPeer()
+		for rootAccount, entry := range n.transactionMap {
+			list := n.ListPeerBy(rootAccount)
+			e := n.self.getPeerEntry(rootAccount)
+			e.PeerCount = int64(len(list))
 
-		glog.Infoln("===", 0, n.self.GetIndex(n), n.self.GetAddress(n), n.self.Id, n.self.Status, n.GetBlockNumber(nil), n.self.PeerCount)
-		for i := 0; i < len(list); i++ {
-			p := list[i]
-			glog.Infoln("==>", i+1, p.GetIndex(n), p.GetAddress(n), p.Id, p.Status, p.BlockNumber, p.PeerCount)
-		}
-		if len(list) == 0 {
-			n.Consensused = n.PrepareConsensus()
-		}
-		if !lastConsensused && n.Consensused {
-			lastConsensused = n.Consensused
-			n.ready.Done()
+			glog.Infoln("=== :", util.GetString(rootAccount), 0, n.self.GetIndex(n), n.self.GetAddress(n), n.self.Id, e.Status, e.BlockNumber, e.PeerCount)
+			for i := 0; i < len(list); i++ {
+				p := list[i]
+				e := p.getPeerEntry(rootAccount)
+				glog.Infoln("==> :", util.GetString(rootAccount), i+1, p.GetIndex(n), p.GetAddress(n), p.Id, e.Status, e.BlockNumber, e.PeerCount)
+			}
+			if len(list) == 0 {
+				entry.Consensused = n.PrepareConsensus(rootAccount)
+			}
 		}
 
 		time.Sleep(time.Duration(config.GetBlockDuration()) * time.Second)
@@ -1653,25 +1672,32 @@ func (n *Node) SendRequestInfo(p *Peer) {
 	glog.Infoln("request to", p.GetAddress(n))
 }
 
-func (n *Node) PrepareConsensus() bool {
-	list := n.ListPeer()
-	count := int64(0)
-	currentBlock := n.GetBlockNumber(nil)
-	currentCount := n.self.PeerCount
-	for i := 0; i < len(list); i++ {
-		p := list[i]
-		if p.Status >= PeerKnown && p.BlockNumber == currentBlock && (p.PeerCount == currentCount) {
-			count++
-		}
-	}
+func (n *Node) PrepareConsensus(rootAccount libcore.Address) bool {
 	l := len(n.config.GetBootstraps())
 	if l == 0 {
 		return true
 	}
+
+	list := n.ListPeerBy(rootAccount)
+	count := int64(0)
+	currentBlock := n.GetBlockNumber(rootAccount)
+	currentCount := int64(len(list))
+	for i := 0; i < len(list); i++ {
+		p := list[i]
+		e, ok := p.peermap[rootAccount]
+		if ok {
+			if e.Status >= PeerKnown && e.BlockNumber == currentBlock && (e.PeerCount == currentCount) {
+				count++
+			}
+		}
+	}
 	if count > 0 && (count+1) == currentCount {
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			p.Status = PeerConsensused
+			e, ok := p.peermap[rootAccount]
+			if ok {
+				e.Status = PeerConsensused
+			}
 		}
 		return true
 	}
@@ -1681,53 +1707,58 @@ func (n *Node) PrepareConsensus() bool {
 func (n *Node) discoveryPeer(p *Peer) {
 	config := n.config
 
-	lastSendBlock := int64(-1)
-	lastSendTime := time.Now()
 	for {
-		switch p.Status {
-		case PeerNone:
-			n.ConnectTo(p)
-		case PeerConnected:
-			n.SendRequestInfo(p)
-		case PeerKnown:
-			n.Consensused = n.PrepareConsensus()
-		}
-		if p.Status >= PeerKnown && n.GetBlockNumber(nil) > p.BlockNumber {
-			glog.Infoln("===", n.GetBlockNumber(nil), lastSendBlock, lastSendTime, p.address, p.Id, p.Status, p.BlockNumber, p.PeerCount)
-			if lastSendBlock >= 0 && lastSendBlock == (p.BlockNumber+1) && (time.Since(lastSendTime) < (time.Duration(int64(config.GetBlockDuration()) * int64(time.Second)))) {
-				time.Sleep(3 * time.Second)
-			} else {
-				block, err := n.storageService.GetMerkleService(nil).GetBlockByIndex(uint64(p.BlockNumber + 1))
-				if err != nil {
-					glog.Error(err)
+		balanced := true
+		for rootAccount, e := range p.peermap {
+			entry := n.getTransactionEntry(rootAccount)
+			switch e.Status {
+			case PeerNone:
+				n.ConnectTo(p)
+			case PeerConnected:
+				n.SendRequestInfo(p)
+			case PeerKnown:
+				entry.Consensused = n.PrepareConsensus(rootAccount)
+			}
+			if e.Status >= PeerKnown && n.GetBlockNumber(rootAccount) > e.BlockNumber {
+				balanced = balanced && false
+
+				glog.Infoln("===", n.GetBlockNumber(rootAccount), e.lastSendBlock, e.lastSendTime, p.address, p.Id, e.Status, e.BlockNumber, e.PeerCount)
+				if e.lastSendBlock >= 0 && e.lastSendBlock == (e.BlockNumber+1) && (time.Since(e.lastSendTime) < (time.Duration(3 * int64(time.Second)))) {
+					time.Sleep(3 * time.Second)
 				} else {
-					_, err = n.consensusService.HashBlock(block)
+					block, err := n.storageService.GetMerkleService(rootAccount).GetBlockByIndex(uint64(e.BlockNumber + 1))
 					if err != nil {
 						glog.Error(err)
 					} else {
-						blockData, err := block.MarshalBinary()
+						_, err = n.consensusService.HashBlock(block)
 						if err != nil {
 							glog.Error(err)
 						} else {
-							mid, msgData, err := n.EncodeMessage(blockData)
+							blockData, err := block.MarshalBinary()
 							if err != nil {
 								glog.Error(err)
 							} else {
-								err = n.net.SendMsg(n.config.GetChainId(), p.Id, TOPIC_PEER_DATA, msgData)
+								mid, msgData, err := n.EncodeMessage(blockData)
 								if err != nil {
 									glog.Error(err)
 								} else {
-									lastSendBlock = int64(block.GetIndex())
-									lastSendTime = time.Now()
-									glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(blockData), p.GetAddress(n), p.Id)
+									err = n.net.SendMsg(n.config.GetChainId(), p.Id, TOPIC_PEER_DATA, msgData)
+									if err != nil {
+										glog.Error(err)
+									} else {
+										e.lastSendBlock = int64(block.GetIndex())
+										e.lastSendTime = time.Now()
+										glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(blockData), p.GetAddress(n), p.Id)
+									}
 								}
 							}
 						}
 					}
+					time.Sleep(time.Second)
 				}
-				time.Sleep(time.Second)
 			}
-		} else {
+		}
+		if balanced {
 			time.Sleep(time.Duration(config.GetBlockDuration()) * time.Second)
 		}
 	}
@@ -1737,6 +1768,7 @@ func (n *Node) Load(rootAccount libcore.Address) error {
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
 
+	e := n.self.getPeerEntry(rootAccount)
 	entry := n.getTransactionEntry(rootAccount)
 
 	ss := n.storageService
@@ -1789,6 +1821,9 @@ func (n *Node) Load(rootAccount libcore.Address) error {
 
 		current++
 	}
+	e.BlockNumber = n.GetBlockNumber(rootAccount)
+	e.Status = PeerConsensused
+
 	return nil
 }
 
@@ -1882,9 +1917,9 @@ func (n *Node) receive() {
 								}
 							}
 						}
+						n.SendPeerInfo(rootAccount, fromPeer)
 					}
 				}
-				n.SendPeerInfo(fromPeer)
 
 			default:
 				glog.Errorln("<<< error message")
@@ -1928,23 +1963,22 @@ func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 		if err != nil {
 			return err
 		}
+		rootAccount, err := block.ByteToAddress(peerInfo.Account)
+		if err != nil {
+			return err
+		}
 		p := n.GetPeer(index)
 		if p == nil {
 			p = &Peer{
-				Id:          publisher,
-				Key:         publicKey,
-				Status:      PeerKnown,
-				BlockNumber: peerInfo.BlockNumber,
-				PeerCount:   peerInfo.PeerCount,
+				Id:  publisher,
+				Key: publicKey,
 			}
 			n.AddPeer(p)
+			n.UpdateStatus(p, rootAccount, PeerKnown)
 		} else {
-			if p.Status < PeerKnown {
-				p.Status = PeerKnown
-			}
-			p.BlockNumber = peerInfo.BlockNumber
-			p.PeerCount = peerInfo.PeerCount
+			n.UpdateSafeStatus(p, rootAccount, PeerKnown)
 		}
+		n.UpdatePeer(p, peerInfo)
 	}
 	return nil
 }
@@ -1987,8 +2021,7 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 				return err
 			}
 			peerInfo := msg.(*pb.PeerInfo)
-			fromPeer.BlockNumber = peerInfo.BlockNumber
-			fromPeer.PeerCount = peerInfo.PeerCount
+			n.UpdatePeer(fromPeer, peerInfo)
 
 		case core.CORE_BLOCK:
 			b := &block.Block{}
@@ -2019,32 +2052,38 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 							}
 						}
 					}
+					n.SendPeerInfo(rootAccount, fromPeer)
 				}
 			}
-			n.SendPeerInfo(fromPeer)
 		}
 	}
 	return nil
 }
 
-func (n *Node) SendPeerInfo(toPeer *Peer) {
-	peers, _ := n.net.ChainNodesInfo(n.config.GetChainId())
-	peerData, err := core.Marshal(&pb.PeerInfo{
-		BlockNumber: n.GetBlockNumber(nil),
-		PeerCount:   int64(len(peers)),
-	})
+func (n *Node) SendPeerInfo(rootAccount libcore.Address, toPeer *Peer) {
+	rootData, err := block.AddressToByte(rootAccount)
 	if err != nil {
 		glog.Error(err)
 	} else {
-		mid, msgData, err := n.EncodeMessage(peerData)
+		e := n.self.getPeerEntry(rootAccount)
+		peerData, err := core.Marshal(&pb.PeerInfo{
+			Account:     rootData,
+			BlockNumber: e.BlockNumber,
+			PeerCount:   e.PeerCount,
+		})
 		if err != nil {
 			glog.Error(err)
 		} else {
-			err = n.net.SendMsg(n.config.GetChainId(), toPeer.Id, TOPIC_PEER_DATA, msgData)
+			mid, msgData, err := n.EncodeMessage(peerData)
 			if err != nil {
 				glog.Error(err)
 			} else {
-				glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(peerData), toPeer.GetAddress(n), toPeer.Id)
+				err = n.net.SendMsg(n.config.GetChainId(), toPeer.Id, TOPIC_PEER_DATA, msgData)
+				if err != nil {
+					glog.Error(err)
+				} else {
+					glog.Infof(">>> send data %d(%s) to %s(%s)\n", mid, core.GetInfo(peerData), toPeer.GetAddress(n), toPeer.Id)
+				}
 			}
 		}
 	}
@@ -2188,33 +2227,6 @@ func (n *Node) Stop() error {
 
 func (n *Node) discovery() {
 	for {
-		pubKeyData, err := n.self.Key.MarshalBinary()
-		if err != nil {
-			glog.Error(err)
-		} else {
-			peers, _ := n.net.ChainNodesInfo(n.config.GetChainId())
-			n.self.PeerCount = int64(len(peers))
-
-			peerData, err := core.Marshal(&pb.PeerInfo{
-				PublicKey:   pubKeyData,
-				BlockNumber: n.GetBlockNumber(nil),
-				PeerCount:   int64(len(peers)),
-			})
-			if err != nil {
-				glog.Error(err)
-			} else {
-				_, msgData, err := n.EncodeMessage(peerData)
-				if err != nil {
-					glog.Error(err)
-				} else {
-					err = n.net.BroadcastWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY, msgData)
-					if err != nil {
-						glog.Error(err)
-					}
-				}
-			}
-		}
-
 		peers, err := n.net.ChainNodesInfo(n.config.GetChainId())
 		if err != nil {
 			glog.Error(err)
@@ -2231,11 +2243,43 @@ func (n *Node) discovery() {
 			}
 		}
 
-		if n.Consensused {
-			time.Sleep(60 * time.Second)
+		pubKeyData, err := n.self.Key.MarshalBinary()
+		if err != nil {
+			glog.Error(err)
 		} else {
-			time.Sleep(10 * time.Second)
+			for rootAccount := range n.transactionMap {
+				rootData, err := block.AddressToByte(rootAccount)
+				if err != nil {
+					glog.Error(err)
+				} else {
+					peers := n.ListPeerBy(rootAccount)
+					e := n.self.getPeerEntry(rootAccount)
+					e.PeerCount = int64(len(peers))
+
+					peerData, err := core.Marshal(&pb.PeerInfo{
+						Account:     rootData,
+						PublicKey:   pubKeyData,
+						BlockNumber: n.GetBlockNumber(rootAccount),
+						PeerCount:   int64(len(peers)),
+					})
+					if err != nil {
+						glog.Error(err)
+					} else {
+						_, msgData, err := n.EncodeMessage(peerData)
+						if err != nil {
+							glog.Error(err)
+						} else {
+							err = n.net.BroadcastWithChainId(n.config.GetChainId(), TOPIC_PEER_DISCOVERY, msgData)
+							if err != nil {
+								glog.Error(err)
+							}
+						}
+					}
+				}
+			}
 		}
+
+		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -2270,6 +2314,42 @@ func (n *Node) RemovePeer(p *Peer) error {
 	return nil
 }
 
+func (n *Node) UpdatePeer(p *Peer, info *pb.PeerInfo) error {
+	n.peerLocker.Lock()
+	defer n.peerLocker.Unlock()
+
+	a, err := block.ByteToAddress(info.Account)
+	if err != nil {
+		return err
+	}
+	entry := p.getPeerEntry(a)
+	entry.BlockNumber = info.BlockNumber
+	entry.PeerCount = info.PeerCount
+
+	return nil
+}
+
+func (n *Node) UpdateStatus(p *Peer, rootAccount libcore.Address, s Status) error {
+	n.peerLocker.Lock()
+	defer n.peerLocker.Unlock()
+
+	entry := p.getPeerEntry(rootAccount)
+	entry.Status = s
+
+	return nil
+}
+
+func (n *Node) UpdateSafeStatus(p *Peer, rootAccount libcore.Address, s Status) error {
+	n.peerLocker.Lock()
+	defer n.peerLocker.Unlock()
+
+	entry := p.getPeerEntry(rootAccount)
+	if entry.Status < s {
+		entry.Status = s
+	}
+	return nil
+}
+
 func (n *Node) ListPeer() []*Peer {
 	n.peerLocker.RLock()
 	defer n.peerLocker.RUnlock()
@@ -2277,6 +2357,20 @@ func (n *Node) ListPeer() []*Peer {
 	list := make([]*Peer, 0)
 	for _, p := range n.peers {
 		list = append(list, p)
+	}
+	return list
+}
+
+func (n *Node) ListPeerBy(rootAccount libcore.Address) []*Peer {
+	n.peerLocker.RLock()
+	defer n.peerLocker.RUnlock()
+
+	list := make([]*Peer, 0)
+	for _, p := range n.peers {
+		_, ok := p.peermap[rootAccount]
+		if ok {
+			list = append(list, p)
+		}
 	}
 	return list
 }

@@ -172,6 +172,10 @@ func (c *Config) GetSecret() string {
 	return c.Secret
 }
 
+func (c *Config) SetSecret(secret string) {
+	c.Secret = secret
+}
+
 func (c *Config) GetBootstraps() []string {
 	return c.NetConfig.Seeds
 }
@@ -193,7 +197,7 @@ func (c *Config) GetRPCPort() int64 {
 }
 
 func (c *Config) GetSystemCode() string {
-	return "TEST"
+	return ""
 }
 
 func (c *Config) GetBlockDuration() uint32 {
