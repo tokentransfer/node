@@ -100,10 +100,8 @@ func (suite *NodeSuite) load(c *C) *Node {
 	c.Assert(err, IsNil)
 
 	var rootAccount libcore.Address = nil
-
-	n.Load(rootAccount)
-
-	if n.GetBlockNumber(rootAccount) < 0 {
+	entry := n.GetEntry(rootAccount)
+	if entry.GetBlockNumber() < 0 {
 		block, err := n.GenerateBlock(rootAccount)
 		if err != nil {
 			panic(err)

@@ -34,111 +34,11 @@ import (
 	libcrypto "github.com/tokentransfer/interfaces/crypto"
 )
 
-type Status int
-
 const (
-	PeerNone Status = iota
-	PeerConnected
-	PeerKnown
-	PeerConsensused
-)
-
-func (s Status) String() string {
-	switch s {
-	case PeerNone:
-		return "none"
-	case PeerConnected:
-		return "connected"
-	case PeerKnown:
-		return "known"
-	case PeerConsensused:
-		return "consensused"
-	}
-	return "unknown status"
-}
-
-const (
-	BLOCK_DURATION       = 10
 	TOPIC_PEER_DISCOVERY = "peer_discovery"
 	TOPIC_PEER_DATA      = "peer_data"
 	TOPIC_PEER_MESSAGE   = "peer_message"
 )
-
-type peerEntry struct {
-	BlockNumber int64
-	PeerCount   int64
-	Status      Status
-
-	lastSendBlock int64
-	lastSendTime  time.Time
-}
-
-type Peer struct {
-	Id  string
-	Key libaccount.PublicKey
-
-	address string
-	index   uint64
-	peermap map[libcore.Address]*peerEntry
-}
-
-func (p *Peer) GetPublicKey() libaccount.PublicKey {
-	return p.Key
-}
-
-func (p *Peer) getPeerEntry(rootAccount libcore.Address) *peerEntry {
-	entry, ok := p.peermap[rootAccount]
-	if !ok {
-		entry = &peerEntry{
-			lastSendBlock: int64(-1),
-			lastSendTime:  time.Now(),
-		}
-		p.peermap[rootAccount] = entry
-	}
-	return entry
-}
-
-func (p *Peer) GetIndex(n *Node) uint64 {
-	if p.index == 0 {
-		address, err := p.Key.GenerateAddress()
-		if err != nil {
-			return 0
-		}
-		index, err := n.GetIndex(address.String())
-		if err != nil {
-			return 0
-		}
-
-		p.address = address.String()
-		p.index = index
-	}
-	return p.index
-}
-
-func (p *Peer) GetAddress(n *Node) string {
-	if len(p.address) == 0 {
-		address, err := p.Key.GenerateAddress()
-		if err != nil {
-			return ""
-		}
-		index, err := n.GetIndex(address.String())
-		if err != nil {
-			return ""
-		}
-
-		p.address = address.String()
-		p.index = index
-	}
-	return p.address
-}
-
-type transactionEntry struct {
-	Consensused    bool
-	ValidatedBlock libblock.Block
-
-	txlist []libblock.TransactionWithData
-	txmap  map[string]libblock.TransactionWithData
-}
 
 type Node struct {
 	messageId uint64
@@ -148,7 +48,9 @@ type Node struct {
 	consensusService *ConsensusService
 	storageService   *StorageService
 
-	transactionMap    map[libcore.Address]*transactionEntry
+	entryMap    map[libcore.Address]*Entry
+	entryLocker *sync.Mutex
+
 	transactionLocker *sync.Mutex
 
 	net protocol.Net
@@ -177,8 +79,10 @@ func NewNode() *Node {
 		peers:      map[uint64]*Peer{},
 		peerLocker: &sync.RWMutex{},
 
-		transactionMap:    make(map[libcore.Address]*transactionEntry),
 		transactionLocker: &sync.Mutex{},
+
+		entryMap:    make(map[libcore.Address]*Entry),
+		entryLocker: &sync.Mutex{},
 
 		accountService: account.NewAccountService(),
 		cryptoService:  &crypto.CryptoService{},
@@ -645,11 +549,14 @@ func (n *Node) processTransaction(rootAccount libcore.Address, tx libblock.Trans
 	}
 
 	// util.PrintJSON("txWithData", txWithData)
-	_, ok = n.AddTransaction(rootAccount, txWithData)
+	ok, err = n.AddTransaction(rootAccount, txWithData)
+	if err != nil {
+		return nil, nil, err
+	}
 	if ok {
 		glog.Infoln(">>> receive transaction", h.String())
 	} else {
-		glog.Infoln(">>> drop transaction", h.String())
+		glog.Infoln(">>> drop exists transaction", h.String())
 	}
 
 	return txWithData, tx, nil
@@ -713,7 +620,8 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 	switch method {
 	case "blockNumber":
 		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
-			return n.GetBlockNumber(rootAccount), nil
+			entry := n.GetEntry(rootAccount)
+			return entry.GetBlockNumber(), nil
 		})
 		if err != nil {
 			return nil, err
@@ -1168,64 +1076,49 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 	}
 }
 
-func (n *Node) getTransactionEntry(rootAccount libcore.Address) *transactionEntry {
-	entry, ok := n.transactionMap[rootAccount]
+func (n *Node) GetEntry(rootAccount libcore.Address) *Entry {
+	n.entryLocker.Lock()
+	defer n.entryLocker.Unlock()
+
+	entry, ok := n.entryMap[rootAccount]
 	if !ok {
-		entry = &transactionEntry{
+		entry = &Entry{
 			txlist: make([]libblock.TransactionWithData, 0),
 			txmap:  make(map[string]libblock.TransactionWithData),
 		}
-		n.transactionMap[rootAccount] = entry
+		err := n.load(rootAccount, entry)
+		if err != nil {
+			glog.Error(err)
+		} else {
+			n.entryMap[rootAccount] = entry
+		}
 	}
 	return entry
 }
 
-func (n *Node) AddTransaction(rootAccount libcore.Address, txWithData libblock.TransactionWithData) (libcore.Hash, bool) {
+func (n *Node) AddTransaction(rootAccount libcore.Address, txWithData libblock.TransactionWithData) (bool, error) {
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
 
 	_, err := n.consensusService.HashTransaction(txWithData)
 	if err != nil {
-		return nil, false
+		return false, err
 	}
 
-	entry := n.getTransactionEntry(rootAccount)
+	entry := n.GetEntry(rootAccount)
 
-	h := txWithData.GetTransaction().GetHash()
-	_, ok := entry.txmap[h.String()]
+	h := txWithData.GetTransaction().GetHash().String()
+	_, ok := entry.txmap[h]
 	if ok {
-		return nil, false
+		return false, util.ErrorOf("already exists", "transaction", h)
 	}
 
 	entry.txlist = append(entry.txlist, txWithData)
-	entry.txmap[h.String()] = txWithData
-	return h, true
+	entry.txmap[h] = txWithData
+	return true, nil
 }
 
-func (n *Node) ClearTransaction(rootAccount libcore.Address, b libblock.Block) {
-	n.transactionLocker.Lock()
-	defer n.transactionLocker.Unlock()
-
-	entry := n.getTransactionEntry(rootAccount)
-
-	txlist := make([]libblock.TransactionWithData, 0)
-	txmap := make(map[string]libblock.TransactionWithData)
-	for i := 0; i < len(entry.txlist); i++ {
-		txWithData := entry.txlist[i]
-		h := txWithData.GetTransaction().GetHash()
-		_, ok := entry.txmap[h.String()]
-		if ok {
-			glog.Infoln(">>> drop block transaction", h.String())
-		} else {
-			txlist = append(txlist, txWithData)
-			txmap[h.String()] = txWithData
-		}
-	}
-	entry.txlist = txlist
-	entry.txmap = txmap
-}
-
-func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.TransactionWithData, entry *transactionEntry) (libblock.Block, error) {
+func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.TransactionWithData, entry *Entry) (libblock.Block, error) {
 	config := n.config
 	cs := n.cryptoService
 	ss := n.storageService
@@ -1392,7 +1285,7 @@ func (n *Node) AddBlock(rootAccount libcore.Address, b libblock.Block) error {
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
 
-	entry := n.getTransactionEntry(rootAccount)
+	entry := n.GetEntry(rootAccount)
 
 	ss := n.storageService
 	cc := ss.GetChunkService(rootAccount)
@@ -1422,7 +1315,7 @@ func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bo
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
 
-	entry := n.getTransactionEntry(rootAccount)
+	entry := n.GetEntry(rootAccount)
 
 	cs := n.cryptoService
 	ss := n.storageService
@@ -1557,7 +1450,7 @@ func (n *Node) GenerateBlock(rootAccount libcore.Address) (libblock.Block, error
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
 
-	entry := n.getTransactionEntry(rootAccount)
+	entry := n.GetEntry(rootAccount)
 
 	list := entry.txlist
 	entry.txlist = make([]libblock.TransactionWithData, 0)
@@ -1569,7 +1462,7 @@ func (n *Node) GenerateBlock(rootAccount libcore.Address) (libblock.Block, error
 func (n *Node) generate() {
 	for {
 		hasTx := false
-		for rootAccount, entry := range n.transactionMap {
+		for rootAccount, entry := range n.entryMap {
 			if entry.Consensused && len(entry.txlist) > 0 {
 				hasTx = hasTx || true
 
@@ -1604,15 +1497,15 @@ func (n *Node) generate() {
 			}
 		}
 		if !hasTx {
-			for rootAccount, entry := range n.transactionMap {
+			for rootAccount, entry := range n.entryMap {
 				if entry.Consensused {
-					glog.Infof("=== block %d, %s, prepare %d, %d\n", n.GetBlockNumber(rootAccount), n.GetBlockHash(rootAccount), n.GetBlockNumber(rootAccount)+1, len(entry.txlist))
+					glog.Infof("=== %s: block %d, %s, prepare %d, %d\n", util.GetString(rootAccount), entry.GetBlockNumber(), entry.GetBlockHash(), entry.GetBlockNumber()+1, len(entry.txlist))
 				}
 			}
 
 			for i := 0; i < int(n.config.GetBlockDuration()*5); i++ {
 				hasTx := false
-				for _, entry := range n.transactionMap {
+				for _, entry := range n.entryMap {
 					if len(entry.txlist) > 0 {
 						hasTx = true
 						break
@@ -1644,7 +1537,7 @@ func (n *Node) broadcast(data []byte) {
 func (n *Node) connect() {
 	config := n.config
 	for {
-		for rootAccount, entry := range n.transactionMap {
+		for rootAccount, entry := range n.entryMap {
 			list := n.ListPeerBy(rootAccount)
 			e := n.self.getPeerEntry(rootAccount)
 			e.PeerCount = int64(len(list))
@@ -1680,7 +1573,8 @@ func (n *Node) PrepareConsensus(rootAccount libcore.Address) bool {
 
 	list := n.ListPeerBy(rootAccount)
 	count := int64(0)
-	currentBlock := n.GetBlockNumber(rootAccount)
+	entry := n.GetEntry(rootAccount)
+	currentBlock := entry.GetBlockNumber()
 	currentCount := int64(len(list))
 	for i := 0; i < len(list); i++ {
 		p := list[i]
@@ -1710,7 +1604,7 @@ func (n *Node) discoveryPeer(p *Peer) {
 	for {
 		balanced := true
 		for rootAccount, e := range p.peermap {
-			entry := n.getTransactionEntry(rootAccount)
+			entry := n.GetEntry(rootAccount)
 			switch e.Status {
 			case PeerNone:
 				n.ConnectTo(p)
@@ -1719,10 +1613,10 @@ func (n *Node) discoveryPeer(p *Peer) {
 			case PeerKnown:
 				entry.Consensused = n.PrepareConsensus(rootAccount)
 			}
-			if e.Status >= PeerKnown && n.GetBlockNumber(rootAccount) > e.BlockNumber {
+			if e.Status >= PeerKnown && entry.GetBlockNumber() > e.BlockNumber {
 				balanced = balanced && false
 
-				glog.Infoln("===", n.GetBlockNumber(rootAccount), e.lastSendBlock, e.lastSendTime, p.address, p.Id, e.Status, e.BlockNumber, e.PeerCount)
+				glog.Infoln("===", entry.GetBlockNumber(), e.lastSendBlock, e.lastSendTime, p.address, p.Id, e.Status, e.BlockNumber, e.PeerCount)
 				if e.lastSendBlock >= 0 && e.lastSendBlock == (e.BlockNumber+1) && (time.Since(e.lastSendTime) < (time.Duration(3 * int64(time.Second)))) {
 					time.Sleep(3 * time.Second)
 				} else {
@@ -1764,15 +1658,11 @@ func (n *Node) discoveryPeer(p *Peer) {
 	}
 }
 
-func (n *Node) Load(rootAccount libcore.Address) error {
-	n.transactionLocker.Lock()
-	defer n.transactionLocker.Unlock()
-
-	e := n.self.getPeerEntry(rootAccount)
-	entry := n.getTransactionEntry(rootAccount)
-
+func (n *Node) load(rootAccount libcore.Address, entry *Entry) error {
 	ss := n.storageService
 	ms := ss.GetMerkleService(rootAccount)
+
+	e := n.self.getPeerEntry(rootAccount)
 
 	current := uint64(0)
 	for {
@@ -1821,7 +1711,7 @@ func (n *Node) Load(rootAccount libcore.Address) error {
 
 		current++
 	}
-	e.BlockNumber = n.GetBlockNumber(rootAccount)
+	e.BlockNumber = entry.GetBlockNumber()
 	e.Status = PeerConsensused
 
 	return nil
@@ -1832,30 +1722,6 @@ func (n *Node) Dump(rootAccount libcore.Address, printer core.Printer) {
 	cc := ss.GetChunkService(rootAccount)
 
 	cc.Dump(printer)
-}
-
-func (n *Node) GetBlockNumber(rootAccount libcore.Address) int64 {
-	entry := n.getTransactionEntry(rootAccount)
-	if entry.ValidatedBlock != nil {
-		return int64(entry.ValidatedBlock.GetIndex())
-	}
-	return -1
-}
-
-func (n *Node) GetBlockHash(rootAccount libcore.Address) string {
-	entry := n.getTransactionEntry(rootAccount)
-	if entry.ValidatedBlock != nil {
-		return entry.ValidatedBlock.GetHash().String()
-	}
-	return ""
-}
-
-func (n *Node) GetBlock(rootAccount libcore.Address) libblock.Block {
-	entry := n.getTransactionEntry(rootAccount)
-	if entry.ValidatedBlock != nil {
-		return entry.ValidatedBlock
-	}
-	return nil
 }
 
 func (n *Node) send() {
@@ -1900,7 +1766,8 @@ func (n *Node) receive() {
 						glog.Error(err)
 					} else {
 						rootAccount := b.GetAccount()
-						if int64(b.GetIndex()) <= n.GetBlockNumber(rootAccount) {
+						entry := n.GetEntry(rootAccount)
+						if int64(b.GetIndex()) <= entry.GetBlockNumber() {
 							glog.Infoln("<<< drop message block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
 						} else {
 							glog.Infoln("<<< receive message block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
@@ -2034,7 +1901,8 @@ func (n *Node) dataHandler(id string, msgData []byte) error {
 					glog.Error(err)
 				} else {
 					rootAccount := b.GetAccount()
-					if int64(b.GetIndex()) <= n.GetBlockNumber(rootAccount) {
+					entry := n.GetEntry(rootAccount)
+					if int64(b.GetIndex()) <= entry.GetBlockNumber() {
 						glog.Infoln("<<< drop data block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
 					} else {
 						glog.Infoln("<<< receive data block", util.GetString(rootAccount), b.GetIndex(), h.String(), len(b.GetTransactions()))
@@ -2187,9 +2055,6 @@ func (n *Node) start() error {
 }
 
 func (n *Node) Start() error {
-	if err := n.Load(nil); err != nil {
-		return err
-	}
 	if err := n.start(); err != nil {
 		return err
 	}
@@ -2247,7 +2112,7 @@ func (n *Node) discovery() {
 		if err != nil {
 			glog.Error(err)
 		} else {
-			for rootAccount := range n.transactionMap {
+			for rootAccount := range n.entryMap {
 				rootData, err := block.AddressToByte(rootAccount)
 				if err != nil {
 					glog.Error(err)
@@ -2256,10 +2121,11 @@ func (n *Node) discovery() {
 					e := n.self.getPeerEntry(rootAccount)
 					e.PeerCount = int64(len(peers))
 
+					entry := n.GetEntry(rootAccount)
 					peerData, err := core.Marshal(&pb.PeerInfo{
 						Account:     rootData,
 						PublicKey:   pubKeyData,
-						BlockNumber: n.GetBlockNumber(rootAccount),
+						BlockNumber: entry.GetBlockNumber(),
 						PeerCount:   int64(len(peers)),
 					})
 					if err != nil {

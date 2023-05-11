@@ -8,10 +8,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/caivega/glog"
 	"github.com/mitchellh/cli"
 	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/consensus"
 	"github.com/tokentransfer/node/rpc"
+	"github.com/tokentransfer/node/util"
 )
 
 const (
@@ -68,6 +70,11 @@ func (c *StartCommand) startNode(config *config.Config) *consensus.Node {
 	if err != nil {
 		panic(err)
 	}
+
+	entry := n.GetEntry(nil)
+	blockNumber := entry.GetBlockNumber()
+	blockHash := entry.GetBlockHash()
+	glog.Infof("%s: block, %d, %s", util.GetString(nil), blockNumber, blockHash)
 
 	r := rpc.NewRPCService(n)
 	err = r.Init(config)

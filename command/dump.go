@@ -76,10 +76,6 @@ func (i *DumpCommand) Run(args []string) int {
 	if err != nil {
 		panic(err)
 	}
-	err = n.Load(account)
-	if err != nil {
-		panic(err)
-	}
 	n.Dump(account, i)
 	return 0
 }
