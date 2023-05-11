@@ -6,6 +6,8 @@ import (
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
+	libstore "github.com/tokentransfer/interfaces/store"
+	"github.com/tokentransfer/node/storage"
 	"github.com/tokentransfer/node/util"
 )
 
@@ -104,6 +106,9 @@ func (p *Peer) GetAddress(n *Node) string {
 type Entry struct {
 	Consensused    bool
 	ValidatedBlock libblock.Block
+
+	merkle  libstore.MerkleService
+	storage *storage.StorageService
 
 	txlist []libblock.TransactionWithData
 	txmap  map[string]libblock.TransactionWithData

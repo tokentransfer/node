@@ -1,4 +1,4 @@
-package chunk
+package storage
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ import (
 	"github.com/tokentransfer/node/vm"
 )
 
-type ChunkService struct {
+type StorageService struct {
 	storage core.Storage
 	stackdb *db.StackService
 
@@ -27,8 +27,8 @@ type ChunkService struct {
 	locker     sync.Mutex
 }
 
-func NewChunkService(c libcore.Config, account libcore.Address) (*ChunkService, error) {
-	service := &ChunkService{
+func NewStorageService(c libcore.Config, account libcore.Address) (*StorageService, error) {
+	service := &StorageService{
 		categories: func(a libcore.Address) []string {
 			if a != nil {
 				return []string{
@@ -51,22 +51,22 @@ func NewChunkService(c libcore.Config, account libcore.Address) (*ChunkService, 
 	return service, nil
 }
 
-func (s *ChunkService) RootHash() libcore.Hash {
+func (s *StorageService) RootHash() libcore.Hash {
 	return libcore.Hash(s.storage.Root())
 }
 
-func (s *ChunkService) GetStorage() core.Storage {
+func (s *StorageService) GetStorage() core.Storage {
 	return s.storage
 }
 
-func (s *ChunkService) Dump(printer core.Printer) {
+func (s *StorageService) Dump(printer core.Printer) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
 	s.storage.DumpLog(printer)
 }
 
-func (s *ChunkService) CreateSandbox() error {
+func (s *StorageService) CreateSandbox() error {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
@@ -90,7 +90,7 @@ func (s *ChunkService) CreateSandbox() error {
 	return nil
 }
 
-func (s *ChunkService) CommitSandbox() error {
+func (s *StorageService) CommitSandbox() error {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
@@ -109,7 +109,7 @@ func (s *ChunkService) CommitSandbox() error {
 	return nil
 }
 
-func (s *ChunkService) CancelSandbox() error {
+func (s *StorageService) CancelSandbox() error {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
@@ -125,7 +125,7 @@ func (s *ChunkService) CancelSandbox() error {
 	return nil
 }
 
-func (s *ChunkService) getRoot(rootAccount libcore.Address) (core.Group, error) {
+func (s *StorageService) getRoot(rootAccount libcore.Address) (core.Group, error) {
 	root, err := s.storage.Group("/")
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func getGroup(parent core.Group, name string) (core.Group, error) {
 	return g, nil
 }
 
-func (s *ChunkService) writeData(rootGroup core.Group, category string, dir string, name string, data []byte) (libcore.Hash, libcore.Hash, libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) writeData(rootGroup core.Group, category string, dir string, name string, data []byte) (libcore.Hash, libcore.Hash, libcore.Hash, libcore.Hash, error) {
 	var categoryGroup core.Group
 	if len(category) > 0 {
 		group, err := getGroup(rootGroup, category)
@@ -209,7 +209,7 @@ func (s *ChunkService) writeData(rootGroup core.Group, category string, dir stri
 	return libcore.Hash(s.storage.Root()), libcore.Hash(categoryGroup.Key()), libcore.Hash(dirGroup.Key()), libcore.Hash(d.Key()), nil
 }
 
-func (s *ChunkService) readData(rootGroup core.Group, category string, dir string, name string) (core.Key, core.Key, core.Key, []byte, error) {
+func (s *StorageService) readData(rootGroup core.Group, category string, dir string, name string) (core.Key, core.Key, core.Key, []byte, error) {
 	var categoryGroup core.Group
 	if len(category) > 0 {
 		group, err := rootGroup.Group(category)
@@ -253,7 +253,7 @@ func (s *ChunkService) readData(rootGroup core.Group, category string, dir strin
 	return categoryGroup.Key(), dirGroup.Key(), key, content, nil
 }
 
-func (s *ChunkService) ReadCode(codeAccount libcore.Address) ([]byte, []byte, error) {
+func (s *StorageService) ReadCode(codeAccount libcore.Address) ([]byte, []byte, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
 		return nil, nil, err
@@ -266,7 +266,7 @@ func (s *ChunkService) ReadCode(codeAccount libcore.Address) ([]byte, []byte, er
 	return wasmCode, abiCode, nil
 }
 
-func (s *ChunkService) WriteCode(account libcore.Address, wasmCode []byte, abiCode []byte) (libcore.Hash, error) {
+func (s *StorageService) WriteCode(account libcore.Address, wasmCode []byte, abiCode []byte) (libcore.Hash, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
 		return nil, err
@@ -285,7 +285,7 @@ func (s *ChunkService) WriteCode(account libcore.Address, wasmCode []byte, abiCo
 	return codeHash, nil
 }
 
-func (s *ChunkService) ReadData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address) ([]byte, error) {
+func (s *StorageService) ReadData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address) ([]byte, error) {
 	rootGroup, err := s.getRoot(rootAccount)
 	if err != nil {
 		return nil, err
@@ -297,7 +297,7 @@ func (s *ChunkService) ReadData(rootAccount libcore.Address, dataAccount libcore
 	return data, nil
 }
 
-func (s *ChunkService) WriteData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) WriteData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.getRoot(rootAccount)
 	if err != nil {
 		return nil, nil, err
@@ -309,7 +309,7 @@ func (s *ChunkService) WriteData(rootAccount libcore.Address, dataAccount libcor
 	return rootHash, dataHash, nil
 }
 
-func (s *ChunkService) ReadUser(rootAccount libcore.Address, userAccount libcore.Address, codeAccount libcore.Address) (*pb.UserInfo, error) {
+func (s *StorageService) ReadUser(rootAccount libcore.Address, userAccount libcore.Address, codeAccount libcore.Address) (*pb.UserInfo, error) {
 	rootGroup, err := s.getRoot(rootAccount)
 	if err != nil {
 		return nil, err
@@ -338,7 +338,7 @@ func (s *ChunkService) ReadUser(rootAccount libcore.Address, userAccount libcore
 	return info, nil
 }
 
-func (s *ChunkService) WriteUser(account libcore.Address, destination libcore.Address, code libcore.Address, info *pb.UserInfo) (libcore.Hash, libcore.Address, error) {
+func (s *StorageService) WriteUser(account libcore.Address, destination libcore.Address, code libcore.Address, info *pb.UserInfo) (libcore.Hash, libcore.Address, error) {
 	var newInfo *pb.UserInfo
 	var dataAccount libcore.Address
 	var contentKey core.Key
@@ -411,7 +411,7 @@ func (s *ChunkService) WriteUser(account libcore.Address, destination libcore.Ad
 	return dataHash, dataAccount, nil
 }
 
-func (s *ChunkService) WritePage(name string, account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) WritePage(name string, account libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
 		return nil, nil, err
@@ -439,7 +439,7 @@ func (s *ChunkService) WritePage(name string, account libcore.Address, data []by
 	return libcore.Hash(s.storage.Root()), dataHash, nil
 }
 
-func (s *ChunkService) ReadPageByName(name string) ([]byte, error) {
+func (s *StorageService) ReadPageByName(name string) ([]byte, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
 		return nil, err
@@ -468,7 +468,7 @@ func (s *ChunkService) ReadPageByName(name string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (s *ChunkService) ReadPageByAddress(account libcore.Address) ([]byte, error) {
+func (s *StorageService) ReadPageByAddress(account libcore.Address) ([]byte, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
 		return nil, err
@@ -480,7 +480,7 @@ func (s *ChunkService) ReadPageByAddress(account libcore.Address) ([]byte, error
 	return data, nil
 }
 
-func (s *ChunkService) CreateContract(account libcore.Address, wasmCode []byte, abiCode []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) CreateContract(account libcore.Address, wasmCode []byte, abiCode []byte) (libcore.Hash, libcore.Hash, error) {
 	err := vm.VerifyWasm(wasmCode, abiCode)
 	if err != nil {
 		return nil, nil, err
@@ -492,7 +492,7 @@ func (s *ChunkService) CreateContract(account libcore.Address, wasmCode []byte, 
 	return libcore.Hash(s.storage.Root()), libcore.Hash(k), nil
 }
 
-func (s *ChunkService) RunContract(cs libcrypto.CryptoService, cost uint64, signAccount libcore.Address, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Address, libcore.Hash, libcore.Hash, []byte, error) {
+func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost uint64, signAccount libcore.Address, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Address, libcore.Hash, libcore.Hash, []byte, error) {
 	wasmCode, abiCode, err := s.ReadCode(toAccount)
 	if err != nil {
 		return 0, nil, nil, nil, nil, err
@@ -569,7 +569,7 @@ func (s *ChunkService) RunContract(cs libcrypto.CryptoService, cost uint64, sign
 	}
 }
 
-func (s *ChunkService) CallContract(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, method string, params [][]byte) (int64, interface{}, error) {
+func (s *StorageService) CallContract(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, method string, params [][]byte) (int64, interface{}, error) {
 	wasmCode, abiCode, err := s.ReadCode(codeAccount)
 	if err != nil {
 		return 0, nil, err
@@ -587,7 +587,7 @@ func (s *ChunkService) CallContract(rootAccount libcore.Address, dataAccount lib
 	return usedCost, r, nil
 }
 
-func (s *ChunkService) GetContractData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, format string) (int64, interface{}, error) {
+func (s *StorageService) GetContractData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, format string) (int64, interface{}, error) {
 	wasmData, _ := s.ReadData(rootAccount, dataAccount, codeAccount)
 	var r interface{}
 	var e error
@@ -606,7 +606,7 @@ func (s *ChunkService) GetContractData(rootAccount libcore.Address, dataAccount 
 	return int64(len(wasmData)), r, nil
 }
 
-func (s *ChunkService) GetData(hash libcore.Hash, format string) (int64, interface{}, error) {
+func (s *StorageService) GetData(hash libcore.Hash, format string) (int64, interface{}, error) {
 	key := core.Key(hash)
 	data, err := s.storage.Get(key)
 	if err != nil {
@@ -639,7 +639,7 @@ func (s *ChunkService) GetData(hash libcore.Hash, format string) (int64, interfa
 	return int64(len(contentData)), r, nil
 }
 
-func (s *ChunkService) ReadState(rootAccount libcore.Address, theAccount libcore.Address, name string) ([]byte, error) {
+func (s *StorageService) ReadState(rootAccount libcore.Address, theAccount libcore.Address, name string) ([]byte, error) {
 	rootGroup, err := s.getRoot(rootAccount)
 	if err != nil {
 		return nil, err
@@ -651,7 +651,7 @@ func (s *ChunkService) ReadState(rootAccount libcore.Address, theAccount libcore
 	return data, nil
 }
 
-func (s *ChunkService) WriteState(rootAccount libcore.Address, theAccount libcore.Address, name string, data []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) WriteState(rootAccount libcore.Address, theAccount libcore.Address, name string, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.getRoot(rootAccount)
 	if err != nil {
 		return nil, nil, err
@@ -663,7 +663,7 @@ func (s *ChunkService) WriteState(rootAccount libcore.Address, theAccount libcor
 	return rootHash, dataHash, nil
 }
 
-func (s *ChunkService) GetGas(rootAccount libcore.Address, theAccount libcore.Address) (*util.Value, error) {
+func (s *StorageService) GetGas(rootAccount libcore.Address, theAccount libcore.Address) (*util.Value, error) {
 	data, err := s.ReadState(rootAccount, theAccount, "gas")
 	if err != nil {
 		return nil, err
@@ -675,7 +675,7 @@ func (s *ChunkService) GetGas(rootAccount libcore.Address, theAccount libcore.Ad
 	return value, nil
 }
 
-func (s *ChunkService) UpdateGas(rootAccount libcore.Address, theAccount libcore.Address, value util.Value) error {
+func (s *StorageService) UpdateGas(rootAccount libcore.Address, theAccount libcore.Address, value util.Value) error {
 	_, _, err := s.WriteState(rootAccount, theAccount, "gas", []byte(value.String()))
 	if err != nil {
 		return err
@@ -683,7 +683,7 @@ func (s *ChunkService) UpdateGas(rootAccount libcore.Address, theAccount libcore
 	return nil
 }
 
-func (s *ChunkService) GetAccountGas(rootAccount libcore.Address, account libcore.Address) (*util.Value, *util.Value, error) {
+func (s *StorageService) GetAccountGas(rootAccount libcore.Address, account libcore.Address) (*util.Value, *util.Value, error) {
 	value, err := s.GetGas(rootAccount, account)
 	if err != nil {
 		return nil, nil, err
@@ -695,7 +695,7 @@ func (s *ChunkService) GetAccountGas(rootAccount libcore.Address, account libcor
 	return value, localValue, nil
 }
 
-func (s *ChunkService) Init(c libcore.Config) error {
+func (s *StorageService) Init(c libcore.Config) error {
 	dataDir := c.GetDataDir()
 	if len(s.categories) > 0 {
 		list := append([]string{dataDir}, s.categories...)
@@ -725,11 +725,11 @@ func (s *ChunkService) Init(c libcore.Config) error {
 	return nil
 }
 
-func (s *ChunkService) Start() error {
+func (s *StorageService) Start() error {
 	return nil
 }
 
-func (s *ChunkService) Close() error {
+func (s *StorageService) Close() error {
 	err := s.storage.Close()
 	if err != nil {
 		return err
@@ -738,7 +738,7 @@ func (s *ChunkService) Close() error {
 }
 
 // test
-func (s *ChunkService) dump(name string) {
+func (s *StorageService) dump(name string) {
 	name = fmt.Sprintf("%s(%d)", name, s.stackdb.Len())
 
 	dumpStorage(s.storage, name+": current storage")
@@ -764,7 +764,7 @@ func (s *ChunkService) dump(name string) {
 	}
 }
 
-func (s *ChunkService) dumpWith(name string, popKv libstore.KvService) {
+func (s *StorageService) dumpWith(name string, popKv libstore.KvService) {
 	s.dump(name)
 
 	if popKv != nil {

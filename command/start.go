@@ -102,7 +102,10 @@ func (c *StartCommand) startNode(config *config.Config, account libcore.Address)
 		panic(err)
 	}
 
-	entry := n.GetEntry(account)
+	entry, err := n.GetEntry(account)
+	if err != nil {
+		panic(err)
+	}
 	blockNumber := entry.GetBlockNumber()
 	blockHash := entry.GetBlockHash()
 	glog.Infof("%s: block, %d, %s", util.GetString(account), blockNumber, blockHash)
@@ -137,7 +140,7 @@ func (c *StartCommand) Run(args []string) int {
 	if n == nil {
 		return 1
 	}
-	defer n.Stop()
+	defer n.Close()
 
 	// Wait for exit
 	return c.handleSignals(config, n)
@@ -173,7 +176,7 @@ func (c *StartCommand) handleSignals(config *config.Config, n *consensus.Node) i
 	// Attempt a graceful leave
 	gracefulCh := make(chan struct{})
 	go func() {
-		if err := n.Stop(); err != nil {
+		if err := n.Close(); err != nil {
 			panic(err)
 		}
 		close(gracefulCh)

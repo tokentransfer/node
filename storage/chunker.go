@@ -15,10 +15,10 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Package chunking implements an algorithm for content-based chunking of arbitrary files.
-package chunk
+package storage
 
 import (
-	"github.com/tokentransfer/node/chunk/adler32"
+	"github.com/tokentransfer/node/storage/adler32"
 )
 
 const (

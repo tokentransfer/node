@@ -10,9 +10,9 @@ import (
 	"github.com/caivega/glog"
 	libcore "github.com/tokentransfer/interfaces/core"
 	"github.com/tokentransfer/node/block"
-	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/storage"
 	"github.com/tokentransfer/node/util"
 
 	. "github.com/tokentransfer/check"
@@ -27,11 +27,11 @@ func Test_Node(t *testing.T) {
 
 func dump(c *C, s core.Storage, name string) {
 	fmt.Println("=================" + name + "=================")
-	s.DumpLog(chunk.LogPrinter{})
+	s.DumpLog(storage.LogPrinter{})
 
 	root, err := s.Group("/")
 	c.Assert(err, IsNil)
-	dumpGroup(c, s, root, chunk.LogPrinter{})
+	dumpGroup(c, s, root, storage.LogPrinter{})
 }
 
 func dumpGroup(c *C, s core.Storage, g core.Group, log core.Printer) {
@@ -100,7 +100,8 @@ func (suite *NodeSuite) load(c *C) *Node {
 	c.Assert(err, IsNil)
 
 	var rootAccount libcore.Address = nil
-	entry := n.GetEntry(rootAccount)
+	entry, err := n.GetEntry(rootAccount)
+	c.Assert(err, IsNil)
 	if entry.GetBlockNumber() < 0 {
 		block, err := n.GenerateBlock(rootAccount)
 		if err != nil {
@@ -124,7 +125,7 @@ func (suite *NodeSuite) load(c *C) *Node {
 }
 
 func (suite *NodeSuite) close(c *C, n *Node) {
-	err := n.Stop()
+	err := n.Close()
 	c.Assert(err, IsNil)
 }
 
@@ -163,7 +164,8 @@ func (suite *NodeSuite) testProcess(c *C) {
 	n := suite.load(c)
 
 	var rootAccount libcore.Address = nil
-	s := n.storageService.GetChunkService(rootAccount)
+	s, err := n.getStorageService(rootAccount)
+	c.Assert(err, IsNil)
 	storage := s.GetStorage()
 	dump(c, storage, "before")
 

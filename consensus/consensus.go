@@ -31,15 +31,15 @@ type accountEntry struct {
 }
 
 type ConsensusService struct {
-	CryptoService  libcrypto.CryptoService
-	Config         libcore.Config
-	AccountService libaccount.AccountService
-	StorageService *StorageService
+	n *Node
 }
 
 func (service *ConsensusService) GetAccountInfo(rootAccount libcore.Address, account libcore.Address) (*block.AccountState, error) {
-	ss := service.StorageService
-	ms := ss.GetMerkleService(rootAccount)
+	entry, err := service.n.GetEntry(rootAccount)
+	if err != nil {
+		return nil, err
+	}
+	ms := entry.merkle
 
 	accountKey := account.String()
 	state, err := ms.GetStateByTypeAndKey(block.ACCOUNT_STATE, accountKey)
@@ -54,10 +54,13 @@ func (service *ConsensusService) GetAccountInfo(rootAccount libcore.Address, acc
 }
 
 func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, t libblock.Transaction) (bool, error) {
-	cs := service.CryptoService
-	ss := service.StorageService
-	ms := ss.GetMerkleService(rootAccount)
-	cc := ss.GetChunkService(rootAccount)
+	entry, err := service.n.GetEntry(rootAccount)
+	if err != nil {
+		return false, err
+	}
+	cs := service.n.cryptoService
+	ss := entry.storage
+	ms := entry.merkle
 
 	ok, err := cs.Verify(t)
 	if err != nil {
@@ -91,7 +94,7 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 	if err != nil {
 		return false, err
 	}
-	fromValue, err := cc.GetGas(account, fromAccount)
+	fromValue, err := ss.GetGas(account, fromAccount)
 	if err != nil {
 		return false, err
 	}
@@ -233,35 +236,38 @@ func (service *ConsensusService) removeBalance(oldValue *util.Value, value util.
 }
 
 func (service *ConsensusService) getAccountEntry(rootAccount libcore.Address, account libcore.Address, accountMap map[string]*accountEntry) (bool, *accountEntry, error) {
-	ss := service.StorageService
-	ms := ss.GetMerkleService(rootAccount)
-	cc := ss.GetChunkService(rootAccount)
+	entry, err := service.n.GetEntry(rootAccount)
+	if err != nil {
+		return false, nil, err
+	}
+	ss := entry.storage
+	ms := entry.merkle
 
-	entry, ok := accountMap[account.String()]
+	e, ok := accountMap[account.String()]
 	if !ok {
 		sequence := libstore.GetSequence(ms, account)
 		lastInfo, info, err := service.getAccountInfo(rootAccount, account, sequence)
 		if err != nil {
 			return false, nil, err
 		}
-		lastGas, lastLocalGas, err := cc.GetAccountGas(rootAccount, account)
+		lastGas, lastLocalGas, err := ss.GetAccountGas(rootAccount, account)
 		if err != nil {
 			return false, nil, err
 		}
-		entry = &accountEntry{
+		e = &accountEntry{
 			lastInfo: lastInfo,
 			info:     info,
 
 			lastGas:      lastGas,
 			lastLocalGas: lastLocalGas,
 		}
-		accountMap[account.String()] = entry
+		accountMap[account.String()] = e
 	}
-	return ok, entry, nil
+	return ok, e, nil
 }
 
 func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address, t libblock.Transaction) (libblock.TransactionWithData, error) {
-	config := service.Config
+	config := service.n.config
 
 	tx, ok := t.(*block.Transaction)
 	if !ok {
@@ -400,13 +406,18 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 }
 
 func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, remainCost uint64, tx *block.Transaction, info *block.PayloadInfo, accountMap map[string]*accountEntry) (uint64, []string, error) {
-	cs := service.CryptoService
-	as := service.AccountService
-	ss := service.StorageService
-	cc := ss.GetChunkService(rootAccount)
+	cost := uint64(0)
+
+	entry, err := service.n.GetEntry(rootAccount)
+	if err != nil {
+		return cost, nil, err
+	}
+	cs := service.n.cryptoService
+	as := service.n.accountService
+	ss := entry.storage
 
 	accounts := make([]string, 0)
-	cost := uint64(0)
+
 	for _, payload := range info.Infos {
 		meta, msg, err := core.Unmarshal(payload.Content)
 		if err != nil {
@@ -451,7 +462,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			if err != nil {
 				return 0, nil, err
 			}
-			usedCost, retAccount, _, retHash, retContent, err := cc.RunContract(cs, remainCost, tx.Account, dataAccount, tx.To, info.Method, info.Params, inputs, outputs)
+			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(cs, remainCost, tx.Account, dataAccount, tx.To, info.Method, info.Params, inputs, outputs)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -470,7 +481,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)
-			_, pageHash, err := cc.WritePage(info.Name, tx.To, info.Data)
+			_, pageHash, err := ss.WritePage(info.Name, tx.To, info.Data)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -484,7 +495,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 
 		case core.CORE_CODE_INFO:
 			info := msg.(*pb.CodeInfo)
-			_, codeHash, err := cc.CreateContract(tx.To, info.Code, info.Abi)
+			_, codeHash, err := ss.CreateContract(tx.To, info.Code, info.Abi)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -502,7 +513,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			if err != nil {
 				return cost, nil, err
 			}
-			userHash, userAccount, err := cc.WriteUser(tx.Account, tx.To, account, info)
+			userHash, userAccount, err := ss.WriteUser(tx.Account, tx.To, account, info)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -541,7 +552,9 @@ func getAccounts(as libaccount.AccountService, list [][]byte) ([]libcore.Address
 }
 
 func (service *ConsensusService) HashBlock(b libblock.Block) (libcore.Hash, error) {
-	h, _, err := service.CryptoService.Raw(b, libcrypto.RawBinary)
+	cs := service.n.cryptoService
+
+	h, _, err := cs.Raw(b, libcrypto.RawBinary)
 	if err != nil {
 		return nil, err
 	}
@@ -565,17 +578,19 @@ func (service *ConsensusService) HashBlock(b libblock.Block) (libcore.Hash, erro
 }
 
 func (service *ConsensusService) HashTransaction(txWithData libblock.TransactionWithData) (libcore.Hash, error) {
-	_, _, err := service.CryptoService.Raw(txWithData, libcrypto.RawBinary)
+	cs := service.n.cryptoService
+
+	_, _, err := cs.Raw(txWithData, libcrypto.RawBinary)
 	if err != nil {
 		return nil, err
 	}
 
-	h, _, err := service.CryptoService.Raw(txWithData.GetTransaction(), libcrypto.RawBinary)
+	h, _, err := cs.Raw(txWithData.GetTransaction(), libcrypto.RawBinary)
 	if err != nil {
 		return nil, err
 	}
 
-	_, _, err = service.CryptoService.Raw(txWithData.GetReceipt(), libcrypto.RawBinary)
+	_, _, err = cs.Raw(txWithData.GetReceipt(), libcrypto.RawBinary)
 	if err != nil {
 		return nil, err
 	}
@@ -588,7 +603,9 @@ func (service *ConsensusService) HashTransaction(txWithData libblock.Transaction
 }
 
 func (service *ConsensusService) HashReceipt(r libblock.Receipt) (libcore.Hash, error) {
-	h, _, err := service.CryptoService.Raw(r, libcrypto.RawBinary)
+	cs := service.n.cryptoService
+
+	h, _, err := cs.Raw(r, libcrypto.RawBinary)
 	if err != nil {
 		return nil, err
 	}
@@ -605,7 +622,9 @@ func (service *ConsensusService) HashReceipt(r libblock.Receipt) (libcore.Hash, 
 }
 
 func (service *ConsensusService) HashState(s libblock.State) (libcore.Hash, error) {
-	h, _, err := service.CryptoService.Raw(s, libcrypto.RawBinary)
+	cs := service.n.cryptoService
+
+	h, _, err := cs.Raw(s, libcrypto.RawBinary)
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/tokentransfer/node/chunk"
+	"github.com/tokentransfer/node/storage"
 )
 
 const APP_VERSION = "0.1"
@@ -109,7 +109,7 @@ func chunkFile(filename string, size int, printSummary, printChunks bool) (*Hand
 	defer fi.Close()
 
 	buffer := make([]byte, 16384)
-	chunker := chunk.NewChunker()
+	chunker := storage.NewChunker()
 
 	numChunks := 1
 	numBytes := 0

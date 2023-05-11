@@ -85,7 +85,10 @@ func (i *GenesisCommand) Run(args []string) int {
 	if err != nil {
 		panic(err)
 	}
-	entry := n.GetEntry(account)
+	entry, err := n.GetEntry(account)
+	if err != nil {
+		panic(err)
+	}
 	if entry.GetBlockNumber() >= 0 {
 		i.Ui.Error(fmt.Sprintf("=== %s: load block %d, %s, %d\n", util.GetString(account), entry.GetBlockNumber(), entry.GetBlockHash(), len(entry.GetBlock().GetTransactions())))
 		return 1
