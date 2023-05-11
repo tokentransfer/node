@@ -5,13 +5,13 @@ import (
 
 	"github.com/tokentransfer/go-MerklePatriciaTree/mpt"
 	"github.com/tokentransfer/node/crypto"
-	"github.com/tokentransfer/node/store"
+	"github.com/tokentransfer/node/db"
 
 	libstore "github.com/tokentransfer/interfaces/store"
 )
 
 func NewMemKVStore() libstore.KvService {
-	kv := store.MemoryService{}
+	kv := db.MemoryService{}
 	err := kv.Init(nil)
 	if err != nil {
 		panic(err)
@@ -20,7 +20,7 @@ func NewMemKVStore() libstore.KvService {
 }
 
 func NewLevelKVStore() libstore.KvService {
-	kv := store.LevelService{Path: "./test"}
+	kv := db.LevelService{Path: "./test"}
 	err := kv.Init(nil)
 	if err != nil {
 		panic(err)

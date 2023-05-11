@@ -11,7 +11,7 @@ import (
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
-	"github.com/tokentransfer/node/store"
+	"github.com/tokentransfer/node/db"
 
 	libstore "github.com/tokentransfer/interfaces/store"
 )
@@ -68,7 +68,7 @@ func (suite *StorageSuite) testCode(c *C) {
 }
 
 func (suite *StorageSuite) testStack(c *C) {
-	db0 := &store.MemoryService{
+	db0 := &db.MemoryService{
 		Name: "memory",
 	}
 	err := db0.Init(nil)
@@ -76,7 +76,7 @@ func (suite *StorageSuite) testStack(c *C) {
 	err = db0.Start()
 	c.Assert(err, IsNil)
 
-	db1 := &store.MemoryService{
+	db1 := &db.MemoryService{
 		Name: "memory",
 	}
 	err = db1.Init(nil)
@@ -84,7 +84,7 @@ func (suite *StorageSuite) testStack(c *C) {
 	err = db1.Start()
 	c.Assert(err, IsNil)
 
-	stackdb, err := store.CreateStackService(db0)
+	stackdb, err := db.CreateStackService(db0)
 	c.Assert(err, IsNil)
 	err = stackdb.Push(db1)
 	c.Assert(err, IsNil)

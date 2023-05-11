@@ -14,14 +14,14 @@ import (
 	libstore "github.com/tokentransfer/interfaces/store"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
-	"github.com/tokentransfer/node/store"
+	"github.com/tokentransfer/node/db"
 	"github.com/tokentransfer/node/util"
 	"github.com/tokentransfer/node/vm"
 )
 
 type ChunkService struct {
 	storage core.Storage
-	stackdb *store.StackService
+	stackdb *db.StackService
 
 	categories []string
 	locker     sync.Mutex
@@ -71,7 +71,7 @@ func (s *ChunkService) CreateSandbox() error {
 	defer s.locker.Unlock()
 
 	// s.dump("before create")
-	memdb := &store.MemoryService{
+	memdb := &db.MemoryService{
 		Name: "memory",
 	}
 	err := memdb.Init(nil)
@@ -703,7 +703,7 @@ func (s *ChunkService) Init(c libcore.Config) error {
 	}
 	dbPath := path.Join(dataDir, "data")
 
-	datadb := &store.LevelService{Path: dbPath}
+	datadb := &db.LevelService{Path: dbPath}
 	err := datadb.Init(c)
 	if err != nil {
 		return err
@@ -712,7 +712,7 @@ func (s *ChunkService) Init(c libcore.Config) error {
 	if err != nil {
 		return err
 	}
-	stackdb, err := store.CreateStackService(datadb)
+	stackdb, err := db.CreateStackService(datadb)
 	if err != nil {
 		return err
 	}

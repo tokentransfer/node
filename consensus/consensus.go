@@ -135,7 +135,16 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 					return false, util.ErrorOfInvalid("format", "user info")
 				}
 			case core.CORE_META_INFO:
+				info := msg.(*pb.MetaInfo)
+				if !(len(info.Symbol) > 0 && len(info.Items) > 0) {
+					return false, util.ErrorOfInvalid("format", "meta info")
+				}
 			case core.CORE_TOKEN_INFO:
+				info := msg.(*pb.TokenInfo)
+				if !(len(info.Symbol) > 0 && len(info.Items) > 0) {
+					return false, util.ErrorOfInvalid("format", "token info")
+				}
+
 			case core.CORE_DATA_INFO:
 			case core.CORE_PEER_INFO:
 			default:

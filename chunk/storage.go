@@ -11,7 +11,7 @@ import (
 	libstore "github.com/tokentransfer/interfaces/store"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/crypto"
-	"github.com/tokentransfer/node/store"
+	"github.com/tokentransfer/node/db"
 	"github.com/tokentransfer/node/util"
 )
 
@@ -28,22 +28,22 @@ type chunkStorage struct {
 
 // reference from https://github.com/indyjo/cafs/blob/master/ram/ramstorage.go
 func NewStorage(maxBytes int64) (core.Storage, error) {
-	db := &store.MemoryService{
+	dbs := &db.MemoryService{
 		Name: "memory",
 	}
-	// db := &store.LevelService{
+	// dbs := &db.LevelService{
 	// 	Name: "test",
 	// 	Path: "./test",
 	// }
-	err := db.Init(nil)
+	err := dbs.Init(nil)
 	if err != nil {
 		return nil, err
 	}
-	err = db.Start()
+	err = dbs.Start()
 	if err != nil {
 		return nil, err
 	}
-	return NewStorageWith(db, maxBytes)
+	return NewStorageWith(dbs, maxBytes)
 }
 
 func NewStorageWith(db libstore.KvService, maxBytes int64) (core.Storage, error) {

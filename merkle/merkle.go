@@ -7,7 +7,7 @@ import (
 	"github.com/tokentransfer/go-MerklePatriciaTree/mpt"
 
 	"github.com/tokentransfer/node/block"
-	"github.com/tokentransfer/node/store"
+	"github.com/tokentransfer/node/db"
 	"github.com/tokentransfer/node/util"
 
 	libblock "github.com/tokentransfer/interfaces/block"
@@ -172,7 +172,7 @@ func (service *MerkleService) Init(c libcore.Config) error {
 	}
 	dbPath := path.Join(dataDir, "index")
 
-	indexdb := &store.LevelService{Path: dbPath}
+	indexdb := &db.LevelService{Path: dbPath}
 	err := indexdb.Init(c)
 	if err != nil {
 		return err
@@ -184,7 +184,7 @@ func (service *MerkleService) Init(c libcore.Config) error {
 	service.im = NewMerkleTree(service.crypto, indexdb)
 
 	dbPath = path.Join(dataDir, "block")
-	blockdb := &store.LevelService{Path: dbPath}
+	blockdb := &db.LevelService{Path: dbPath}
 	err = blockdb.Init(c)
 	if err != nil {
 		return err
@@ -196,7 +196,7 @@ func (service *MerkleService) Init(c libcore.Config) error {
 	service.bm = NewMerkleTree(service.crypto, blockdb)
 
 	dbPath = path.Join(dataDir, "transaction")
-	txdb := &store.LevelService{Path: dbPath}
+	txdb := &db.LevelService{Path: dbPath}
 	err = txdb.Init(c)
 	if err != nil {
 		return err
@@ -208,7 +208,7 @@ func (service *MerkleService) Init(c libcore.Config) error {
 	service.tm = NewMerkleTree(service.crypto, txdb)
 
 	dbPath = path.Join(dataDir, "receipt")
-	statedb := &store.LevelService{Path: dbPath}
+	statedb := &db.LevelService{Path: dbPath}
 	err = statedb.Init(c)
 	if err != nil {
 		return err
