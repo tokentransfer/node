@@ -10,6 +10,8 @@ import (
 
 	"github.com/caivega/glog"
 	"github.com/mitchellh/cli"
+	libcore "github.com/tokentransfer/interfaces/core"
+	"github.com/tokentransfer/node/account"
 	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/consensus"
 	"github.com/tokentransfer/node/rpc"
@@ -35,30 +37,59 @@ var _ cli.Command = &StartCommand{}
 
 // readConfig is responsible for setup of our configuration using
 // the command line and any file configs
-func (c *StartCommand) readConfig() *config.Config {
+func (c *StartCommand) readConfig() (*config.Config, libcore.Address) {
 	var configFile string
+	var accountString string
 
 	cmdFlags := flag.NewFlagSet("node", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.Ui.Output(c.Help()) }
 	cmdFlags.StringVar(&configFile, "config", "./config.json", "json file to read config from")
+	cmdFlags.StringVar(&accountString, "account", "", "the account")
 	if err := cmdFlags.Parse(c.args); err != nil {
-		return nil
+		panic(err)
 	}
 
 	config, err := config.NewConfig(configFile)
 	if err != nil {
 		panic(err)
 	}
-	return config
-}
 
-// setupLoggers is used to setup the logGate, logWriter, and our logOutput
-func (c *StartCommand) setupLoggers(config *config.Config) {
+	if len(config.GetSecret()) == 0 {
+		secret, err := c.Ui.AskSecret("The secret:")
+		if err != nil {
+			panic(err)
+		}
+		config.SetSecret(secret)
+	}
 
+	as := account.NewAccountService()
+	_, nodeKey, err := as.NewKeyFromSecret(config.GetSecret())
+	if err != nil {
+		panic(err)
+	}
+	nodeAccount, err := nodeKey.GetAddress()
+	if err != nil {
+		panic(err)
+	}
+	c.Ui.Info("Node: " + util.GetString(nodeAccount))
+
+	var account libcore.Address
+	if len(accountString) > 0 {
+		_, a, err := as.NewAccountFromAddress(accountString)
+		if err != nil {
+			panic(err)
+		}
+		account = a
+	} else {
+		account = nil
+	}
+	c.Ui.Info("Account: " + util.GetString(account))
+
+	return config, account
 }
 
 // startNode is used to start the Node and IPC
-func (c *StartCommand) startNode(config *config.Config) *consensus.Node {
+func (c *StartCommand) startNode(config *config.Config, account libcore.Address) *consensus.Node {
 	c.Ui.Output("Starting node...")
 
 	n := consensus.NewNode()
@@ -71,10 +102,10 @@ func (c *StartCommand) startNode(config *config.Config) *consensus.Node {
 		panic(err)
 	}
 
-	entry := n.GetEntry(nil)
+	entry := n.GetEntry(account)
 	blockNumber := entry.GetBlockNumber()
 	blockHash := entry.GetBlockHash()
-	glog.Infof("%s: block, %d, %s", util.GetString(nil), blockNumber, blockHash)
+	glog.Infof("%s: block, %d, %s", util.GetString(account), blockNumber, blockHash)
 
 	r := rpc.NewRPCService(n)
 	err = r.Init(config)
@@ -96,24 +127,13 @@ func (c *StartCommand) Run(args []string) int {
 
 	// Parse our configs
 	c.args = args
-	config := c.readConfig()
+	config, account := c.readConfig()
 	if config == nil {
 		return 1
 	}
 
-	if len(config.GetSecret()) == 0 {
-		secret, err := c.Ui.AskSecret("The secret:")
-		if err != nil {
-			panic(err)
-		}
-		config.SetSecret(secret)
-	}
-
-	// Setup the log outputs
-	c.setupLoggers(config)
-
 	// Start the Node
-	n := c.startNode(config)
+	n := c.startNode(config, account)
 	if n == nil {
 		return 1
 	}
