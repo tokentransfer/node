@@ -41,7 +41,7 @@ func (c *StartCommand) readConfig() (*config.Config, libcore.Address) {
 	var configFile string
 	var accountString string
 
-	cmdFlags := flag.NewFlagSet("node", flag.ContinueOnError)
+	cmdFlags := flag.NewFlagSet("start", flag.ContinueOnError)
 	cmdFlags.Usage = func() { c.Ui.Output(c.Help()) }
 	cmdFlags.StringVar(&configFile, "config", "./config.json", "json file to read config from")
 	cmdFlags.StringVar(&accountString, "account", "", "the account")
@@ -203,6 +203,7 @@ Usage: node start [options]
 Options:
 
 	-config=./config.json	Path to a JSON file to read configuration from.
+	-account		The account
 `
 	return strings.TrimSpace(helpText)
 }

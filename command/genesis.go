@@ -36,7 +36,7 @@ func (i *GenesisCommand) Run(args []string) int {
 	var configFile string
 	var accountString string
 
-	cmdFlags := flag.NewFlagSet("info", flag.ContinueOnError)
+	cmdFlags := flag.NewFlagSet("genesis", flag.ContinueOnError)
 	cmdFlags.Usage = func() { i.Ui.Output(i.Help()) }
 	cmdFlags.StringVar(&configFile, "config", "./config.json", "json file to read config from")
 	cmdFlags.StringVar(&accountString, "account", "", "the account")
