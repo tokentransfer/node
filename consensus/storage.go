@@ -10,6 +10,7 @@ import (
 	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/merkle"
+	"github.com/tokentransfer/node/util"
 )
 
 type StorageService struct {
@@ -17,10 +18,10 @@ type StorageService struct {
 	cs     libcrypto.CryptoService
 	as     libaccount.AccountService
 
-	merkleMap    map[libcore.Address]libstore.MerkleService
+	merkleMap    map[string]libstore.MerkleService
 	merkleLocker *sync.Mutex
 
-	chunkMap    map[libcore.Address]*chunk.ChunkService
+	chunkMap    map[string]*chunk.ChunkService
 	chunkLocker *sync.Mutex
 }
 
@@ -30,9 +31,9 @@ func NewStorageService(config *config.Config, cs libcrypto.CryptoService, as lib
 		cs:     cs,
 		as:     as,
 
-		merkleMap:    make(map[libcore.Address]libstore.MerkleService),
+		merkleMap:    make(map[string]libstore.MerkleService),
 		merkleLocker: new(sync.Mutex),
-		chunkMap:     make(map[libcore.Address]*chunk.ChunkService),
+		chunkMap:     make(map[string]*chunk.ChunkService),
 		chunkLocker:  new(sync.Mutex),
 	}, nil
 }
@@ -41,13 +42,14 @@ func (service *StorageService) GetMerkleService(rootAccount libcore.Address) lib
 	service.merkleLocker.Lock()
 	defer service.merkleLocker.Unlock()
 
-	ms, ok := service.merkleMap[rootAccount]
+	root := util.GetString(rootAccount)
+	ms, ok := service.merkleMap[root]
 	if !ok {
 		s, err := merkle.NewMerkleService(service.config, service.cs, rootAccount)
 		if err != nil {
 			panic(err)
 		}
-		service.merkleMap[rootAccount] = s
+		service.merkleMap[root] = s
 
 		ms = s
 	}
@@ -58,13 +60,14 @@ func (service *StorageService) GetChunkService(rootAccount libcore.Address) *chu
 	service.chunkLocker.Lock()
 	defer service.chunkLocker.Unlock()
 
-	ss, ok := service.chunkMap[rootAccount]
+	root := util.GetString(rootAccount)
+	ss, ok := service.chunkMap[root]
 	if !ok {
 		s, err := chunk.NewChunkService(service.config, rootAccount)
 		if err != nil {
 			panic(err)
 		}
-		service.chunkMap[rootAccount] = s
+		service.chunkMap[root] = s
 
 		ss = s
 	}

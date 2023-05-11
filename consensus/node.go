@@ -48,7 +48,7 @@ type Node struct {
 	consensusService *ConsensusService
 	storageService   *StorageService
 
-	entryMap    map[libcore.Address]*Entry
+	entryMap    map[string]*Entry
 	entryLocker *sync.Mutex
 
 	transactionLocker *sync.Mutex
@@ -81,7 +81,7 @@ func NewNode() *Node {
 
 		transactionLocker: &sync.Mutex{},
 
-		entryMap:    make(map[libcore.Address]*Entry),
+		entryMap:    make(map[string]*Entry),
 		entryLocker: &sync.Mutex{},
 
 		accountService: account.NewAccountService(),
@@ -105,7 +105,7 @@ func (n *Node) Init(c libcore.Config) error {
 	}
 	n.self = &Peer{
 		Key:     pubKey,
-		peermap: make(map[libcore.Address]*peerEntry),
+		peermap: make(map[string]*peerEntry),
 	}
 
 	storageService, err := NewStorageService(n.config, n.cryptoService, n.accountService)
@@ -1080,7 +1080,8 @@ func (n *Node) GetEntry(rootAccount libcore.Address) *Entry {
 	n.entryLocker.Lock()
 	defer n.entryLocker.Unlock()
 
-	entry, ok := n.entryMap[rootAccount]
+	root := util.GetString(rootAccount)
+	entry, ok := n.entryMap[root]
 	if !ok {
 		entry = &Entry{
 			txlist: make([]libblock.TransactionWithData, 0),
@@ -1090,7 +1091,7 @@ func (n *Node) GetEntry(rootAccount libcore.Address) *Entry {
 		if err != nil {
 			glog.Error(err)
 		} else {
-			n.entryMap[rootAccount] = entry
+			n.entryMap[root] = entry
 		}
 	}
 	return entry
@@ -1462,7 +1463,8 @@ func (n *Node) GenerateBlock(rootAccount libcore.Address) (libblock.Block, error
 func (n *Node) generate() {
 	for {
 		hasTx := false
-		for rootAccount, entry := range n.entryMap {
+		for root, entry := range n.entryMap {
+			_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
 			if entry.Consensused && len(entry.txlist) > 0 {
 				hasTx = hasTx || true
 
@@ -1497,9 +1499,9 @@ func (n *Node) generate() {
 			}
 		}
 		if !hasTx {
-			for rootAccount, entry := range n.entryMap {
+			for root, entry := range n.entryMap {
 				if entry.Consensused {
-					glog.Infof("=== %s: block %d, %s, prepare %d, %d\n", util.GetString(rootAccount), entry.GetBlockNumber(), entry.GetBlockHash(), entry.GetBlockNumber()+1, len(entry.txlist))
+					glog.Infof("=== %s: block %d, %s, prepare %d, %d\n", root, entry.GetBlockNumber(), entry.GetBlockHash(), entry.GetBlockNumber()+1, len(entry.txlist))
 				}
 			}
 
@@ -1537,16 +1539,17 @@ func (n *Node) broadcast(data []byte) {
 func (n *Node) connect() {
 	config := n.config
 	for {
-		for rootAccount, entry := range n.entryMap {
+		for root, entry := range n.entryMap {
+			_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
 			list := n.ListPeerBy(rootAccount)
 			e := n.self.getPeerEntry(rootAccount)
 			e.PeerCount = int64(len(list))
 
-			glog.Infoln("=== :", util.GetString(rootAccount), 0, n.self.GetIndex(n), n.self.GetAddress(n), n.self.Id, e.Status, e.BlockNumber, e.PeerCount)
+			glog.Infoln("=== :", root, 0, n.self.GetIndex(n), n.self.GetAddress(n), n.self.Id, e.Status, e.BlockNumber, e.PeerCount)
 			for i := 0; i < len(list); i++ {
 				p := list[i]
 				e := p.getPeerEntry(rootAccount)
-				glog.Infoln("==> :", util.GetString(rootAccount), i+1, p.GetIndex(n), p.GetAddress(n), p.Id, e.Status, e.BlockNumber, e.PeerCount)
+				glog.Infoln("==> :", root, i+1, p.GetIndex(n), p.GetAddress(n), p.Id, e.Status, e.BlockNumber, e.PeerCount)
 			}
 			if len(list) == 0 {
 				entry.Consensused = n.PrepareConsensus(rootAccount)
@@ -1571,6 +1574,7 @@ func (n *Node) PrepareConsensus(rootAccount libcore.Address) bool {
 		return true
 	}
 
+	root := util.GetString(rootAccount)
 	list := n.ListPeerBy(rootAccount)
 	count := int64(0)
 	entry := n.GetEntry(rootAccount)
@@ -1578,7 +1582,7 @@ func (n *Node) PrepareConsensus(rootAccount libcore.Address) bool {
 	currentCount := int64(len(list))
 	for i := 0; i < len(list); i++ {
 		p := list[i]
-		e, ok := p.peermap[rootAccount]
+		e, ok := p.peermap[root]
 		if ok {
 			if e.Status >= PeerKnown && e.BlockNumber == currentBlock && (e.PeerCount == currentCount) {
 				count++
@@ -1588,7 +1592,7 @@ func (n *Node) PrepareConsensus(rootAccount libcore.Address) bool {
 	if count > 0 && (count+1) == currentCount {
 		for i := 0; i < len(list); i++ {
 			p := list[i]
-			e, ok := p.peermap[rootAccount]
+			e, ok := p.peermap[root]
 			if ok {
 				e.Status = PeerConsensused
 			}
@@ -1603,7 +1607,8 @@ func (n *Node) discoveryPeer(p *Peer) {
 
 	for {
 		balanced := true
-		for rootAccount, e := range p.peermap {
+		for root, e := range p.peermap {
+			_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
 			entry := n.GetEntry(rootAccount)
 			switch e.Status {
 			case PeerNone:
@@ -1659,6 +1664,11 @@ func (n *Node) discoveryPeer(p *Peer) {
 }
 
 func (n *Node) load(rootAccount libcore.Address, entry *Entry) error {
+	n.transactionLocker.Lock()
+	defer n.transactionLocker.Unlock()
+
+	fmt.Println("load", util.GetString(rootAccount))
+
 	ss := n.storageService
 	ms := ss.GetMerkleService(rootAccount)
 
@@ -1837,8 +1847,9 @@ func (n *Node) discoveryHandler(publisher string, msgData []byte) error {
 		p := n.GetPeer(index)
 		if p == nil {
 			p = &Peer{
-				Id:  publisher,
-				Key: publicKey,
+				Id:      publisher,
+				Key:     publicKey,
+				peermap: make(map[string]*peerEntry),
 			}
 			n.AddPeer(p)
 			n.UpdateStatus(p, rootAccount, PeerKnown)
@@ -2112,7 +2123,8 @@ func (n *Node) discovery() {
 		if err != nil {
 			glog.Error(err)
 		} else {
-			for rootAccount := range n.entryMap {
+			for root := range n.entryMap {
+				_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
 				rootData, err := block.AddressToByte(rootAccount)
 				if err != nil {
 					glog.Error(err)
@@ -2231,9 +2243,10 @@ func (n *Node) ListPeerBy(rootAccount libcore.Address) []*Peer {
 	n.peerLocker.RLock()
 	defer n.peerLocker.RUnlock()
 
+	root := util.GetString(rootAccount)
 	list := make([]*Peer, 0)
 	for _, p := range n.peers {
-		_, ok := p.peermap[rootAccount]
+		_, ok := p.peermap[root]
 		if ok {
 			list = append(list, p)
 		}

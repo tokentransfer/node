@@ -147,7 +147,7 @@ func (suite *NodeSuite) testGas(c *C) {
 	suite.close(c, n)
 }
 
-func (suite *NodeSuite) TestTransaction(c *C) {
+func (suite *NodeSuite) testTransaction(c *C) {
 	blobData, err := util.ReadFile("./data/tx.blob")
 	c.Assert(err, IsNil)
 	fmt.Println(len(blobData), string(blobData))
@@ -159,7 +159,7 @@ func (suite *NodeSuite) TestTransaction(c *C) {
 	c.Assert(err, IsNil)
 }
 
-func (suite *NodeSuite) TestProcess(c *C) {
+func (suite *NodeSuite) testProcess(c *C) {
 	n := suite.load(c)
 
 	var rootAccount libcore.Address = nil

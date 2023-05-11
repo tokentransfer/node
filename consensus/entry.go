@@ -6,6 +6,7 @@ import (
 	libaccount "github.com/tokentransfer/interfaces/account"
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
+	"github.com/tokentransfer/node/util"
 )
 
 type Status int
@@ -46,7 +47,7 @@ type Peer struct {
 
 	address string
 	index   uint64
-	peermap map[libcore.Address]*peerEntry
+	peermap map[string]*peerEntry
 }
 
 func (p *Peer) GetPublicKey() libaccount.PublicKey {
@@ -54,13 +55,14 @@ func (p *Peer) GetPublicKey() libaccount.PublicKey {
 }
 
 func (p *Peer) getPeerEntry(rootAccount libcore.Address) *peerEntry {
-	entry, ok := p.peermap[rootAccount]
+	root := util.GetString(rootAccount)
+	entry, ok := p.peermap[root]
 	if !ok {
 		entry = &peerEntry{
 			lastSendBlock: int64(-1),
 			lastSendTime:  time.Now(),
 		}
-		p.peermap[rootAccount] = entry
+		p.peermap[root] = entry
 	}
 	return entry
 }
