@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	. "github.com/tokentransfer/check"
-	"github.com/tokentransfer/node/chunk"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/db"
+	"github.com/tokentransfer/node/storage"
 
 	libstore "github.com/tokentransfer/interfaces/store"
 )
@@ -62,7 +62,7 @@ func (suite *StorageSuite) TestProto(c *C) {
 }
 
 func (suite *StorageSuite) testCode(c *C) {
-	s, err := chunk.NewStorage(2048)
+	s, err := storage.NewStorage(2048)
 	c.Assert(err, IsNil)
 	test(c, s)
 }
@@ -89,11 +89,11 @@ func (suite *StorageSuite) testStack(c *C) {
 	err = stackdb.Push(db1)
 	c.Assert(err, IsNil)
 
-	s, err := chunk.NewStorageWith(stackdb, 2048*2048*8)
+	s, err := storage.NewStorageWith(stackdb, 2048*2048*8)
 	c.Assert(err, IsNil)
 	test(c, s)
 
-	s0, err := chunk.LoadStorageWith(stackdb, 2048*2048*8)
+	s0, err := storage.LoadStorageWith(stackdb, 2048*2048*8)
 	c.Assert(err, IsNil)
 	dump(s0, "s0")
 
@@ -104,11 +104,11 @@ func (suite *StorageSuite) testStack(c *C) {
 	_, err = stackdb.Commit()
 	c.Assert(err, IsNil)
 
-	s1, err := chunk.LoadStorageWith(db0, 2048*2048*8)
+	s1, err := storage.LoadStorageWith(db0, 2048*2048*8)
 	c.Assert(err, IsNil)
 	dump(s1, "s1")
 
-	s2, err := chunk.LoadStorageWith(db1, 2048*2048*8)
+	s2, err := storage.LoadStorageWith(db1, 2048*2048*8)
 	c.Assert(err, IsNil)
 	dump(s2, "s2")
 
