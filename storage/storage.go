@@ -10,12 +10,9 @@ import (
 	"github.com/caivega/glog"
 	libstore "github.com/tokentransfer/interfaces/store"
 	"github.com/tokentransfer/node/core"
-	"github.com/tokentransfer/node/crypto"
 	"github.com/tokentransfer/node/db"
 	"github.com/tokentransfer/node/util"
 )
-
-var cs = &crypto.CryptoService{}
 
 type chunkStorage struct {
 	mutex   sync.Mutex

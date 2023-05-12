@@ -10,14 +10,18 @@ import (
 
 	"github.com/caivega/glog"
 	libcore "github.com/tokentransfer/interfaces/core"
-	libcrypto "github.com/tokentransfer/interfaces/crypto"
 	libstore "github.com/tokentransfer/interfaces/store"
+	"github.com/tokentransfer/node/account"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
+	"github.com/tokentransfer/node/crypto"
 	"github.com/tokentransfer/node/db"
 	"github.com/tokentransfer/node/util"
 	"github.com/tokentransfer/node/vm"
 )
+
+var as = account.NewAccountService()
+var cs = &crypto.CryptoService{}
 
 type StorageService struct {
 	storage core.Storage
@@ -156,6 +160,41 @@ func getGroup(parent core.Group, name string) (core.Group, error) {
 	return g, nil
 }
 
+func (s *StorageService) read(key core.Key) ([]byte, error) {
+	data, err := s.storage.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	reader := data.Open()
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, reader); err != nil {
+		return nil, err
+	}
+	reader.Close()
+	data.Dispose()
+
+	return buf.Bytes(), nil
+}
+
+func (s *StorageService) write(name string, data []byte) (core.Data, error) {
+	t := s.storage.Create(name)
+	_, err := t.Write(data)
+	if err != nil {
+		return nil, err
+	}
+	err = t.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	d, err := t.Data()
+	if err != nil {
+		return nil, err
+	}
+	t.Dispose()
+	return d, nil
+}
+
 func (s *StorageService) writeData(rootGroup core.Group, category string, dir string, name string, data []byte) (libcore.Hash, libcore.Hash, libcore.Hash, libcore.Hash, error) {
 	var categoryGroup core.Group
 	if len(category) > 0 {
@@ -283,6 +322,64 @@ func (s *StorageService) WriteCode(account libcore.Address, wasmCode []byte, abi
 		return dirHash, nil
 	}
 	return codeHash, nil
+}
+
+func (s *StorageService) ReadMeta(symbol string) (libcore.Address, *pb.MetaInfo, error) {
+	rootGroup, err := s.getRoot(nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, _, _, metaData, err := s.readData(rootGroup, "token", "meta", symbol)
+	if err != nil {
+		return nil, nil, err
+	}
+	t, msg, err := core.UnmarshalData(metaData)
+	if err != nil {
+		return nil, nil, err
+	}
+	if t != core.CORE_DATA_MAP {
+		return nil, nil, util.ErrorOfInvalid("data map", "data")
+	}
+	m := msg.(map[string]interface{})
+	account := util.ToString(&m, "account")
+	_, a, err := as.NewAccountFromAddress(account)
+	if err != nil {
+		return nil, nil, err
+	}
+	info := toMetaInfo(&m, "info")
+	return a, info, nil
+}
+
+func toMetaInfo(m *map[string]interface{}, key string) *pb.MetaInfo {
+	if m != nil {
+		data := (*m)[key]
+		if data != nil {
+			info, ok := data.(*pb.MetaInfo)
+			if ok {
+				return info
+			}
+		}
+	}
+	return nil
+}
+
+func (s *StorageService) WriteMeta(account libcore.Address, info *pb.MetaInfo) (libcore.Hash, error) {
+	rootGroup, err := s.getRoot(nil)
+	if err != nil {
+		return nil, err
+	}
+	metaData, err := core.MarshalData(map[string]interface{}{
+		"account": account.String(),
+		"info":    info,
+	})
+	if err != nil {
+		return nil, err
+	}
+	_, _, _, metaHash, err := s.writeData(rootGroup, "token", "meta", info.Symbol, metaData)
+	if err != nil {
+		return nil, err
+	}
+	return metaHash, nil
 }
 
 func (s *StorageService) ReadData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address) ([]byte, error) {
@@ -492,7 +589,7 @@ func (s *StorageService) CreateContract(account libcore.Address, wasmCode []byte
 	return libcore.Hash(s.storage.Root()), libcore.Hash(k), nil
 }
 
-func (s *StorageService) RunContract(cs libcrypto.CryptoService, cost uint64, signAccount libcore.Address, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Address, libcore.Hash, libcore.Hash, []byte, error) {
+func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Address, libcore.Hash, libcore.Hash, []byte, error) {
 	wasmCode, abiCode, err := s.ReadCode(toAccount)
 	if err != nil {
 		return 0, nil, nil, nil, nil, err
@@ -579,11 +676,11 @@ func (s *StorageService) CallContract(rootAccount libcore.Address, dataAccount l
 	if err != nil {
 		return 0, nil, err
 	}
-	r, err := core.AsData(resultData)
+	t, r, err := core.UnmarshalData(resultData)
 	if err != nil {
 		return 0, nil, err
 	}
-	glog.Infoln("> call contract", usedCost, dataAccount.String(), codeAccount.String(), len(resultData), method, r)
+	glog.Infoln("> call contract", usedCost, dataAccount.String(), codeAccount.String(), len(resultData), method, t, r)
 	return usedCost, r, nil
 }
 
@@ -593,7 +690,7 @@ func (s *StorageService) GetContractData(rootAccount libcore.Address, dataAccoun
 	var e error
 	switch format {
 	case "data":
-		r, e = core.AsData(wasmData)
+		_, r, e = core.UnmarshalData(wasmData)
 		if e != nil {
 			return 0, nil, e
 		}
@@ -625,7 +722,7 @@ func (s *StorageService) GetData(hash libcore.Hash, format string) (int64, inter
 	var e error
 	switch format {
 	case "data":
-		r, e = core.AsData(contentData)
+		_, r, e = core.UnmarshalData(contentData)
 		if e != nil {
 			return 0, nil, e
 		}

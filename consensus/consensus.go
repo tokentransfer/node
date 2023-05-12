@@ -74,7 +74,7 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 		return false, util.ErrorOfInvalid("data", "transaction")
 	}
 
-	fromAccount := tx.From
+	fromAccount := tx.Account
 	sequence := libstore.GetSequence(ms, fromAccount) + 1
 	if tx.Sequence != sequence {
 		return false, util.ErrorOfInvalid("sequence", fmt.Sprintf("%d != %d", tx.Sequence, sequence))
@@ -142,10 +142,39 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 				if !(len(info.Symbol) > 0 && len(info.Items) > 0) {
 					return false, util.ErrorOfInvalid("format", "meta info")
 				}
+				for i := 0; i < len(info.Items); i++ {
+					item := info.Items[i]
+					if item == nil {
+						return false, util.ErrorOfEmpty("meta item", fmt.Sprintf("%d", i))
+					}
+					_, err := core.GetDataTypeByName(item.Type)
+					if err != nil {
+						return false, err
+					}
+				}
+				a, _, _ := ss.ReadMeta(info.Symbol)
+				if a != nil && a.String() != fromAccount.String() {
+					return false, util.ErrorOfUnmatched("account", "meta info", a.String(), fromAccount.String())
+				}
+
 			case core.CORE_TOKEN_INFO:
 				info := msg.(*pb.TokenInfo)
 				if !(len(info.Symbol) > 0 && len(info.Items) > 0) {
 					return false, util.ErrorOfInvalid("format", "token info")
+				}
+				a, meta, err := ss.ReadMeta(info.Symbol)
+				if err != nil {
+					return false, err
+				}
+				if a != nil && a.String() != fromAccount.String() {
+					return false, util.ErrorOfUnmatched("account", "token info", a.String(), fromAccount.String())
+				}
+				if !(meta.Total < 0 || info.Index < uint64(meta.Total)) {
+					return false, util.ErrorOfInvalid("token index", fmt.Sprintf("%d, %d", info.Index, meta.Total))
+				}
+				err = service.verifyToken(meta, info)
+				if err != nil {
+					return false, err
 				}
 
 			case core.CORE_DATA_INFO:
@@ -157,6 +186,46 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 	}
 
 	return true, nil
+}
+
+func (service *ConsensusService) verifyToken(meta *pb.MetaInfo, token *pb.TokenInfo) error {
+	ml := len(meta.Items)
+	tl := len(token.Items)
+	if ml != tl {
+		return util.ErrorOfUnmatched("token item", "length", ml, tl)
+	}
+	for i := 0; i < ml; i++ {
+		metaItem := meta.Items[i]
+		tokenItem := token.Items[i]
+		if tokenItem == nil {
+			return util.ErrorOfEmpty("token item", fmt.Sprintf("%d", i))
+		}
+		if tokenItem.Name != metaItem.Name {
+			return util.ErrorOfUnmatched("token item", "name", tokenItem.Name, metaItem.Name)
+		}
+		t, err := core.GetDataTypeByName(metaItem.Type)
+		if err != nil {
+			return err
+		}
+		required := getOptions(metaItem.Options)
+		if required {
+			_, err = t.FromString(tokenItem.Value)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func getOptions(options []string) bool {
+	required := true
+	for _, o := range options {
+		if o == "optional" {
+			required = false
+		}
+	}
+	return required
 }
 
 func (service *ConsensusService) getAccountInfo(rootAccount libcore.Address, account libcore.Address, sequence uint64) (*block.AccountState, *block.AccountState, error) {
@@ -292,15 +361,6 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 		return nil, util.ErrorOf("error", "sequence", fmt.Sprintf("%d != %d", tx.Sequence, fromSequence))
 	}
 
-	toAccount := tx.To
-	existDest, _, err := service.getAccountEntry(rootAccount, toAccount, accountMap)
-	if err != nil {
-		return nil, err
-	}
-	if !existDest {
-		accounts = append(accounts, toAccount.String())
-	}
-
 	gasAccount := config.GetGasAccount()
 	existGas, gasEntry, err := service.getAccountEntry(rootAccount, gasAccount, accountMap)
 	if err != nil {
@@ -412,7 +472,6 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 	if err != nil {
 		return cost, nil, err
 	}
-	cs := service.n.cryptoService
 	as := service.n.accountService
 	ss := entry.storage
 
@@ -462,7 +521,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			if err != nil {
 				return 0, nil, err
 			}
-			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(cs, remainCost, tx.Account, dataAccount, tx.To, info.Method, info.Params, inputs, outputs)
+			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(remainCost, tx.Account, dataAccount, tx.Account, info.Method, info.Params, inputs, outputs)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -481,13 +540,13 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 
 		case core.CORE_PAGE_INFO:
 			info := msg.(*pb.PageInfo)
-			_, pageHash, err := ss.WritePage(info.Name, tx.To, info.Data)
+			_, pageHash, err := ss.WritePage(info.Name, tx.Account, info.Data)
 			if err != nil {
 				return cost, nil, err
 			}
-			accountEntry, ok := accountMap[tx.To.String()]
+			accountEntry, ok := accountMap[tx.Account.String()]
 			if !ok {
-				return cost, nil, util.ErrorOfNotFound("account entry", tx.To.String())
+				return cost, nil, util.ErrorOfNotFound("account entry", tx.Account.String())
 			}
 			accountEntry.info.Page = &block.DataInfo{
 				Hash: pageHash,
@@ -495,13 +554,13 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 
 		case core.CORE_CODE_INFO:
 			info := msg.(*pb.CodeInfo)
-			_, codeHash, err := ss.CreateContract(tx.To, info.Code, info.Abi)
+			_, codeHash, err := ss.CreateContract(tx.Account, info.Code, info.Abi)
 			if err != nil {
 				return cost, nil, err
 			}
-			accountEntry, ok := accountMap[tx.To.String()]
+			accountEntry, ok := accountMap[tx.Account.String()]
 			if !ok {
-				return cost, nil, util.ErrorOfNotFound("account entry", tx.To.String())
+				return cost, nil, util.ErrorOfNotFound("account entry", tx.Account.String())
 			}
 			accountEntry.info.Code = &block.DataInfo{
 				Hash: codeHash,
@@ -513,7 +572,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			if err != nil {
 				return cost, nil, err
 			}
-			userHash, userAccount, err := ss.WriteUser(tx.Account, tx.To, account, info)
+			userHash, userAccount, err := ss.WriteUser(tx.Account, tx.Account, account, info)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -526,7 +585,22 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			}
 
 		case core.CORE_META_INFO:
+			info := msg.(*pb.MetaInfo)
+			metaHash, err := ss.WriteMeta(tx.Account, info)
+			if err != nil {
+				return cost, nil, err
+			}
+			accountEntry, ok := accountMap[tx.Account.String()]
+			if !ok {
+				return cost, nil, util.ErrorOfNotFound("account entry", tx.Account.String())
+			}
+			accountEntry.info.Token = &block.DataInfo{
+				Hash: metaHash,
+			}
+
 		case core.CORE_TOKEN_INFO:
+			// info := msg.(*pb.TokenInfo)
+
 		case core.CORE_DATA_INFO:
 		default:
 			return cost, nil, util.ErrorOfUnknown("format", "info")

@@ -186,9 +186,7 @@ func (n *Node) callContract(rootAccount libcore.Address, txm map[string]interfac
 func (n *Node) signTransaction(rootAccount libcore.Address, txm map[string]interface{}) (string, *block.Transaction, error) {
 	as := n.accountService
 
-	from := util.ToString(&txm, "from")
 	secret := util.ToString(&txm, "secret")
-	to := util.ToString(&txm, "to")
 	gas := util.ToUint64(&txm, "gas")
 
 	var account libcore.Address
@@ -212,24 +210,17 @@ func (n *Node) signTransaction(rootAccount libcore.Address, txm map[string]inter
 		return "", nil, err
 	}
 	fromAddress := fromAccount.String()
-	if fromAddress != from {
-		return "", nil, util.ErrorOfUnmatched("account", "in secret", from, fromAddress)
-	}
-	_, toAccount, err := as.NewAccountFromAddress(to)
-	if err != nil {
-		return "", nil, err
+	if fromAddress != account.String() {
+		return "", nil, util.ErrorOfUnmatched("account", "in secret", fromAddress, account.String())
 	}
 	seq := n.getNextSequence(rootAccount, fromAccount)
 
 	tx := &block.Transaction{
 		TransactionType: block.TRANSACTION,
 
-		From:     fromAccount,
+		Account:  account,
 		Sequence: seq,
-		To:       toAccount,
-
-		Account: account,
-		Gas:     gas,
+		Gas:      gas,
 	}
 
 	payloadInfo := &block.PayloadInfo{}
@@ -1822,22 +1813,27 @@ func (n *Node) load(rootAccount libcore.Address, entry *Entry) error {
 		}
 		entry.ValidatedBlock = b
 
-		allData, err := b.MarshalBinary()
+		allData, err := b.Raw(libcrypto.RawBinary)
 		if err != nil {
 			glog.Error(err)
 			break
 		}
-		ignoreData, err := b.Raw(false)
+		ignoreData, err := b.Raw(libcrypto.RawIgnoreVariableFields)
 		if err != nil {
 			glog.Error(err)
 			break
 		}
-		signData, err := b.Raw(true)
+		signData, err := b.Raw(libcrypto.RawIgnoreSigningFields)
 		if err != nil {
 			glog.Error(err)
 			break
 		}
-		glog.Infoln("load block", current, b.GetHash().String(), len(allData), len(ignoreData), len(signData))
+		hashData, err := b.Raw(libcrypto.RawIgnoreContent)
+		if err != nil {
+			glog.Error(err)
+			break
+		}
+		glog.Infoln("load block", current, b.GetHash().String(), len(allData), len(ignoreData), len(signData), len(hashData))
 
 		current++
 	}
