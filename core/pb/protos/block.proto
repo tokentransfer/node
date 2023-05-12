@@ -66,7 +66,7 @@ message AccountState {
     bytes RootHash	= 10;
 }
 
-message LinkInfo {
+message GroupInfo {
     bytes Hash		   = 1;
     repeated bytes List    = 2;
     map<string, bytes> Map = 3;
