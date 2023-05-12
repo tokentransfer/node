@@ -19,16 +19,13 @@ message Block {
 message Transaction {
     uint32 TransactionType  = 1;
    
-    bytes From		= 2;
-    uint64 Sequence	= 3;
-    bytes To		= 4;
- 
-    bytes Account       = 5;
-    uint64 Gas          = 6;
-    PayloadInfo Payload = 7;
+    bytes Account       = 2;
+    uint64 Sequence     = 3;    
+    uint64 Gas          = 4;
+    PayloadInfo Payload = 5;
 
-    bytes PublicKey     = 8;
-    bytes Signature     = 9;
+    bytes PublicKey     = 6;
+    bytes Signature     = 7;
 }
 
 message Receipt {
