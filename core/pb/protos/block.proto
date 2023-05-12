@@ -86,10 +86,8 @@ message MetaItem {
 
 message MetaInfo {
     string Symbol           = 1;
-    uint64 Index            = 2;
-    uint64 Count            = 3;
-    int64 Total             = 4;
-    repeated MetaItem Items = 5;
+    int64 Total             = 2;
+    repeated MetaItem Items = 3;
 }
 
 message TokenItem {
