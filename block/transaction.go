@@ -1,6 +1,7 @@
 package block
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/tokentransfer/node/core"
@@ -17,13 +18,10 @@ type Transaction struct {
 
 	TransactionType libblock.TransactionType
 
-	From     libcore.Address
+	Account  libcore.Address
 	Sequence uint64
-	To       libcore.Address
-
-	Account libcore.Address
-	Gas     uint64
-	Payload *PayloadInfo
+	Gas      uint64
+	Payload  *PayloadInfo
 
 	PublicKey libcore.PublicKey
 	Signature libcore.Signature
@@ -41,17 +39,6 @@ func (tx *Transaction) SetHash(h libcore.Hash) {
 	tx.Hash = h
 }
 
-func ByteToAddress(b []byte) (libcore.Address, error) {
-	if b == nil {
-		return nil, nil
-	}
-	_, a, err := as.NewAccountFromBytes(b)
-	if err != nil {
-		return nil, err
-	}
-	return a, nil
-}
-
 func (tx *Transaction) UnmarshalBinary(data []byte) error {
 	var err error
 
@@ -66,20 +53,11 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 
 	tx.TransactionType = libblock.TransactionType(t.TransactionType)
 
-	tx.From, err = ByteToAddress(t.From)
-	if err != nil {
-		return err
-	}
-	tx.Sequence = t.Sequence
-	tx.To, err = ByteToAddress(t.To)
-	if err != nil {
-		return err
-	}
-
 	tx.Account, err = ByteToAddress(t.Account)
 	if err != nil {
 		return err
 	}
+	tx.Sequence = t.Sequence
 	tx.Gas = t.Gas
 	tx.Payload = fromPayloadInfo(t.Payload)
 
@@ -89,102 +67,72 @@ func (tx *Transaction) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-func AddressToByte(a libcore.Address) ([]byte, error) {
-	if a == nil {
-		return nil, nil
-	}
-	return a.MarshalBinary()
-}
-
 func (tx *Transaction) MarshalBinary() ([]byte, error) {
-	fromData, err := AddressToByte(tx.From)
-	if err != nil {
-		return nil, err
-	}
-	toData, err := AddressToByte(tx.To)
-	if err != nil {
-		return nil, err
-	}
-
-	accountData, err := AddressToByte(tx.Account)
-	if err != nil {
-		return nil, err
-	}
-
-	t := &pb.Transaction{
-		TransactionType: uint32(tx.TransactionType),
-
-		From:     fromData,
-		Sequence: tx.Sequence,
-		To:       toData,
-
-		Account: accountData,
-		Gas:     tx.Gas,
-		Payload: toPayloadInfo(tx.Payload, libcrypto.RawBinary),
-
-		PublicKey: []byte(tx.PublicKey),
-		Signature: []byte(tx.Signature),
-	}
-	return core.Marshal(t)
+	return tx.Raw(libcrypto.RawBinary)
 }
 
-func (tx *Transaction) Raw(ignoreSigningFields bool) ([]byte, error) {
-	if ignoreSigningFields {
-		fromAccount, err := AddressToByte(tx.From)
-		if err != nil {
-			return nil, err
-		}
-		toAccount, err := AddressToByte(tx.To)
-		if err != nil {
-			return nil, err
-		}
-		account, err := AddressToByte(tx.Account)
-		if err != nil {
-			return nil, err
-		}
-		t := &pb.Transaction{
-			TransactionType: uint32(tx.TransactionType),
+func (tx *Transaction) Raw(rt libcrypto.RawType) ([]byte, error) {
+	switch rt {
+	case libcrypto.RawBinary:
+		{
+			accountData, err := AddressToByte(tx.Account)
+			if err != nil {
+				return nil, err
+			}
 
-			From:     fromAccount,
-			Sequence: tx.Sequence,
-			To:       toAccount,
+			t := &pb.Transaction{
+				TransactionType: uint32(tx.TransactionType),
 
-			Account: account,
-			Gas:     tx.Gas,
-			Payload: toPayloadInfo(tx.Payload, libcrypto.RawIgnoreSigningFields),
+				Account:  accountData,
+				Sequence: tx.Sequence,
+				Gas:      tx.Gas,
+				Payload:  toPayloadInfo(tx.Payload, libcrypto.RawBinary),
 
-			PublicKey: []byte(tx.PublicKey),
+				PublicKey: []byte(tx.PublicKey),
+				Signature: []byte(tx.Signature),
+			}
+			return core.Marshal(t)
 		}
-		return core.Marshal(t)
-	} else { //ignore variable fields
-		fromAccount, err := AddressToByte(tx.From)
-		if err != nil {
-			return nil, err
-		}
-		toAccount, err := AddressToByte(tx.To)
-		if err != nil {
-			return nil, err
-		}
-		account, err := AddressToByte(tx.Account)
-		if err != nil {
-			return nil, err
-		}
+	case libcrypto.RawIgnoreSigningFields:
+		{
+			account, err := AddressToByte(tx.Account)
+			if err != nil {
+				return nil, err
+			}
+			t := &pb.Transaction{
+				TransactionType: uint32(tx.TransactionType),
 
-		t := &pb.Transaction{
-			TransactionType: uint32(tx.TransactionType),
+				Account:  account,
+				Sequence: tx.Sequence,
+				Gas:      tx.Gas,
+				Payload:  toPayloadInfo(tx.Payload, libcrypto.RawIgnoreSigningFields),
 
-			From:     fromAccount,
-			Sequence: tx.Sequence,
-			To:       toAccount,
-
-			Account: account,
-			Gas:     tx.Gas,
-			Payload: toPayloadInfo(tx.Payload, libcrypto.RawIgnoreVariableFields),
-
-			PublicKey: []byte(tx.PublicKey),
-			Signature: []byte(tx.Signature),
+				PublicKey: []byte(tx.PublicKey),
+			}
+			return core.Marshal(t)
 		}
-		return core.Marshal(t)
+	case libcrypto.RawIgnoreVariableFields:
+		{
+			account, err := AddressToByte(tx.Account)
+			if err != nil {
+				return nil, err
+			}
+
+			t := &pb.Transaction{
+				TransactionType: uint32(tx.TransactionType),
+
+				Account:  account,
+				Sequence: tx.Sequence,
+				Gas:      tx.Gas,
+				Payload:  toPayloadInfo(tx.Payload, libcrypto.RawIgnoreVariableFields),
+
+				PublicKey: []byte(tx.PublicKey),
+				Signature: []byte(tx.Signature),
+			}
+			return core.Marshal(t)
+		}
+	default:
+		return nil, util.ErrorOfInvalid("raw type", fmt.Sprintf("%d", rt))
 	}
 }
 
@@ -273,7 +221,11 @@ func (txWithData *TransactionWithData) UnmarshalBinary(data []byte) error {
 }
 
 func (txWithData *TransactionWithData) MarshalBinary() ([]byte, error) {
-	txData, err := txWithData.Transaction.MarshalBinary()
+	return txWithData.Raw(libcrypto.RawBinary)
+}
+
+func (txWithData *TransactionWithData) Raw(rt libcrypto.RawType) ([]byte, error) {
+	txData, err := txWithData.Transaction.Raw(rt)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +235,7 @@ func (txWithData *TransactionWithData) MarshalBinary() ([]byte, error) {
 	}
 	tx := msg.(*pb.Transaction)
 
-	receiptData, err := txWithData.Receipt.MarshalBinary()
+	receiptData, err := txWithData.Receipt.Raw(rt)
 	if err != nil {
 		return nil, err
 	}
@@ -303,55 +255,4 @@ func (txWithData *TransactionWithData) MarshalBinary() ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
-}
-
-func (txWithData *TransactionWithData) Raw(ignoreSigningFields bool) ([]byte, error) {
-	txData, err := txWithData.Transaction.Raw(ignoreSigningFields)
-	if err != nil {
-		return nil, err
-	}
-	_, msg, err := core.Unmarshal(txData)
-	if err != nil {
-		return nil, err
-	}
-	tx := msg.(*pb.Transaction)
-
-	receiptData, err := txWithData.Receipt.Raw(ignoreSigningFields)
-	if err != nil {
-		return nil, err
-	}
-	_, msg, err = core.Unmarshal(receiptData)
-	if err != nil {
-		return nil, err
-	}
-	receipt := msg.(*pb.Receipt)
-
-	td := &pb.TransactionWithData{
-		Transaction: tx,
-		Receipt:     receipt,
-		Date:        txWithData.Date,
-	}
-	data, err := core.Marshal(td)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func ReadTransaction(data []byte) (libblock.Transaction, error) {
-	if len(data) == 0 {
-		return nil, util.ErrorOfInvalid("null", "transaction data")
-	}
-	meta := core.GetMeta(data)
-	switch meta {
-	case core.CORE_TRANSACTION:
-		tx := &Transaction{}
-		err := tx.UnmarshalBinary(data)
-		if err != nil {
-			return nil, err
-		}
-		return tx, nil
-	default:
-		return nil, util.ErrorOfInvalid("transaction", "data")
-	}
 }

@@ -54,7 +54,7 @@ const (
 	CORE_PAGE_INFO     = DataType(147)
 	CORE_CODE_INFO     = DataType(148)
 	CORE_USER_INFO     = DataType(149)
-	CORE_LINK_INFO     = DataType(150)
+	CORE_GROUP_INFO    = DataType(150)
 )
 
 func init() {
@@ -158,8 +158,8 @@ func GetInfo(data []byte) string {
 			return "code_info"
 		case CORE_USER_INFO:
 			return "user_info"
-		case CORE_LINK_INFO:
-			return "link_info"
+		case CORE_GROUP_INFO:
+			return "group_info"
 		default:
 			return "unknown"
 		}
@@ -369,6 +369,22 @@ func UnmarshalData(data []byte) (DataType, interface{}, error) {
 	meta := DataType(data[0])
 	bs := data[1:]
 	switch meta {
+	case CORE_DATA:
+		meta, msg, err := UnmarshalData(data)
+		if err != nil {
+			return 0, nil, err
+		}
+		if meta != CORE_DATA {
+			return 0, nil, util.ErrorOfInvalid("data", "data")
+		}
+		d := msg.(*pb.Data)
+		_, o, err := UnmarshalData(d.Bytes)
+		if err != nil {
+			return 0, nil, err
+		}
+		return meta, o, nil
+	case CORE_DATA_NULL:
+		return meta, nil, nil
 	case CORE_DATA_BOOLEAN:
 		if len(bs) != 1 {
 			return 0, nil, util.ErrorOfInvalid("data", "boolean")
@@ -432,6 +448,42 @@ func UnmarshalData(data []byte) (DataType, interface{}, error) {
 		d := make([]byte, len(bs))
 		copy(d, bs)
 		o = d
+	case CORE_DATA_LIST:
+		t, msg, err := Unmarshal(data)
+		if err != nil {
+			return 0, nil, err
+		}
+		if t != CORE_DATA_LIST {
+			return 0, nil, util.ErrorOfInvalid("data list", "data")
+		}
+		list := msg.(*pb.DataList)
+		rlist := make([]interface{}, 0)
+		for _, item := range list.List {
+			_, sdata, err := UnmarshalData(item.Bytes)
+			if err != nil {
+				return 0, nil, err
+			}
+			rlist = append(rlist, sdata)
+		}
+		return meta, rlist, nil
+	case CORE_DATA_MAP:
+		t, msg, err := Unmarshal(data)
+		if err != nil {
+			return 0, nil, err
+		}
+		if t != CORE_DATA_MAP {
+			return 0, nil, util.ErrorOfInvalid("data map", "data")
+		}
+		m := msg.(*pb.DataMap)
+		rm := make(map[string]interface{})
+		for k, v := range m.Map {
+			_, sdata, err := UnmarshalData(v.Bytes)
+			if err != nil {
+				return 0, nil, err
+			}
+			rm[k] = sdata
+		}
+		return meta, rm, nil
 	default:
 		return Unmarshal(data)
 	}
@@ -483,8 +535,8 @@ func Marshal(message proto.Message) ([]byte, error) {
 		meta = CORE_CODE_INFO
 	case *pb.UserInfo:
 		meta = CORE_USER_INFO
-	case *pb.LinkInfo:
-		meta = CORE_LINK_INFO
+	case *pb.GroupInfo:
+		meta = CORE_GROUP_INFO
 
 	default:
 		err := util.ErrorOfInvalid("type", "data")
@@ -556,8 +608,8 @@ func Unmarshal(data []byte) (DataType, proto.Message, error) {
 		msg = &pb.CodeInfo{}
 	case CORE_USER_INFO:
 		msg = &pb.UserInfo{}
-	case CORE_LINK_INFO:
-		msg = &pb.LinkInfo{}
+	case CORE_GROUP_INFO:
+		msg = &pb.GroupInfo{}
 
 	default:
 		err := util.ErrorOfInvalid("format", "data")

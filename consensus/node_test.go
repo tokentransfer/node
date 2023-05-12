@@ -78,10 +78,11 @@ func dumpGroup(c *C, s core.Storage, g core.Group, log core.Printer) {
 				fmt.Println(">", index, len(dataBytes))
 				if len(dataBytes) > 0 {
 					c.Assert(err, IsNil)
-					o, err := core.AsData(dataBytes)
+					t, o, err := core.UnmarshalData(dataBytes)
 					if err != nil {
 						fmt.Println(item, err, string(dataBytes))
 					} else {
+						fmt.Println(item, t)
 						util.PrintJSON(item, o)
 					}
 				}

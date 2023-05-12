@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/util"
 )
 
@@ -34,45 +33,6 @@ func (t DataType) Primary() bool {
 func (t DataType) String() string {
 	n := dataNames[t]
 	return nameMap[n]
-}
-
-func AsData(data []byte) (interface{}, error) {
-	meta, msg, err := UnmarshalData(data)
-	if err != nil {
-		return nil, err
-	}
-	switch meta {
-	case CORE_DATA:
-		d := msg.(*pb.Data)
-		return AsData(d.Bytes)
-	case CORE_DATA_NULL:
-		return nil, nil
-
-	case CORE_DATA_LIST:
-		list := msg.(*pb.DataList)
-		rlist := make([]interface{}, 0)
-		for _, item := range list.List {
-			sdata, err := AsData(item.Bytes)
-			if err != nil {
-				return nil, err
-			}
-			rlist = append(rlist, sdata)
-		}
-		return rlist, nil
-
-	case CORE_DATA_MAP:
-		m := msg.(*pb.DataMap)
-		rm := make(map[string]interface{})
-		for k, v := range m.Map {
-			sdata, err := AsData(v.Bytes)
-			if err != nil {
-				return nil, err
-			}
-			rm[k] = sdata
-		}
-		return rm, nil
-	}
-	return msg, nil
 }
 
 func AsBytes(data []byte) ([]byte, error) {

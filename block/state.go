@@ -128,6 +128,10 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 }
 
 func (s *AccountState) MarshalBinary() ([]byte, error) {
+	return s.Raw(libcrypto.RawBinary)
+}
+
+func (s *AccountState) Raw(rt libcrypto.RawType) ([]byte, error) {
 	a, err := s.Account.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -135,105 +139,22 @@ func (s *AccountState) MarshalBinary() ([]byte, error) {
 
 	return core.Marshal(&pb.AccountState{
 		State: &pb.State{
-			StateType:  uint32(core.CORE_ACCOUNT_STATE),
-			BlockIndex: s.BlockIndex,
-			Account:    a,
-			Sequence:   s.Sequence,
-			Previous:   []byte(s.Previous),
-			Version:    s.Version,
+			StateType: uint32(core.CORE_ACCOUNT_STATE),
+			Account:   a,
+			Sequence:  s.Sequence,
+			Previous:  []byte(s.Previous),
+			Version:   s.Version,
 		},
 
 		Name:  s.Name,
-		User:  toDataInfo(s.User, libcrypto.RawBinary),
-		Code:  toDataInfo(s.Code, libcrypto.RawBinary),
-		Page:  toDataInfo(s.Page, libcrypto.RawBinary),
-		Token: toDataInfo(s.Token, libcrypto.RawBinary),
-		Data:  toDataInfo(s.Data, libcrypto.RawBinary),
-		File:  toDataInfo(s.File, libcrypto.RawBinary),
+		User:  toDataInfo(s.User, rt),
+		Code:  toDataInfo(s.Code, rt),
+		Page:  toDataInfo(s.Page, rt),
+		Token: toDataInfo(s.Token, rt),
+		Data:  toDataInfo(s.Data, rt),
+		File:  toDataInfo(s.File, rt),
 
 		PublicKey: []byte(s.PublicKey),
 		RootHash:  []byte(s.RootHash),
 	})
-}
-
-func (s *AccountState) Raw(ignoreSigningFields bool) ([]byte, error) {
-	a, err := s.Account.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	if ignoreSigningFields {
-		return core.Marshal(&pb.AccountState{
-			State: &pb.State{
-				StateType: uint32(core.CORE_ACCOUNT_STATE),
-				Account:   a,
-				Sequence:  s.Sequence,
-				Previous:  []byte(s.Previous),
-				Version:   s.Version,
-			},
-
-			Name:  s.Name,
-			User:  toDataInfo(s.User, libcrypto.RawIgnoreSigningFields),
-			Code:  toDataInfo(s.Code, libcrypto.RawIgnoreSigningFields),
-			Page:  toDataInfo(s.Page, libcrypto.RawIgnoreSigningFields),
-			Token: toDataInfo(s.Token, libcrypto.RawIgnoreSigningFields),
-			Data:  toDataInfo(s.Data, libcrypto.RawIgnoreSigningFields),
-			File:  toDataInfo(s.File, libcrypto.RawIgnoreSigningFields),
-
-			PublicKey: []byte(s.PublicKey),
-			RootHash:  []byte(s.RootHash),
-		})
-	} else { // ignore variable fields
-		return core.Marshal(&pb.AccountState{
-			State: &pb.State{
-				StateType: uint32(core.CORE_ACCOUNT_STATE),
-				Account:   a,
-				Sequence:  s.Sequence,
-				Previous:  []byte(s.Previous),
-				Version:   s.Version,
-			},
-
-			Name:  s.Name,
-			User:  toDataInfo(s.User, libcrypto.RawIgnoreVariableFields),
-			Code:  toDataInfo(s.Code, libcrypto.RawIgnoreVariableFields),
-			Page:  toDataInfo(s.Page, libcrypto.RawIgnoreVariableFields),
-			Token: toDataInfo(s.Token, libcrypto.RawIgnoreVariableFields),
-			Data:  toDataInfo(s.Data, libcrypto.RawIgnoreVariableFields),
-			File:  toDataInfo(s.File, libcrypto.RawIgnoreVariableFields),
-
-			PublicKey: []byte(s.PublicKey),
-			RootHash:  []byte(s.RootHash),
-		})
-	}
-
-}
-
-func ReadState(data []byte) (libblock.State, error) {
-	if len(data) == 0 {
-		return nil, util.ErrorOf("empty", "data", "entry")
-	}
-	meta := core.GetMeta(data)
-	switch meta {
-	case core.CORE_ACCOUNT_STATE:
-		s := &AccountState{}
-		err := s.UnmarshalBinary(data)
-		if err != nil {
-			return nil, err
-		}
-		return s, nil
-	default:
-		return nil, util.ErrorOfUnknown("data", "state")
-	}
-}
-
-func CloneState(state libblock.State) (libblock.State, error) {
-	data, err := state.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	s, err := ReadState(data)
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
 }

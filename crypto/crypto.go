@@ -34,22 +34,11 @@ func (service *CryptoService) Hash(msg []byte) (libcore.Hash, error) {
 }
 
 func (service *CryptoService) Raw(h libcrypto.Hashable, rt libcrypto.RawType) (libcore.Hash, []byte, error) {
-	var rawData []byte
-	var err error
-	switch rt {
-	case libcrypto.RawBinary:
-		rawData, err = h.MarshalBinary()
-	case libcrypto.RawIgnoreVariableFields:
-		rawData, err = h.Raw(false)
-	case libcrypto.RawIgnoreSigningFields:
-		rawData, err = h.Raw(true)
-	default:
-		err = util.ErrorOfUnknown("raw type", fmt.Sprintf("%d", rt))
-	}
+	rawData, err := h.Raw(rt)
 	if err != nil {
 		return nil, nil, err
 	}
-	hashData, err := h.Raw(false)
+	hashData, err := h.Raw(libcrypto.RawIgnoreVariableFields)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -72,7 +61,7 @@ func (service *CryptoService) Sign(p libaccount.Key, s libcrypto.Signable) error
 	}
 	s.SetPublicKey(libcore.PublicKey(publicBytes))
 
-	data, err := s.Raw(true)
+	data, err := s.Raw(libcrypto.RawIgnoreSigningFields)
 	if err != nil {
 		return err
 	}
@@ -110,7 +99,7 @@ func (service *CryptoService) Verify(s libcrypto.Signable) (bool, error) {
 	if !libcore.Equals(a, s.GetAccount()) {
 		return false, util.ErrorOfUnmatched("address", "in public key", s.GetAccount().String(), a.String())
 	}
-	data, err := s.Raw(true)
+	data, err := s.Raw(libcrypto.RawIgnoreSigningFields)
 	if err != nil {
 		return false, err
 	}

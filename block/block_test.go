@@ -41,18 +41,12 @@ func generateTransaction(seq uint64, value int64, gas uint64) *Transaction {
 		panic(err)
 	}
 
-	_, to, err := as.NewAccountFromAddress("0x42f32B004Da1093d51AE40a58F38E33BA4f46397")
-	if err != nil {
-		panic(err)
-	}
-
 	tx := &Transaction{
 		TransactionType: libblock.TransactionType(1),
 
 		Account:  from,
 		Sequence: seq,
 		Gas:      gas,
-		To:       to,
 		Payload: &PayloadInfo{
 			Infos: []*DataInfo{
 				{

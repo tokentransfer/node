@@ -5,6 +5,7 @@ import (
 	"github.com/tokentransfer/node/core/pb"
 
 	libcore "github.com/tokentransfer/interfaces/core"
+	libcrypto "github.com/tokentransfer/interfaces/crypto"
 )
 
 type Message struct {
@@ -62,8 +63,8 @@ func (tx *Message) MarshalBinary() ([]byte, error) {
 	return data, nil
 }
 
-func (tx *Message) Raw(ignoreSigningFields bool) ([]byte, error) {
-	if ignoreSigningFields {
+func (tx *Message) Raw(rt libcrypto.RawType) ([]byte, error) {
+	if rt == libcrypto.RawIgnoreSigningFields {
 		t := &pb.MessageKey{
 			MessageKey: tx.MessageKey,
 		}

@@ -7,7 +7,7 @@ import (
 
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
-	"github.com/tokentransfer/interfaces/crypto"
+	libcrypto "github.com/tokentransfer/interfaces/crypto"
 )
 
 type Receipt struct {
@@ -75,11 +75,15 @@ func (r *Receipt) UnmarshalBinary(data []byte) error {
 }
 
 func (r *Receipt) MarshalBinary() ([]byte, error) {
+	return r.Raw(libcrypto.RawBinary)
+}
+
+func (r *Receipt) Raw(rt libcrypto.RawType) ([]byte, error) {
 	l := len(r.States)
 	states := make([][]byte, l)
 	for i := 0; i < l; i++ {
 		s := r.States[i]
-		data, err := s.MarshalBinary()
+		data, err := s.Raw(rt)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +94,7 @@ func (r *Receipt) MarshalBinary() ([]byte, error) {
 	for i := 0; i < l; i++ {
 		info := r.Datas[i]
 		if info != nil {
-			pbInfo := toDataInfo(info, crypto.RawBinary)
+			pbInfo := toDataInfo(info, rt)
 			data, err := core.Marshal(pbInfo)
 			if err != nil {
 				return nil, err
@@ -98,55 +102,6 @@ func (r *Receipt) MarshalBinary() ([]byte, error) {
 			datas[i] = data
 		}
 	}
-	receipt := &pb.Receipt{
-		TransactionResult: uint32(r.TransactionResult),
-		TransactionIndex:  r.TransactionIndex,
-		BlockIndex:        r.BlockIndex,
-		States:            states,
-		Datas:             datas,
-	}
-	return core.Marshal(receipt)
-}
-
-func (r *Receipt) Raw(ignoreSigningFields bool) ([]byte, error) {
-	l := len(r.States)
-	states := make([][]byte, l)
-	for i := 0; i < l; i++ {
-		s := r.States[i]
-		data, err := s.Raw(ignoreSigningFields)
-		if err != nil {
-			return nil, err
-		}
-		states[i] = data
-	}
-	l = len(r.Datas)
-	datas := make([][]byte, l)
-	if ignoreSigningFields {
-		for i := 0; i < l; i++ {
-			info := r.Datas[i]
-			if info != nil {
-				pbInfo := toDataInfo(info, crypto.RawIgnoreSigningFields)
-				data, err := core.Marshal(pbInfo)
-				if err != nil {
-					return nil, err
-				}
-				datas[i] = data
-			}
-		}
-	} else {
-		for i := 0; i < l; i++ {
-			info := r.Datas[i]
-			if info != nil {
-				pbInfo := toDataInfo(info, crypto.RawIgnoreVariableFields)
-				data, err := core.Marshal(pbInfo)
-				if err != nil {
-					return nil, err
-				}
-				datas[i] = data
-			}
-		}
-	}
-
 	receipt := &pb.Receipt{
 		TransactionResult: uint32(r.TransactionResult),
 		States:            states,

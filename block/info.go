@@ -1,6 +1,7 @@
 package block
 
 import (
+	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
 	libcrypto "github.com/tokentransfer/interfaces/crypto"
 
@@ -8,6 +9,110 @@ import (
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/util"
 )
+
+type GroupInfo struct {
+	Hash libcore.Hash
+	List []*DataInfo
+	Map  map[string]*DataInfo
+}
+
+func (s *GroupInfo) GetHash() libcore.Hash {
+	return s.Hash
+}
+
+func (s *GroupInfo) SetHash(h libcore.Hash) {
+	s.Hash = h
+}
+
+func (s *GroupInfo) AddData(info *DataInfo) *GroupInfo {
+	s.List = append(s.List, info)
+
+	return s
+}
+
+func (s *GroupInfo) PutData(name string, info *DataInfo) *GroupInfo {
+	if s.Map == nil {
+		s.Map = make(map[string]*DataInfo)
+	}
+	s.Map[name] = info
+
+	return s
+}
+
+func (s *GroupInfo) UnmarshalBinary(data []byte) error {
+	meta, msg, err := core.Unmarshal(data)
+	if err != nil {
+		return err
+	}
+	if meta != core.CORE_GROUP_INFO {
+		return util.ErrorOfInvalid("group info", "data")
+	}
+	info := msg.(*pb.GroupInfo)
+
+	s.Hash = libcore.Hash(info.Hash)
+	s.List = fromDataList(info.List)
+	s.Map = fromDataMap(info.Map)
+	return nil
+}
+
+func fromDataList(infos []*pb.DataInfo) []*DataInfo {
+	if infos == nil {
+		return nil
+	}
+	l := len(infos)
+	list := make([]*DataInfo, l)
+	for i, info := range infos {
+		list[i] = fromDataInfo(info)
+	}
+	return list
+}
+
+func fromDataMap(m map[string]*pb.DataInfo) map[string]*DataInfo {
+	if m == nil {
+		return nil
+	}
+	r := make(map[string]*DataInfo)
+	for k, v := range m {
+		r[k] = fromDataInfo(v)
+	}
+	return r
+}
+
+func (s *GroupInfo) MarshalBinary() ([]byte, error) {
+	info := &pb.GroupInfo{
+		Hash: []byte(s.Hash),
+		List: toDataList(s.List, libcrypto.RawBinary),
+		Map:  toDataMap(s.Map, libcrypto.RawBinary),
+	}
+	data, err := core.Marshal(info)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func toDataList(infos []*DataInfo, rt libcrypto.RawType) []*pb.DataInfo {
+	if infos == nil {
+		return nil
+	}
+	l := len(infos)
+	list := make([]*pb.DataInfo, l)
+	for i := 0; i < l; i++ {
+		list[i] = toDataInfo(infos[i], rt)
+	}
+	return list
+}
+
+func toDataMap(m map[string]*DataInfo, rt libcrypto.RawType) map[string]*pb.DataInfo {
+	if m == nil {
+		return nil
+	}
+	r := make(map[string]*pb.DataInfo)
+	for k, v := range m {
+		r[k] = toDataInfo(v, rt)
+	}
+	return r
+}
 
 type DataInfo struct {
 	Hash    libcore.Hash
@@ -65,34 +170,30 @@ func toDataInfo(info *DataInfo, rt libcrypto.RawType) *pb.DataInfo {
 			}
 		case libcrypto.RawIgnoreVariableFields:
 			return &pb.DataInfo{
-				Hash: []byte(info.Hash),
+				Hash:    []byte(info.Hash),
+				Content: info.Content,
 			}
 		case libcrypto.RawIgnoreSigningFields:
+			return &pb.DataInfo{
+				Hash:    []byte(info.Hash),
+				Content: info.Content,
+			}
+		case libcrypto.RawIgnoreContent:
 			return &pb.DataInfo{
 				Hash: []byte(info.Hash),
 			}
 		}
-
 	}
 	return nil
 }
 
-func (s *DataInfo) Raw(ignoreSigningFields bool) ([]byte, error) {
-	if ignoreSigningFields {
-		info := toDataInfo(s, libcrypto.RawIgnoreSigningFields)
-		data, err := core.Marshal(info)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	} else { //ignore variable fields
-		info := toDataInfo(s, libcrypto.RawIgnoreVariableFields)
-		data, err := core.Marshal(info)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
+func (s *DataInfo) Raw(rt libcrypto.RawType) ([]byte, error) {
+	info := toDataInfo(s, rt)
+	data, err := core.Marshal(info)
+	if err != nil {
+		return nil, err
 	}
+	return data, nil
 }
 
 type PayloadInfo struct {
@@ -128,19 +229,7 @@ func (s *PayloadInfo) UnmarshalBinary(data []byte) error {
 }
 
 func (s *PayloadInfo) MarshalBinary() ([]byte, error) {
-	infos := make([]*pb.DataInfo, 0)
-	for _, info := range s.Infos {
-		pbInfo := toDataInfo(info, libcrypto.RawBinary)
-		infos = append(infos, pbInfo)
-	}
-	info := &pb.PayloadInfo{
-		Infos: infos,
-	}
-	data, err := core.Marshal(info)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+	return s.Raw(libcrypto.RawBinary)
 }
 
 func fromPayloadInfo(info *pb.PayloadInfo) *PayloadInfo {
@@ -171,34 +260,79 @@ func toPayloadInfo(info *PayloadInfo, rt libcrypto.RawType) *pb.PayloadInfo {
 	return nil
 }
 
-func (s *PayloadInfo) Raw(ignoreSigningFields bool) ([]byte, error) {
-	if ignoreSigningFields {
-		infos := make([]*pb.DataInfo, 0)
-		for _, info := range s.Infos {
-			pbInfo := toDataInfo(info, libcrypto.RawIgnoreSigningFields)
-			infos = append(infos, pbInfo)
-		}
-		info := &pb.PayloadInfo{
-			Infos: infos,
-		}
-		data, err := core.Marshal(info)
+func (s *PayloadInfo) Raw(rt libcrypto.RawType) ([]byte, error) {
+	info := &pb.PayloadInfo{
+		Infos: toDataList(s.Infos, rt),
+	}
+	data, err := core.Marshal(info)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func AddressToByte(a libcore.Address) ([]byte, error) {
+	if a == nil {
+		return nil, nil
+	}
+	return a.MarshalBinary()
+}
+
+func ByteToAddress(b []byte) (libcore.Address, error) {
+	if b == nil {
+		return nil, nil
+	}
+	_, a, err := as.NewAccountFromBytes(b)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func ReadState(data []byte) (libblock.State, error) {
+	if len(data) == 0 {
+		return nil, util.ErrorOf("empty", "data", "entry")
+	}
+	meta := core.GetMeta(data)
+	switch meta {
+	case core.CORE_ACCOUNT_STATE:
+		s := &AccountState{}
+		err := s.UnmarshalBinary(data)
 		if err != nil {
 			return nil, err
 		}
-		return data, nil
-	} else { //ignore variable fields
-		infos := make([]*pb.DataInfo, 0)
-		for _, info := range s.Infos {
-			pbInfo := toDataInfo(info, libcrypto.RawIgnoreVariableFields)
-			infos = append(infos, pbInfo)
-		}
-		info := &pb.PayloadInfo{
-			Infos: infos,
-		}
-		data, err := core.Marshal(info)
+		return s, nil
+	default:
+		return nil, util.ErrorOfUnknown("data", "state")
+	}
+}
+
+func CloneState(state libblock.State) (libblock.State, error) {
+	data, err := state.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	s, err := ReadState(data)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+func ReadTransaction(data []byte) (libblock.Transaction, error) {
+	if len(data) == 0 {
+		return nil, util.ErrorOfInvalid("null", "transaction data")
+	}
+	meta := core.GetMeta(data)
+	switch meta {
+	case core.CORE_TRANSACTION:
+		tx := &Transaction{}
+		err := tx.UnmarshalBinary(data)
 		if err != nil {
 			return nil, err
 		}
-		return data, nil
+		return tx, nil
+	default:
+		return nil, util.ErrorOfInvalid("transaction", "data")
 	}
 }

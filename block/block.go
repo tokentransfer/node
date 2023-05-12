@@ -7,6 +7,7 @@ import (
 
 	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
+	libcrypto "github.com/tokentransfer/interfaces/crypto"
 )
 
 // reference from github.com/tokentransfer/chain/block/block.go
@@ -95,52 +96,10 @@ func (b *Block) UnmarshalBinary(data []byte) error {
 }
 
 func (b *Block) MarshalBinary() ([]byte, error) {
-	a, err := AddressToByte(b.Account)
-	if err != nil {
-		return nil, err
-	}
-	block := &pb.Block{
-		Account:         a,
-		BlockIndex:      b.BlockIndex,
-		ParentHash:      []byte(b.ParentHash),
-		RootHash:        []byte(b.RootHash),
-		TransactionHash: []byte(b.TransactionHash),
-		StateHash:       []byte(b.StateHash),
-		Timestamp:       b.Timestamp,
-	}
-
-	l := len(b.Transactions)
-	transactions := make([]*pb.TransactionWithData, l)
-	for i := 0; i < l; i++ {
-		tx := b.Transactions[i]
-		data, err := tx.MarshalBinary()
-		if err != nil {
-			return nil, err
-		}
-		_, msg, err := core.Unmarshal(data)
-		if err != nil {
-			return nil, err
-		}
-		transactions[i] = msg.(*pb.TransactionWithData)
-	}
-	block.Transactions = transactions
-
-	l = len(b.States)
-	states := make([][]byte, l)
-	for i := 0; i < l; i++ {
-		state := b.States[i]
-		data, err := state.MarshalBinary()
-		if err != nil {
-			return nil, err
-		}
-		states[i] = data
-	}
-	block.States = states
-
-	return core.Marshal(block)
+	return b.Raw(libcrypto.RawBinary)
 }
 
-func (b *Block) Raw(ignoreSigningFields bool) ([]byte, error) {
+func (b *Block) Raw(rt libcrypto.RawType) ([]byte, error) {
 	a, err := AddressToByte(b.Account)
 	if err != nil {
 		return nil, err
@@ -159,7 +118,7 @@ func (b *Block) Raw(ignoreSigningFields bool) ([]byte, error) {
 	transactions := make([]*pb.TransactionWithData, l)
 	for i := 0; i < l; i++ {
 		tx := b.Transactions[i]
-		data, err := tx.Raw(ignoreSigningFields)
+		data, err := tx.Raw(rt)
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +134,7 @@ func (b *Block) Raw(ignoreSigningFields bool) ([]byte, error) {
 	states := make([][]byte, l)
 	for i := 0; i < l; i++ {
 		state := b.States[i]
-		data, err := state.Raw(ignoreSigningFields)
+		data, err := state.Raw(rt)
 		if err != nil {
 			return nil, err
 		}
