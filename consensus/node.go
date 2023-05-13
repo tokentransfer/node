@@ -1424,7 +1424,7 @@ func (n *Node) AddTransaction(rootAccount libcore.Address, txWithData libblock.T
 	return true, nil
 }
 
-func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.TransactionWithData, entry *Entry) (libblock.Block, error) {
+func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.TransactionWithData) (libblock.Block, error) {
 	config := n.config
 	cs := n.cryptoService
 	entry, err := n.GetEntry(rootAccount)
@@ -1640,6 +1640,27 @@ func (n *Node) AddBlock(rootAccount libcore.Address, b libblock.Block) error {
 	return nil
 }
 
+func (n *Node) VerifyParent(rootAccount libcore.Address, b libblock.Block) error {
+	if rootAccount != nil {
+		if b.GetParentHash().IsZero() {
+			return util.ErrorOfInvalid("the parent hash of the genesis block", "block")
+		}
+		rootEntry, err := n.GetEntry(nil)
+		if err != nil {
+			return err
+		}
+		_, err = rootEntry.merkle.GetBlockByHash(b.GetParentHash())
+		if err != nil {
+			return err
+		}
+	} else {
+		if !b.GetParentHash().IsZero() {
+			return util.ErrorOfInvalid("the parent hash of the genesis block", "block")
+		}
+	}
+	return nil
+}
+
 func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bool, err error) {
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
@@ -1743,9 +1764,9 @@ func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bo
 			err = util.ErrorOfInvalid("index", "block")
 			return
 		}
-		if !b.GetParentHash().IsZero() {
+		err = n.VerifyParent(rootAccount, b)
+		if err != nil {
 			ok = false
-			err = util.ErrorOfInvalid("parent hash", "block")
 			return
 		}
 	}
@@ -1788,7 +1809,7 @@ func (n *Node) GenerateBlock(rootAccount libcore.Address) (libblock.Block, error
 	entry.txlist = make([]libblock.TransactionWithData, 0)
 	entry.txmap = make(map[string]libblock.TransactionWithData)
 
-	return n._generateBlock(rootAccount, list, entry)
+	return n._generateBlock(rootAccount, list)
 }
 
 func (n *Node) generate() {
@@ -2030,8 +2051,9 @@ func (n *Node) load(rootAccount libcore.Address, entry *Entry) error {
 			if b.GetIndex() != 0 {
 				return util.ErrorOfInvalid("genesis block", fmt.Sprintf("%d, %s", b.GetIndex(), b.GetHash().String()))
 			}
-			if !b.GetParentHash().IsZero() {
-				return util.ErrorOfInvalid("the parent hash of the genesis block", b.GetParentHash().String())
+			err := n.VerifyParent(rootAccount, b)
+			if err != nil {
+				return err
 			}
 		}
 		entry.ValidatedBlock = b
