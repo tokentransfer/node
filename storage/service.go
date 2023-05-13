@@ -363,7 +363,7 @@ func (s *StorageService) WriteCode(account libcore.Address, wasmCode []byte, abi
 	return codeHash, nil
 }
 
-func (s *StorageService) ReadMeta(symbol libcore.Symbol) (uint64, libcore.Address, *pb.MetaInfo, error) {
+func (s *StorageService) ReadMeta(symbol libcore.Symbol) (int64, libcore.Address, *pb.MetaInfo, error) {
 	rootGroup, err := s.getRoot()
 	if err != nil {
 		return 0, nil, nil, err
@@ -382,7 +382,7 @@ func (s *StorageService) ReadMeta(symbol libcore.Symbol) (uint64, libcore.Addres
 		return 0, nil, nil, err
 	}
 	info := toMetaInfo(&metaMap, "info")
-	index := util.ToUint64(&indexMap, "index")
+	index := util.ToInt64(&indexMap, "index")
 	return index, a, info, nil
 }
 
@@ -412,7 +412,7 @@ func (s *StorageService) WriteMeta(account libcore.Address, info *pb.MetaInfo) (
 		return nil, err
 	}
 	_, _, _, indexHash, err := s.writeMap(rootGroup, "token", "index", info.Symbol, map[string]interface{}{
-		"index": uint64(0),
+		"index": int64(-1),
 	})
 	if err != nil {
 		return nil, err
@@ -476,7 +476,7 @@ func (s *StorageService) WriteToken(account libcore.Address, info *pb.TokenInfo)
 		return nil, err
 	}
 	_, _, _, indexHash, err := s.writeMap(rootGroup, "token", "index", info.Symbol, map[string]interface{}{
-		"index": info.Index,
+		"index": int64(info.Index),
 	})
 	if err != nil {
 		return nil, err
@@ -891,18 +891,6 @@ func (s *StorageService) UpdateGas(theAccount libcore.Address, value util.Value)
 		return err
 	}
 	return nil
-}
-
-func (s *StorageService) GetAccountGas(account libcore.Address) (*util.Value, *util.Value, error) {
-	value, err := s.GetGas(account)
-	if err != nil {
-		return nil, nil, err
-	}
-	localValue, err := s.GetGas(account)
-	if err != nil {
-		return nil, nil, err
-	}
-	return value, localValue, nil
 }
 
 func (s *StorageService) Init(c libcore.Config) error {

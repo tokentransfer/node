@@ -102,6 +102,17 @@ func (r *Receipt) Raw(rt libcrypto.RawType) ([]byte, error) {
 			datas[i] = data
 		}
 	}
+	switch rt {
+	case libcrypto.RawBinary:
+		receipt := &pb.Receipt{
+			TransactionResult: uint32(r.TransactionResult),
+			TransactionIndex:  r.TransactionIndex,
+			BlockIndex:        r.BlockIndex,
+			States:            states,
+			Datas:             datas,
+		}
+		return core.Marshal(receipt)
+	}
 	receipt := &pb.Receipt{
 		TransactionResult: uint32(r.TransactionResult),
 		States:            states,

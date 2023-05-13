@@ -49,13 +49,10 @@ type Node struct {
 	accountService   libaccount.AccountService
 	consensusService *ConsensusService
 
-	rootEntry   *Entry
 	entryMap    map[string]*Entry
-	entryLocker *sync.Mutex
+	entryLocker *sync.RWMutex
 
 	storageService    *storage.StorageService
-	merkleLocker      *sync.Mutex
-	storageLocker     *sync.Mutex
 	transactionLocker *sync.Mutex
 
 	net protocol.Net
@@ -84,12 +81,10 @@ func NewNode() *Node {
 		peers:      map[uint64]*Peer{},
 		peerLocker: &sync.RWMutex{},
 
-		merkleLocker:      &sync.Mutex{},
-		storageLocker:     &sync.Mutex{},
 		transactionLocker: &sync.Mutex{},
 
 		entryMap:    make(map[string]*Entry),
-		entryLocker: &sync.Mutex{},
+		entryLocker: &sync.RWMutex{},
 
 		accountService: account.NewAccountService(),
 		cryptoService:  &crypto.CryptoService{},
@@ -125,12 +120,6 @@ func (n *Node) Init(c libcore.Config) error {
 	}
 	n.consensusService = consensusService
 	n.storageService = storageService
-
-	rootEntry, err := n.GetEntry(nil)
-	if err != nil {
-		return err
-	}
-	n.rootEntry = rootEntry
 
 	return nil
 }
@@ -201,20 +190,13 @@ func (n *Node) callContract(rootAccount libcore.Address, txm map[string]interfac
 func (n *Node) signTransaction(rootAccount libcore.Address, txm map[string]interface{}) (string, *block.Transaction, error) {
 	as := n.accountService
 
+	accountString := util.ToString(&txm, "account")
+	_, account, err := as.NewAccountFromAddress(accountString)
+	if err != nil {
+		return "", nil, err
+	}
 	secret := util.ToString(&txm, "secret")
 	gas := util.ToUint64(&txm, "gas")
-
-	var account libcore.Address
-	if util.Has(&txm, "account") {
-		accountString := util.ToString(&txm, "account")
-		_, a, err := as.NewAccountFromAddress(accountString)
-		if err != nil {
-			return "", nil, err
-		}
-		account = a
-	} else {
-		account = nil
-	}
 
 	_, fromKey, err := as.NewKeyFromSecret(secret)
 	if err != nil {
@@ -228,7 +210,8 @@ func (n *Node) signTransaction(rootAccount libcore.Address, txm map[string]inter
 	if fromAddress != account.String() {
 		return "", nil, util.ErrorOfUnmatched("account", "in secret", fromAddress, account.String())
 	}
-	seq := n.getNextSequence(rootAccount, fromAccount)
+
+	seq := n.getNextSequence(rootAccount, account)
 
 	tx := &block.Transaction{
 		TransactionType: block.TRANSACTION,
@@ -492,7 +475,6 @@ func (n *Node) signTransaction(rootAccount libcore.Address, txm map[string]inter
 	if len(payloadInfo.Infos) > 0 {
 		tx.Payload = payloadInfo
 	}
-
 	err = n.cryptoService.Sign(fromKey, tx)
 	if err != nil {
 		return "", nil, err
@@ -653,7 +635,7 @@ func (n *Node) getParams(cm map[string]interface{}) ([][]byte, error) {
 		}
 		return list, nil
 	}
-	return nil, util.ErrorOfNotFound("params", "map")
+	return nil, util.ErrorOfNotFound("params", "in contract")
 }
 
 func (n *Node) verifyTransaction(rootAccount libcore.Address, tx libblock.Transaction) error {
@@ -717,7 +699,7 @@ func (n *Node) processTransaction(rootAccount libcore.Address, tx libblock.Trans
 	}
 
 	// util.PrintJSON("txWithData", txWithData)
-	ok, err = n.AddTransaction(rootAccount, txWithData)
+	ok, err = n.addTransaction(rootAccount, txWithData)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1000,7 +982,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			index := util.AsUint64(&item, "index")
+			index := util.ToUint64(&item, "index")
 
 			txWithData, err := ms.GetTransactionByIndex(a, index)
 			if err != nil {
@@ -1053,7 +1035,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			}
 			ms := entry.merkle
 
-			index := util.AsUint64(&item, "num")
+			index := util.ToUint64(&item, "num")
 			block, err := ms.GetBlockByIndex(index)
 			if err != nil {
 				return nil, err
@@ -1196,7 +1178,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			}
 			hash := tx.GetHash()
 			glog.Infoln("sign transaction", hash.String(), len(blob))
-			return hash, nil
+			return blob, nil
 		})
 		if err != nil {
 			return nil, err
@@ -1362,40 +1344,46 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 }
 
 func (n *Node) GetEntry(rootAccount libcore.Address) (*Entry, error) {
+	n.entryLocker.RLock()
+	root := util.GetString(rootAccount)
+	entry, ok := n.entryMap[root]
+	n.entryLocker.RUnlock()
+	if ok {
+		return entry, nil
+	}
+
 	n.entryLocker.Lock()
 	defer n.entryLocker.Unlock()
 
-	root := util.GetString(rootAccount)
-	entry, ok := n.entryMap[root]
-	if !ok {
-		ms, err := n.getMerkleService(rootAccount)
-		if err != nil {
-			return nil, err
-		}
-		ss, err := n.getStorageService(rootAccount)
-		if err != nil {
-			return nil, err
-		}
-		entry = &Entry{
-			merkle:  ms,
-			storage: ss,
-
-			txlist: make([]libblock.TransactionWithData, 0),
-			txmap:  make(map[string]libblock.TransactionWithData),
-		}
-		err = n.load(rootAccount, entry)
-		if err != nil {
-			return nil, err
-		}
-		n.entryMap[root] = entry
+	entry, ok = n.entryMap[root]
+	if ok {
+		return entry, nil
 	}
+
+	ms, err := n.getMerkleService(rootAccount)
+	if err != nil {
+		return nil, err
+	}
+	ss, err := n.getStorageService(rootAccount)
+	if err != nil {
+		return nil, err
+	}
+	entry = &Entry{
+		merkle:  ms,
+		storage: ss,
+
+		txlist: make([]libblock.TransactionWithData, 0),
+		txmap:  make(map[string]libblock.TransactionWithData),
+	}
+	err = n.load(rootAccount, entry)
+	if err != nil {
+		return nil, err
+	}
+	n.entryMap[root] = entry
 	return entry, nil
 }
 
 func (n *Node) getMerkleService(rootAccount libcore.Address) (libstore.MerkleService, error) {
-	n.merkleLocker.Lock()
-	defer n.merkleLocker.Unlock()
-
 	ms, err := merkle.NewMerkleService(n.config, n.cryptoService, rootAccount)
 	if err != nil {
 		return nil, err
@@ -1404,9 +1392,6 @@ func (n *Node) getMerkleService(rootAccount libcore.Address) (libstore.MerkleSer
 }
 
 func (n *Node) getStorageService(rootAccount libcore.Address) (*storage.StorageService, error) {
-	n.storageLocker.Lock()
-	defer n.storageLocker.Unlock()
-
 	ss, err := storage.NewStorageService(n.storageService, rootAccount)
 	if err != nil {
 		return nil, err
@@ -1414,10 +1399,7 @@ func (n *Node) getStorageService(rootAccount libcore.Address) (*storage.StorageS
 	return ss, nil
 }
 
-func (n *Node) AddTransaction(rootAccount libcore.Address, txWithData libblock.TransactionWithData) (bool, error) {
-	n.transactionLocker.Lock()
-	defer n.transactionLocker.Unlock()
-
+func (n *Node) addTransaction(rootAccount libcore.Address, txWithData libblock.TransactionWithData) (bool, error) {
 	_, err := n.consensusService.HashTransaction(txWithData)
 	if err != nil {
 		return false, err
@@ -1486,6 +1468,14 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 			info := &pb.MetaInfo{
 				Symbol: block.ACCOUNT_STATE.String(),
 				Total:  int64(-1),
+				Items: []*pb.MetaItem{
+					{
+						Name:    "account",
+						Type:    core.CORE_DATA_STRING.String(),
+						Options: make([]string, 0),
+						Desc:    "the account",
+					},
+				},
 			}
 			dataInfo, err := ss.WriteMeta(account, info)
 			if err != nil {
@@ -1669,7 +1659,11 @@ func (n *Node) VerifyParent(rootAccount libcore.Address, b libblock.Block) error
 		if b.GetParentHash().IsZero() {
 			return util.ErrorOfInvalid("the parent hash of the genesis block", "block")
 		}
-		_, err := n.rootEntry.merkle.GetBlockByHash(b.GetParentHash())
+		rootEntry, err := n.GetEntry(nil)
+		if err != nil {
+			return err
+		}
+		_, err = rootEntry.merkle.GetBlockByHash(b.GetParentHash())
 		if err != nil {
 			return err
 		}
@@ -1755,6 +1749,8 @@ func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bo
 			return
 		}
 		if arh.String() != brh.String() {
+			util.PrintJSON("last", txWithData.GetReceipt())
+			util.PrintJSON("current", newWithData.GetReceipt())
 			ok = false
 			err = util.ErrorOfUnmatched("raw hash", "transaction receipt", arh.String(), brh.String())
 			return

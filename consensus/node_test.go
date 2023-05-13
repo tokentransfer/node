@@ -161,7 +161,7 @@ func (suite *NodeSuite) testTransaction(c *C) {
 	c.Assert(err, IsNil)
 }
 
-func (suite *NodeSuite) testProcess(c *C) {
+func (suite *NodeSuite) TestProcess(c *C) {
 	n := suite.load(c)
 
 	var rootAccount libcore.Address = nil

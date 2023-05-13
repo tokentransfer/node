@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"crypto/sha256"
-	"fmt"
 	"hash"
 
 	"github.com/tokentransfer/node/account"
@@ -80,7 +79,6 @@ func (service *CryptoService) Sign(p libaccount.Key, s libcrypto.Signable) error
 		return err
 	}
 	s.SetHash(h)
-	fmt.Println("hash", hash, h)
 
 	return nil
 }

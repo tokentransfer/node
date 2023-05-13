@@ -137,6 +137,30 @@ func (s *AccountState) Raw(rt libcrypto.RawType) ([]byte, error) {
 		return nil, err
 	}
 
+	switch rt {
+	case libcrypto.RawBinary:
+		return core.Marshal(&pb.AccountState{
+			State: &pb.State{
+				StateType:  uint32(core.CORE_ACCOUNT_STATE),
+				BlockIndex: s.BlockIndex,
+				Account:    a,
+				Sequence:   s.Sequence,
+				Previous:   []byte(s.Previous),
+				Version:    s.Version,
+			},
+
+			Name:   s.Name,
+			User:   ToDataInfo(s.User, rt),
+			Code:   ToDataInfo(s.Code, rt),
+			Page:   ToDataInfo(s.Page, rt),
+			Token:  ToDataInfo(s.Token, rt),
+			Memory: ToDataInfo(s.Memory, rt),
+			Data:   ToDataInfo(s.Data, rt),
+
+			PublicKey: []byte(s.PublicKey),
+			RootHash:  []byte(s.RootHash),
+		})
+	}
 	return core.Marshal(&pb.AccountState{
 		State: &pb.State{
 			StateType: uint32(core.CORE_ACCOUNT_STATE),

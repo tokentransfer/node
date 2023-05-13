@@ -76,7 +76,7 @@ func (service *RPCService) rpcService(w http.ResponseWriter, r *http.Request) {
 		service.writeResult(w, 0, nil, err)
 	} else {
 		params := util.ToArray(m, "params")
-		id := util.AsUint64(m, "id")
+		id := util.ToUint64(m, "id")
 		method := util.ToString(m, "method")
 
 		glog.Infoln("rpc", id, r.RequestURI, method, len(params))

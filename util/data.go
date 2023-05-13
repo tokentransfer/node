@@ -55,35 +55,178 @@ func Has(m *map[string]interface{}, key string) bool {
 }
 
 func ToUint64(m *map[string]interface{}, key string) uint64 {
-	s := ToString(m, key)
-	if len(s) > 0 {
-		n := new(big.Int)
-		_, ok := n.SetString(s, 10)
-		if ok {
-			return n.Uint64()
-		}
-	}
-	return 0
-}
-
-func AsUint64(m *map[string]interface{}, key string) uint64 {
-	item, ok := (*m)[key]
+	data, ok := (*m)[key]
 	if ok {
-		i, ok := item.(float64)
-		if ok {
-			return uint64(i)
+		switch data := data.(type) {
+		case bool:
+			if data {
+				return uint64(1)
+			} else {
+				return uint64(0)
+			}
+		case *bool:
+			if *data {
+				return uint64(1)
+			} else {
+				return uint64(0)
+			}
+		case int8:
+			return uint64(data)
+		case *int8:
+			return uint64(*data)
+		case uint8:
+			return uint64(data)
+		case *uint8:
+			return uint64(*data)
+		case int16:
+			return uint64(data)
+		case *int16:
+			return uint64(*data)
+		case uint16:
+			return uint64(data)
+		case *uint16:
+			return uint64(*data)
+		case int32:
+			return uint64(data)
+		case *int32:
+			return uint64(*data)
+		case uint32:
+			return uint64(data)
+		case *uint32:
+			return uint64(*data)
+		case int64:
+			return uint64(data)
+		case *int64:
+			return uint64(*data)
+		case uint64:
+			return data
+		case *uint64:
+			return *data
+		case float32:
+			return uint64(data)
+		case *float32:
+			return uint64(*data)
+		case float64:
+			return uint64(data)
+		case *float64:
+			return uint64(*data)
+		case string:
+			if len(data) > 0 {
+				n := new(big.Int)
+				_, ok := n.SetString(data, 10)
+				if ok {
+					return n.Uint64()
+				}
+			}
+		case *string:
+			if len(*data) > 0 {
+				n := new(big.Int)
+				_, ok := n.SetString(*data, 10)
+				if ok {
+					return n.Uint64()
+				}
+			}
+		case []byte:
+			if len(data) > 0 {
+				n := new(big.Int)
+				n.SetBytes(data)
+				return n.Uint64()
+			}
+		case *[]byte:
+			if len(*data) > 0 {
+				n := new(big.Int)
+				n.SetBytes(*data)
+				return n.Uint64()
+			}
 		}
 	}
 	return 0
 }
 
 func ToInt64(m *map[string]interface{}, key string) int64 {
-	s := ToString(m, key)
-	if len(s) > 0 {
-		n := new(big.Int)
-		_, ok := n.SetString(s, 10)
-		if ok {
-			return n.Int64()
+	data, ok := (*m)[key]
+	if ok {
+		switch data := data.(type) {
+		case bool:
+			if data {
+				return int64(1)
+			} else {
+				return int64(0)
+			}
+		case *bool:
+			if *data {
+				return int64(1)
+			} else {
+				return int64(0)
+			}
+		case int8:
+			return int64(data)
+		case *int8:
+			return int64(*data)
+		case uint8:
+			return int64(data)
+		case *uint8:
+			return int64(*data)
+		case int16:
+			return int64(data)
+		case *int16:
+			return int64(*data)
+		case uint16:
+			return int64(data)
+		case *uint16:
+			return int64(*data)
+		case int32:
+			return int64(data)
+		case *int32:
+			return int64(*data)
+		case uint32:
+			return int64(data)
+		case *uint32:
+			return int64(*data)
+		case int64:
+			return data
+		case *int64:
+			return *data
+		case uint64:
+			return int64(data)
+		case *uint64:
+			return int64(*data)
+		case float32:
+			return int64(data)
+		case *float32:
+			return int64(*data)
+		case float64:
+			return int64(data)
+		case *float64:
+			return int64(*data)
+		case string:
+			if len(data) > 0 {
+				n := new(big.Int)
+				_, ok := n.SetString(data, 10)
+				if ok {
+					return n.Int64()
+				}
+			}
+		case *string:
+			if len(*data) > 0 {
+				n := new(big.Int)
+				_, ok := n.SetString(*data, 10)
+				if ok {
+					return n.Int64()
+				}
+			}
+		case []byte:
+			if len(data) > 0 {
+				n := new(big.Int)
+				n.SetBytes(data)
+				return n.Int64()
+			}
+		case *[]byte:
+			if len(*data) > 0 {
+				n := new(big.Int)
+				n.SetBytes(*data)
+				return n.Int64()
+			}
 		}
 	}
 	return 0

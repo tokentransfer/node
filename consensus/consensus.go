@@ -25,9 +25,6 @@ type accountEntry struct {
 
 	lastGas *util.Value
 	gas     *util.Value
-
-	lastLocalGas *util.Value
-	localGas     *util.Value
 }
 
 type ConsensusService struct {
@@ -84,29 +81,29 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 	if err != nil || info == nil {
 		return false, util.ErrorOfNotFound("account", fromAccount.String())
 	}
-
-	if rootAccount != nil && tx.Gas < 10 {
-		return false, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < 10", tx.Gas))
-	}
-
-	gasValue, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
-	if err != nil {
-		return false, err
-	}
-	fromValue, err := ss.GetGas(fromAccount)
-	if err != nil {
-		return false, err
-	}
-	remain, err := fromValue.Subtract(*gasValue)
-	if err != nil {
-		return false, err
-	}
-	isNegative, err := remain.IsNegative()
-	if err != nil {
-		return false, err
-	}
-	if isNegative {
-		return false, util.ErrorOf("insuffient", "gas", remain.String())
+	if rootAccount != nil {
+		if tx.Gas < 10 {
+			return false, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < 10", tx.Gas))
+		}
+		gasValue, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
+		if err != nil {
+			return false, err
+		}
+		fromValue, err := ss.GetGas(fromAccount)
+		if err != nil {
+			return false, err
+		}
+		remain, err := fromValue.Subtract(*gasValue)
+		if err != nil {
+			return false, err
+		}
+		isNegative, err := remain.IsNegative()
+		if err != nil {
+			return false, err
+		}
+		if isNegative {
+			return false, util.ErrorOf("insuffient", "gas", remain.String())
+		}
 	}
 	if tx.Payload != nil && len(tx.Payload.Infos) > 0 {
 		for _, payload := range tx.Payload.Infos {
@@ -168,7 +165,7 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 				if a != nil && a.String() != fromAccount.String() {
 					return false, util.ErrorOfUnmatched("account", "token info", a.String(), fromAccount.String())
 				}
-				if !(meta.Total < 0 || (info.Index == (index+1) && info.Index < uint64(meta.Total))) {
+				if !(meta.Total < 0 || (info.Index == uint64(index+1) && info.Index < uint64(meta.Total))) {
 					return false, util.ErrorOfInvalid("token index", fmt.Sprintf("%d, %d", info.Index, meta.Total))
 				}
 				err = service.verifyToken(meta, info)
@@ -318,16 +315,12 @@ func (service *ConsensusService) getAccountEntry(rootAccount libcore.Address, ac
 		if err != nil {
 			return false, nil, err
 		}
-		lastGas, lastLocalGas, err := ss.GetAccountGas(account)
-		if err != nil {
-			return false, nil, err
-		}
+		lastGas, _ := ss.GetGas(account)
 		e = &accountEntry{
 			lastInfo: lastInfo,
 			info:     info,
 
-			lastGas:      lastGas,
-			lastLocalGas: lastLocalGas,
+			lastGas: lastGas,
 		}
 		accountMap[account.String()] = e
 	}
@@ -394,11 +387,11 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 		if tx.Gas < gas {
 			return nil, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < %d", tx.Gas, gas))
 		}
-		fromEntry.localGas, err = service.removeBalance(fromEntry.lastLocalGas, *gasAmount)
+		fromEntry.gas, err = service.removeBalance(fromEntry.lastGas, *gasAmount)
 		if err != nil {
 			return nil, err
 		}
-		gasEntry.localGas, err = service.addBalance(gasEntry.lastLocalGas, *gasAmount)
+		gasEntry.gas, err = service.addBalance(gasEntry.lastGas, *gasAmount)
 		if err != nil {
 			return nil, err
 		}
