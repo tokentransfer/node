@@ -427,6 +427,52 @@ func (n *Node) signTransaction(rootAccount libcore.Address, txm map[string]inter
 				Content: pageData,
 			})
 		}
+		if util.Has(&pxm, "meta") {
+			metaInfo := &pb.MetaInfo{}
+
+			pm := util.ToMap(&pxm, "meta")
+			metaInfo.Symbol = util.ToString(&pm, "symbol")
+			metaInfo.Total = util.ToInt64(&pm, "total")
+			metaInfo.Items, err = n.getMetaItems(pm)
+			if err != nil {
+				return "", nil, err
+			}
+			metaData, err := core.Marshal(metaInfo)
+			if err != nil {
+				return "", nil, err
+			}
+			dataHash, err := n.cryptoService.Hash(metaData)
+			if err != nil {
+				return "", nil, err
+			}
+			payloadInfo.Infos = append(payloadInfo.Infos, &block.DataInfo{
+				Hash:    dataHash,
+				Content: metaData,
+			})
+		}
+		if util.Has(&pxm, "token") {
+			tokenInfo := &pb.TokenInfo{}
+
+			pm := util.ToMap(&pxm, "token")
+			tokenInfo.Symbol = util.ToString(&pm, "symbol")
+			tokenInfo.Index = util.ToUint64(&pm, "index")
+			tokenInfo.Items, err = n.getTokenItems(pm)
+			if err != nil {
+				return "", nil, err
+			}
+			tokenData, err := core.Marshal(tokenInfo)
+			if err != nil {
+				return "", nil, err
+			}
+			dataHash, err := n.cryptoService.Hash(tokenData)
+			if err != nil {
+				return "", nil, err
+			}
+			payloadInfo.Infos = append(payloadInfo.Infos, &block.DataInfo{
+				Hash:    dataHash,
+				Content: tokenData,
+			})
+		}
 	}
 	if len(payloadInfo.Infos) > 0 {
 		tx.Payload = payloadInfo
@@ -446,6 +492,116 @@ func (n *Node) signTransaction(rootAccount libcore.Address, txm map[string]inter
 	}
 	blob := libcore.Bytes(data).String()
 	return blob, tx, nil
+}
+
+func (n *Node) getOptions(os string) []string {
+	if len(os) == 0 {
+		return nil
+	}
+	return strings.Split(os, ";")
+}
+
+func (n *Node) getMetaItems(cm map[string]interface{}) ([]*pb.MetaItem, error) {
+	if itemString := util.ToString(&cm, "items"); len(itemString) > 0 {
+		list := make([]*pb.MetaItem, 0)
+		ps := strings.Split(itemString, ",")
+		for i := 0; i < len(ps); i++ {
+			items := strings.Split(ps[i], ":")
+			if len(items) == 4 {
+				name := items[0]
+				t := items[1]
+				options := n.getOptions(items[2])
+				desc := items[3]
+
+				_, err := core.GetDataTypeByName(t)
+				if err != nil {
+					return nil, err
+				}
+
+				list = append(list, &pb.MetaItem{
+					Name:    name,
+					Type:    t,
+					Options: options,
+					Desc:    desc,
+				})
+			} else {
+				return nil, util.ErrorOfInvalid("meta items", itemString)
+			}
+		}
+		return list, nil
+	}
+	if items := util.ToArray(&cm, "items"); items != nil {
+		list := make([]*pb.MetaItem, 0)
+		for i := 0; i < len(items); i++ {
+			item := items[i]
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				return nil, util.ErrorOfInvalid("meta item", "not a map")
+			}
+			name := util.ToString(&m, "name")
+			t := util.ToString(&m, "type")
+
+			_, err := core.GetDataTypeByName(t)
+			if err != nil {
+				return nil, err
+			}
+
+			o := util.ToString(&m, "options")
+			options := n.getOptions(o)
+
+			desc := util.ToString(&m, "desc")
+
+			list = append(list, &pb.MetaItem{
+				Name:    name,
+				Type:    t,
+				Options: options,
+				Desc:    desc,
+			})
+		}
+		return list, nil
+	}
+	return nil, util.ErrorOfNotFound("meta items", "map")
+}
+
+func (n *Node) getTokenItems(cm map[string]interface{}) ([]*pb.TokenItem, error) {
+	if itemString := util.ToString(&cm, "items"); len(itemString) > 0 {
+		list := make([]*pb.TokenItem, 0)
+		ps := strings.Split(itemString, ",")
+		for i := 0; i < len(ps); i++ {
+			items := strings.Split(ps[i], ":")
+			if len(items) == 2 {
+				name := items[0]
+				value := items[1]
+
+				list = append(list, &pb.TokenItem{
+					Name:  name,
+					Value: value,
+				})
+			} else {
+				return nil, util.ErrorOfInvalid("token items", itemString)
+			}
+		}
+		return list, nil
+	}
+	if items := util.ToArray(&cm, "items"); items != nil {
+		list := make([]*pb.TokenItem, 0)
+		for i := 0; i < len(items); i++ {
+			item := items[i]
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				return nil, util.ErrorOfInvalid("token item", "not a map")
+			}
+			name := util.ToString(&m, "name")
+			value := util.ToString(&m, "value")
+
+			list = append(list, &pb.TokenItem{
+				Name:  name,
+				Value: value,
+			})
+		}
+		return list, nil
+	}
+	return nil, util.ErrorOfNotFound("token items", "map")
 }
 
 func (n *Node) getParams(cm map[string]interface{}) ([][]byte, error) {
@@ -1313,7 +1469,7 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 		} else {
 			account := n.config.GetGasAccount()
 			info := &pb.MetaInfo{
-				Symbol: "Account",
+				Symbol: block.ACCOUNT_STATE.String(),
 				Total:  int64(-1),
 			}
 			dataInfo, err := ss.WriteMeta(account, info)
@@ -1324,7 +1480,7 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 				&block.AccountState{
 					State: block.State{
 						StateType:  block.ACCOUNT_STATE,
-						Account:    rootAccount,
+						Account:    account,
 						Sequence:   uint64(0),
 						BlockIndex: uint64(0),
 					},
