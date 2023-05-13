@@ -89,12 +89,11 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 		return false, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < 10", tx.Gas))
 	}
 
-	account := tx.Account
 	gasValue, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
 	if err != nil {
 		return false, err
 	}
-	fromValue, err := ss.GetGas(account, fromAccount)
+	fromValue, err := ss.GetGas(fromAccount)
 	if err != nil {
 		return false, err
 	}
@@ -319,7 +318,7 @@ func (service *ConsensusService) getAccountEntry(rootAccount libcore.Address, ac
 		if err != nil {
 			return false, nil, err
 		}
-		lastGas, lastLocalGas, err := ss.GetAccountGas(rootAccount, account)
+		lastGas, lastLocalGas, err := ss.GetAccountGas(account)
 		if err != nil {
 			return false, nil, err
 		}

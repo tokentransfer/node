@@ -142,7 +142,7 @@ func (n *Node) getContractData(rootAccount libcore.Address, txm map[string]inter
 	}
 
 	format := util.ToString(&txm, "format")
-	usedCost, r, err := ss.GetContractData(fromAccount, fromAccount, toAccount, format)
+	usedCost, r, err := ss.GetContractData(fromAccount, toAccount, format)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -176,7 +176,7 @@ func (n *Node) callContract(rootAccount libcore.Address, txm map[string]interfac
 		return 0, nil, err
 	}
 
-	usedCost, r, err := ss.CallContract(fromAccount, fromAccount, toAccount, method, params)
+	usedCost, r, err := ss.CallContract(fromAccount, toAccount, method, params)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -838,7 +838,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			gas, err := ss.GetGas(rootAccount, a)
+			gas, err := ss.GetGas(a)
 			if err != nil {
 				return nil, err
 			}
@@ -1117,7 +1117,7 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			if err != nil {
 				return nil, err
 			}
-			info, err := ss.ReadUser(a, a, b)
+			info, err := ss.ReadUser(a, b)
 			if err != nil {
 				return nil, err
 			}
@@ -1447,12 +1447,12 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 			if err != nil {
 				return nil, err
 			}
-			err = ss.UpdateGas(rootAccount, rootAccount, *v)
+			err = ss.UpdateGas(rootAccount, *v)
 			if err != nil {
 				return nil, err
 			}
 			gasAccount := config.GetGasAccount()
-			err = ss.UpdateGas(rootAccount, gasAccount, v.ZeroClone())
+			err = ss.UpdateGas(gasAccount, v.ZeroClone())
 			if err != nil {
 				return nil, err
 			}
