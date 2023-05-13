@@ -11,6 +11,7 @@ import (
 	"github.com/tokentransfer/node/consensus"
 	"github.com/tokentransfer/node/util"
 
+	libblock "github.com/tokentransfer/interfaces/block"
 	libcore "github.com/tokentransfer/interfaces/core"
 )
 
@@ -94,7 +95,18 @@ func (i *GenesisCommand) Run(args []string) int {
 		return 1
 	}
 
-	block, err := n.GenerateBlock(account)
+	var rb libblock.Block
+	if account != nil {
+		rootEntry, err := n.GetEntry(nil)
+		if err != nil {
+			panic(err)
+		}
+		rb = rootEntry.ValidatedBlock
+	} else {
+		rb = nil
+	}
+
+	block, err := n.GenerateBlock(account, rb)
 	if err != nil {
 		panic(err)
 	}

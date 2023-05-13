@@ -104,7 +104,7 @@ func (suite *NodeSuite) load(c *C) *Node {
 	entry, err := n.GetEntry(rootAccount)
 	c.Assert(err, IsNil)
 	if entry.GetBlockNumber() < 0 {
-		block, err := n.GenerateBlock(rootAccount)
+		block, err := n.GenerateBlock(rootAccount, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -185,7 +185,7 @@ func (suite *NodeSuite) testProcess(c *C) {
 	_, _, err = n.processTransaction(rootAccount, tx)
 	c.Assert(err, IsNil)
 
-	block, err := n.GenerateBlock(rootAccount)
+	block, err := n.GenerateBlock(rootAccount, nil)
 	c.Assert(err, IsNil)
 	h, err := n.consensusService.HashBlock(block)
 	c.Assert(err, IsNil)

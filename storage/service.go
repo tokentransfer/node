@@ -31,26 +31,22 @@ type StorageService struct {
 
 	categories []string
 	root       libcore.Address
-	locker     sync.Mutex
+	locker     *sync.Mutex
 }
 
-func NewStorageService(c libcore.Config, root libcore.Address) (*StorageService, error) {
+func NewStorageService(s *StorageService, root libcore.Address) (*StorageService, error) {
 	service := &StorageService{
-		root:   root,
-		locker: sync.Mutex{},
-	}
-	err := service.Init(c)
-	if err != nil {
-		return nil, err
-	}
-	err = service.Start()
-	if err != nil {
-		return nil, err
+		storage: s.storage,
+		stackdb: s.stackdb,
+
+		categories: s.categories,
+		root:       root,
+		locker:     s.locker,
 	}
 	return service, nil
 }
 
-func NewCategoryService(c libcore.Config, root libcore.Address) (*StorageService, error) {
+func NewCategoryService(c libcore.Config, category libcore.Address) (*StorageService, error) {
 	service := &StorageService{
 		categories: func(a libcore.Address) []string {
 			if a != nil {
@@ -60,9 +56,8 @@ func NewCategoryService(c libcore.Config, root libcore.Address) (*StorageService
 				}
 			}
 			return []string{}
-		}(root),
-		root:   root,
-		locker: sync.Mutex{},
+		}(category),
+		locker: &sync.Mutex{},
 	}
 	err := service.Init(c)
 	if err != nil {

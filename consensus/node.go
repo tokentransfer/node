@@ -49,9 +49,11 @@ type Node struct {
 	accountService   libaccount.AccountService
 	consensusService *ConsensusService
 
+	rootEntry   *Entry
 	entryMap    map[string]*Entry
 	entryLocker *sync.Mutex
 
+	storageService    *storage.StorageService
 	merkleLocker      *sync.Mutex
 	storageLocker     *sync.Mutex
 	transactionLocker *sync.Mutex
@@ -112,10 +114,23 @@ func (n *Node) Init(c libcore.Config) error {
 		Key:     pubKey,
 		peermap: make(map[string]*peerEntry),
 	}
+
+	storageService, err := storage.NewCategoryService(n.config, nil)
+	if err != nil {
+		return err
+	}
+
 	consensusService := &ConsensusService{
 		n: n,
 	}
 	n.consensusService = consensusService
+	n.storageService = storageService
+
+	rootEntry, err := n.GetEntry(nil)
+	if err != nil {
+		return err
+	}
+	n.rootEntry = rootEntry
 
 	return nil
 }
@@ -1392,7 +1407,7 @@ func (n *Node) getStorageService(rootAccount libcore.Address) (*storage.StorageS
 	n.storageLocker.Lock()
 	defer n.storageLocker.Unlock()
 
-	ss, err := storage.NewStorageService(n.config, rootAccount)
+	ss, err := storage.NewStorageService(n.storageService, rootAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -1424,7 +1439,7 @@ func (n *Node) AddTransaction(rootAccount libcore.Address, txWithData libblock.T
 	return true, nil
 }
 
-func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.TransactionWithData) (libblock.Block, error) {
+func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.TransactionWithData, rb libblock.Block) (libblock.Block, error) {
 	config := n.config
 	cs := n.cryptoService
 	entry, err := n.GetEntry(rootAccount)
@@ -1500,8 +1515,12 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 		b = &block.Block{
 			Account:    rootAccount,
 			BlockIndex: uint64(0),
-			ParentHash: libcrypto.ZeroHash(cs),
-
+			ParentHash: func(rb libblock.Block) libcore.Hash {
+				if rb != nil {
+					return rb.GetHash()
+				}
+				return libcrypto.ZeroHash(cs)
+			}(rb),
 			Transactions:    []libblock.TransactionWithData{},
 			TransactionHash: ms.GetTransactionRoot(),
 
@@ -1510,7 +1529,12 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 
 			RootHash: ss.RootHash(),
 
-			Timestamp: time.Now().UnixNano(),
+			Timestamp: func(rb libblock.Block) int64 {
+				if rb != nil {
+					return rb.GetTime()
+				}
+				return time.Now().UnixNano()
+			}(rb),
 		}
 
 		err := ms.Cancel()
@@ -1645,11 +1669,7 @@ func (n *Node) VerifyParent(rootAccount libcore.Address, b libblock.Block) error
 		if b.GetParentHash().IsZero() {
 			return util.ErrorOfInvalid("the parent hash of the genesis block", "block")
 		}
-		rootEntry, err := n.GetEntry(nil)
-		if err != nil {
-			return err
-		}
-		_, err = rootEntry.merkle.GetBlockByHash(b.GetParentHash())
+		_, err := n.rootEntry.merkle.GetBlockByHash(b.GetParentHash())
 		if err != nil {
 			return err
 		}
@@ -1797,7 +1817,7 @@ func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bo
 	return
 }
 
-func (n *Node) GenerateBlock(rootAccount libcore.Address) (libblock.Block, error) {
+func (n *Node) GenerateBlock(rootAccount libcore.Address, rb libblock.Block) (libblock.Block, error) {
 	n.transactionLocker.Lock()
 	defer n.transactionLocker.Unlock()
 
@@ -1809,7 +1829,7 @@ func (n *Node) GenerateBlock(rootAccount libcore.Address) (libblock.Block, error
 	entry.txlist = make([]libblock.TransactionWithData, 0)
 	entry.txmap = make(map[string]libblock.TransactionWithData)
 
-	return n._generateBlock(rootAccount, list)
+	return n._generateBlock(rootAccount, list, rb)
 }
 
 func (n *Node) generate() {
@@ -1820,7 +1840,7 @@ func (n *Node) generate() {
 			if entry.Consensused && len(entry.txlist) > 0 {
 				hasTx = hasTx || true
 
-				block, err := n.GenerateBlock(rootAccount)
+				block, err := n.GenerateBlock(rootAccount, nil)
 				if err != nil {
 					glog.Error(err)
 				} else {
@@ -2478,10 +2498,15 @@ func (n *Node) Close() error {
 				return err
 			}
 		}
-		if entry.storage != nil {
-			if err := entry.storage.Close(); err != nil {
-				return err
-			}
+		// if entry.storage != nil {
+		// 	if err := entry.storage.Close(); err != nil {
+		// 		return err
+		// 	}
+		// }
+	}
+	if n.storageService != nil {
+		if err := n.storageService.Close(); err != nil {
+			return err
 		}
 	}
 	if n.net != nil {
