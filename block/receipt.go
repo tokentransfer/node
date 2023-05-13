@@ -67,7 +67,7 @@ func (r *Receipt) UnmarshalBinary(data []byte) error {
 			return util.ErrorOfInvalid("data", "info")
 		}
 		info := msg.(*pb.DataInfo)
-		datas[i] = fromDataInfo(info)
+		datas[i] = FromDataInfo(info)
 	}
 	r.Datas = datas
 
@@ -94,7 +94,7 @@ func (r *Receipt) Raw(rt libcrypto.RawType) ([]byte, error) {
 	for i := 0; i < l; i++ {
 		info := r.Datas[i]
 		if info != nil {
-			pbInfo := toDataInfo(info, rt)
+			pbInfo := ToDataInfo(info, rt)
 			data, err := core.Marshal(pbInfo)
 			if err != nil {
 				return nil, err

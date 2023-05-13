@@ -39,6 +39,13 @@ func (s *GroupInfo) PutData(name string, info *DataInfo) *GroupInfo {
 	return s
 }
 
+func (s *GroupInfo) GetData(name string) *DataInfo {
+	if s.Map != nil {
+		return s.Map[name]
+	}
+	return nil
+}
+
 func (s *GroupInfo) UnmarshalBinary(data []byte) error {
 	meta, msg, err := core.Unmarshal(data)
 	if err != nil {
@@ -62,7 +69,7 @@ func fromDataList(infos []*pb.DataInfo) []*DataInfo {
 	l := len(infos)
 	list := make([]*DataInfo, l)
 	for i, info := range infos {
-		list[i] = fromDataInfo(info)
+		list[i] = FromDataInfo(info)
 	}
 	return list
 }
@@ -73,16 +80,20 @@ func fromDataMap(m map[string]*pb.DataInfo) map[string]*DataInfo {
 	}
 	r := make(map[string]*DataInfo)
 	for k, v := range m {
-		r[k] = fromDataInfo(v)
+		r[k] = FromDataInfo(v)
 	}
 	return r
 }
 
 func (s *GroupInfo) MarshalBinary() ([]byte, error) {
+	return s.Raw(libcrypto.RawBinary)
+}
+
+func (s *GroupInfo) Raw(rt libcrypto.RawType) ([]byte, error) {
 	info := &pb.GroupInfo{
 		Hash: []byte(s.Hash),
-		List: toDataList(s.List, libcrypto.RawBinary),
-		Map:  toDataMap(s.Map, libcrypto.RawBinary),
+		List: toDataList(s.List, rt),
+		Map:  toDataMap(s.Map, rt),
 	}
 	data, err := core.Marshal(info)
 	if err != nil {
@@ -98,7 +109,7 @@ func toDataList(infos []*DataInfo, rt libcrypto.RawType) []*pb.DataInfo {
 	l := len(infos)
 	list := make([]*pb.DataInfo, l)
 	for i := 0; i < l; i++ {
-		list[i] = toDataInfo(infos[i], rt)
+		list[i] = ToDataInfo(infos[i], rt)
 	}
 	return list
 }
@@ -109,7 +120,7 @@ func toDataMap(m map[string]*DataInfo, rt libcrypto.RawType) map[string]*pb.Data
 	}
 	r := make(map[string]*pb.DataInfo)
 	for k, v := range m {
-		r[k] = toDataInfo(v, rt)
+		r[k] = ToDataInfo(v, rt)
 	}
 	return r
 }
@@ -142,7 +153,7 @@ func (s *DataInfo) UnmarshalBinary(data []byte) error {
 }
 
 func (s *DataInfo) MarshalBinary() ([]byte, error) {
-	info := toDataInfo(s, libcrypto.RawBinary)
+	info := ToDataInfo(s, libcrypto.RawBinary)
 	data, err := core.Marshal(info)
 	if err != nil {
 		return nil, err
@@ -150,7 +161,7 @@ func (s *DataInfo) MarshalBinary() ([]byte, error) {
 	return data, nil
 }
 
-func fromDataInfo(info *pb.DataInfo) *DataInfo {
+func FromDataInfo(info *pb.DataInfo) *DataInfo {
 	if info != nil {
 		return &DataInfo{
 			Hash:    libcore.Hash(info.Hash),
@@ -160,7 +171,7 @@ func fromDataInfo(info *pb.DataInfo) *DataInfo {
 	return nil
 }
 
-func toDataInfo(info *DataInfo, rt libcrypto.RawType) *pb.DataInfo {
+func ToDataInfo(info *DataInfo, rt libcrypto.RawType) *pb.DataInfo {
 	if info != nil {
 		switch rt {
 		case libcrypto.RawBinary:
@@ -188,7 +199,7 @@ func toDataInfo(info *DataInfo, rt libcrypto.RawType) *pb.DataInfo {
 }
 
 func (s *DataInfo) Raw(rt libcrypto.RawType) ([]byte, error) {
-	info := toDataInfo(s, rt)
+	info := ToDataInfo(s, rt)
 	data, err := core.Marshal(info)
 	if err != nil {
 		return nil, err
@@ -221,7 +232,7 @@ func (s *PayloadInfo) UnmarshalBinary(data []byte) error {
 	info := msg.(*pb.PayloadInfo)
 	infos := make([]*DataInfo, 0)
 	for _, pbInfo := range info.Infos {
-		dataInfo := fromDataInfo(pbInfo)
+		dataInfo := FromDataInfo(pbInfo)
 		infos = append(infos, dataInfo)
 	}
 	s.Infos = infos
@@ -236,7 +247,7 @@ func fromPayloadInfo(info *pb.PayloadInfo) *PayloadInfo {
 	if info != nil {
 		infos := make([]*DataInfo, 0)
 		for _, pbInfo := range info.Infos {
-			dataInfo := fromDataInfo(pbInfo)
+			dataInfo := FromDataInfo(pbInfo)
 			infos = append(infos, dataInfo)
 		}
 		return &PayloadInfo{
@@ -250,7 +261,7 @@ func toPayloadInfo(info *PayloadInfo, rt libcrypto.RawType) *pb.PayloadInfo {
 	if info != nil {
 		infos := make([]*pb.DataInfo, 0)
 		for _, info := range info.Infos {
-			pbInfo := toDataInfo(info, rt)
+			pbInfo := ToDataInfo(info, rt)
 			infos = append(infos, pbInfo)
 		}
 		return &pb.PayloadInfo{
@@ -335,4 +346,37 @@ func ReadTransaction(data []byte) (libblock.Transaction, error) {
 	default:
 		return nil, util.ErrorOfInvalid("transaction", "data")
 	}
+}
+
+func GetDataInfo(info *GroupInfo) (*DataInfo, error) {
+	dataContent, err := info.Raw(libcrypto.RawBinary)
+	if err != nil {
+		return nil, err
+	}
+	dataHash, err := cs.Hash(dataContent)
+	if err != nil {
+		return nil, err
+	}
+	return &DataInfo{
+		Hash:    dataHash,
+		Content: dataContent,
+	}, nil
+}
+
+func GetGroupInfo(info *DataInfo) (*GroupInfo, error) {
+	group := &GroupInfo{}
+	err := group.UnmarshalBinary(info.Content)
+	if err != nil {
+		return nil, err
+	}
+
+	expectInfo, err := GetDataInfo(group)
+	if err != nil {
+		return nil, err
+	}
+	if info.Hash.String() != expectInfo.Hash.String() {
+		return nil, util.ErrorOfUnmatched("hash", "group info", info.Hash.String(), expectInfo.Hash.String())
+	}
+
+	return group, nil
 }

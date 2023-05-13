@@ -47,7 +47,7 @@ type Peer struct {
 	Id  string
 	Key libaccount.PublicKey
 
-	address string
+	address libcore.Address
 	index   uint64
 	peermap map[string]*peerEntry
 }
@@ -80,24 +80,24 @@ func (p *Peer) GetIndex(n *Node) uint64 {
 			return 0
 		}
 
-		p.address = address.String()
+		p.address = address
 		p.index = index
 	}
 	return p.index
 }
 
-func (p *Peer) GetAddress(n *Node) string {
-	if len(p.address) == 0 {
+func (p *Peer) GetAddress(n *Node) libcore.Address {
+	if p.address == nil {
 		address, err := p.Key.GenerateAddress()
 		if err != nil {
-			return ""
+			return nil
 		}
 		index, err := n.GetIndex(address.String())
 		if err != nil {
-			return ""
+			return nil
 		}
 
-		p.address = address.String()
+		p.address = address
 		p.index = index
 	}
 	return p.address

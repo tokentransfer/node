@@ -9,15 +9,17 @@ import (
 	"sync"
 
 	"github.com/caivega/glog"
-	libcore "github.com/tokentransfer/interfaces/core"
-	libstore "github.com/tokentransfer/interfaces/store"
 	"github.com/tokentransfer/node/account"
+	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/core"
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/crypto"
 	"github.com/tokentransfer/node/db"
 	"github.com/tokentransfer/node/util"
 	"github.com/tokentransfer/node/vm"
+
+	libcore "github.com/tokentransfer/interfaces/core"
+	libstore "github.com/tokentransfer/interfaces/store"
 )
 
 var as = account.NewAccountService()
@@ -292,6 +294,30 @@ func (s *StorageService) readData(rootGroup core.Group, category string, dir str
 	return categoryGroup.Key(), dirGroup.Key(), key, content, nil
 }
 
+func (s *StorageService) writeMap(rootGroup core.Group, category string, dir string, name string, m map[string]interface{}) (libcore.Hash, libcore.Hash, libcore.Hash, libcore.Hash, error) {
+	data, err := core.MarshalData(m)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return s.writeData(rootGroup, category, dir, name, data)
+}
+
+func (s *StorageService) readMap(rootGroup core.Group, category string, dir string, name string) (core.Key, core.Key, core.Key, map[string]interface{}, error) {
+	categoryKey, dirKey, key, metaData, err := s.readData(rootGroup, category, dir, name)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	t, msg, err := core.UnmarshalData(metaData)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	if t != core.CORE_DATA_MAP {
+		return nil, nil, nil, nil, util.ErrorOfInvalid("data map", "data")
+	}
+	m := msg.(map[string]interface{})
+	return categoryKey, dirKey, key, m, nil
+}
+
 func (s *StorageService) ReadCode(codeAccount libcore.Address) ([]byte, []byte, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
@@ -324,30 +350,27 @@ func (s *StorageService) WriteCode(account libcore.Address, wasmCode []byte, abi
 	return codeHash, nil
 }
 
-func (s *StorageService) ReadMeta(symbol libcore.Symbol) (libcore.Address, *pb.MetaInfo, error) {
+func (s *StorageService) ReadMeta(symbol libcore.Symbol) (uint64, libcore.Address, *pb.MetaInfo, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, nil, err
 	}
-	_, _, _, metaData, err := s.readData(rootGroup, "token", "meta", symbol.String())
+	_, _, _, metaMap, err := s.readMap(rootGroup, "token", "meta", symbol.String())
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, nil, err
 	}
-	t, msg, err := core.UnmarshalData(metaData)
+	_, _, _, indexMap, err := s.readMap(rootGroup, "token", "index", symbol.String())
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, nil, err
 	}
-	if t != core.CORE_DATA_MAP {
-		return nil, nil, util.ErrorOfInvalid("data map", "data")
-	}
-	m := msg.(map[string]interface{})
-	account := util.ToString(&m, "account")
+	account := util.ToString(&metaMap, "account")
 	_, a, err := as.NewAccountFromAddress(account)
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, nil, err
 	}
-	info := toMetaInfo(&m, "info")
-	return a, info, nil
+	info := toMetaInfo(&metaMap, "info")
+	index := util.ToUint64(&indexMap, "index")
+	return index, a, info, nil
 }
 
 func toMetaInfo(m *map[string]interface{}, key string) *pb.MetaInfo {
@@ -363,29 +386,37 @@ func toMetaInfo(m *map[string]interface{}, key string) *pb.MetaInfo {
 	return nil
 }
 
-func (s *StorageService) WriteMeta(account libcore.Address, info *pb.MetaInfo) (libcore.Hash, []byte, error) {
+func (s *StorageService) WriteMeta(account libcore.Address, info *pb.MetaInfo) (*block.DataInfo, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	metaData, err := core.MarshalData(map[string]interface{}{
+	_, _, _, metaHash, err := s.writeMap(rootGroup, "token", "meta", info.Symbol, map[string]interface{}{
 		"account": account.String(),
 		"info":    info,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	_, _, _, metaHash, err := s.writeData(rootGroup, "token", "meta", info.Symbol, metaData)
-	if err != nil {
-		return nil, nil, err
-	}
-	metaContent, err := core.MarshalData(map[string]interface{}{
+	_, _, _, indexHash, err := s.writeMap(rootGroup, "token", "index", info.Symbol, map[string]interface{}{
 		"index": uint64(0),
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return metaHash, metaContent, nil
+
+	group := &block.GroupInfo{}
+	group.PutData("meta", &block.DataInfo{
+		Hash: metaHash,
+	})
+	group.PutData("index", &block.DataInfo{
+		Hash: indexHash,
+	})
+	dataInfo, err := block.GetDataInfo(group)
+	if err != nil {
+		return nil, err
+	}
+	return dataInfo, nil
 }
 
 func (s *StorageService) ReadToken(symbol libcore.Symbol, index uint64) (libcore.Address, *pb.TokenInfo, error) {
@@ -393,24 +424,16 @@ func (s *StorageService) ReadToken(symbol libcore.Symbol, index uint64) (libcore
 	if err != nil {
 		return nil, nil, err
 	}
-	_, _, _, tokenData, err := s.readData(rootGroup, "token", "token", util.GetTokenKey(symbol.String(), index))
+	_, _, _, tokenMap, err := s.readMap(rootGroup, "token", "token", util.GetTokenKey(symbol.String(), index))
 	if err != nil {
 		return nil, nil, err
 	}
-	t, msg, err := core.UnmarshalData(tokenData)
-	if err != nil {
-		return nil, nil, err
-	}
-	if t != core.CORE_DATA_MAP {
-		return nil, nil, util.ErrorOfInvalid("data map", "data")
-	}
-	m := msg.(map[string]interface{})
-	account := util.ToString(&m, "account")
+	account := util.ToString(&tokenMap, "account")
 	_, a, err := as.NewAccountFromAddress(account)
 	if err != nil {
 		return nil, nil, err
 	}
-	info := toTokenInfo(&m, "info")
+	info := toTokenInfo(&tokenMap, "info")
 	return a, info, nil
 }
 
@@ -427,38 +450,36 @@ func toTokenInfo(m *map[string]interface{}, key string) *pb.TokenInfo {
 	return nil
 }
 
-func (s *StorageService) WriteToken(account libcore.Address, info *pb.TokenInfo, metaContent []byte) (libcore.Hash, []byte, error) {
+func (s *StorageService) WriteToken(account libcore.Address, info *pb.TokenInfo) (*block.DataInfo, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	tokenData, err := core.MarshalData(map[string]interface{}{
+	_, _, _, tokenHash, err := s.writeMap(rootGroup, "token", "token", util.GetTokenKey(info.Symbol, info.Index), map[string]interface{}{
 		"account": account.String(),
 		"info":    info,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	_, _, _, tokenHash, err := s.writeData(rootGroup, "token", "token", util.GetTokenKey(info.Symbol, info.Index), tokenData)
+	_, _, _, indexHash, err := s.writeMap(rootGroup, "token", "index", info.Symbol, map[string]interface{}{
+		"index": info.Index,
+	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	t, d, err := core.UnmarshalData(metaContent)
+	group := &block.GroupInfo{}
+	group.PutData("token", &block.DataInfo{
+		Hash: tokenHash,
+	})
+	group.PutData("index", &block.DataInfo{
+		Hash: indexHash,
+	})
+	dataInfo, err := block.GetDataInfo(group)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	if t != core.CORE_DATA_MAP {
-		return nil, nil, util.ErrorOfInvalid("data map", "data")
-	}
-	m := d.(map[string]interface{})
-	index := util.ToUint64(&m, "index")
-	m["index"] = index + 1
-	metaContent, err = core.MarshalData(m)
-	if err != nil {
-		return nil, nil, err
-	}
-	return tokenHash, metaContent, nil
+	return dataInfo, nil
 }
 
 func (s *StorageService) ReadMemory(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address) ([]byte, error) {

@@ -115,12 +115,12 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 
 	s.Name = state.Name
 
-	s.User = fromDataInfo(state.User)
-	s.Code = fromDataInfo(state.Code)
-	s.Page = fromDataInfo(state.Page)
-	s.Token = fromDataInfo(state.Token)
-	s.Memory = fromDataInfo(state.Memory)
-	s.Data = fromDataInfo(state.Data)
+	s.User = FromDataInfo(state.User)
+	s.Code = FromDataInfo(state.Code)
+	s.Page = FromDataInfo(state.Page)
+	s.Token = FromDataInfo(state.Token)
+	s.Memory = FromDataInfo(state.Memory)
+	s.Data = FromDataInfo(state.Data)
 
 	s.PublicKey = libcore.PublicKey(state.PublicKey)
 	s.RootHash = libcore.Hash(state.RootHash)
@@ -147,12 +147,12 @@ func (s *AccountState) Raw(rt libcrypto.RawType) ([]byte, error) {
 		},
 
 		Name:   s.Name,
-		User:   toDataInfo(s.User, rt),
-		Code:   toDataInfo(s.Code, rt),
-		Page:   toDataInfo(s.Page, rt),
-		Token:  toDataInfo(s.Token, rt),
-		Memory: toDataInfo(s.Memory, rt),
-		Data:   toDataInfo(s.Data, rt),
+		User:   ToDataInfo(s.User, rt),
+		Code:   ToDataInfo(s.Code, rt),
+		Page:   ToDataInfo(s.Page, rt),
+		Token:  ToDataInfo(s.Token, rt),
+		Memory: ToDataInfo(s.Memory, rt),
+		Data:   ToDataInfo(s.Data, rt),
 
 		PublicKey: []byte(s.PublicKey),
 		RootHash:  []byte(s.RootHash),

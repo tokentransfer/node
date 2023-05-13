@@ -3,10 +3,12 @@ package block
 import (
 	"github.com/tokentransfer/node/account"
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/crypto"
 
 	libblock "github.com/tokentransfer/interfaces/block"
 )
 
+var cs = &crypto.CryptoService{}
 var as = account.NewAccountService()
 
 // TransactionType

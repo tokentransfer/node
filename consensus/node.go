@@ -702,13 +702,14 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 			ss := entry.storage
 
 			symbol := util.ToString(&item, "symbol")
-			account, info, err := ss.ReadMeta(libcore.Symbol(symbol))
+			index, account, info, err := ss.ReadMeta(libcore.Symbol(symbol))
 			if err != nil {
 				return nil, err
 			}
 			return map[string]interface{}{
 				"account": account.String(),
 				"info":    info,
+				"index":   index,
 			}, nil
 		})
 		if err != nil {
@@ -1310,7 +1311,26 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 				},
 			}
 		} else {
-			states = make([]libblock.State, 0)
+			account := n.config.GetGasAccount()
+			info := &pb.MetaInfo{
+				Symbol: "Account",
+				Total:  int64(-1),
+			}
+			dataInfo, err := ss.WriteMeta(account, info)
+			if err != nil {
+				return nil, err
+			}
+			states = []libblock.State{
+				&block.AccountState{
+					State: block.State{
+						StateType:  block.ACCOUNT_STATE,
+						Account:    rootAccount,
+						Sequence:   uint64(0),
+						BlockIndex: uint64(0),
+					},
+					Token: dataInfo,
+				},
+			}
 		}
 
 		for i := 0; i < len(states); i++ {
