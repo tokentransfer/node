@@ -63,12 +63,12 @@ type AccountState struct {
 
 	Name string
 
-	User  *DataInfo
-	Code  *DataInfo
-	Page  *DataInfo
-	Token *DataInfo
-	Data  *DataInfo
-	File  *DataInfo
+	User   *DataInfo
+	Code   *DataInfo
+	Page   *DataInfo
+	Token  *DataInfo
+	Memory *DataInfo
+	Data   *DataInfo
 
 	PublicKey libcore.PublicKey
 	RootHash  libcore.Hash
@@ -83,10 +83,10 @@ func (s *AccountState) GetStateKey() []string {
 	name := s.GetName()
 	if len(name) > 0 {
 		list = append(list, name)
-		list = append(list, util.GetVersionKey(name, s.Version, "-"))
+		list = append(list, util.GetVersionKey(name, s.Version))
 	}
 	list = append(list, s.Account.String())
-	list = append(list, util.GetVersionKey(s.Account.String(), s.Version, "-"))
+	list = append(list, util.GetVersionKey(s.Account.String(), s.Version))
 	return list
 }
 
@@ -119,8 +119,8 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.Code = fromDataInfo(state.Code)
 	s.Page = fromDataInfo(state.Page)
 	s.Token = fromDataInfo(state.Token)
+	s.Memory = fromDataInfo(state.Memory)
 	s.Data = fromDataInfo(state.Data)
-	s.File = fromDataInfo(state.File)
 
 	s.PublicKey = libcore.PublicKey(state.PublicKey)
 	s.RootHash = libcore.Hash(state.RootHash)
@@ -146,13 +146,13 @@ func (s *AccountState) Raw(rt libcrypto.RawType) ([]byte, error) {
 			Version:   s.Version,
 		},
 
-		Name:  s.Name,
-		User:  toDataInfo(s.User, rt),
-		Code:  toDataInfo(s.Code, rt),
-		Page:  toDataInfo(s.Page, rt),
-		Token: toDataInfo(s.Token, rt),
-		Data:  toDataInfo(s.Data, rt),
-		File:  toDataInfo(s.File, rt),
+		Name:   s.Name,
+		User:   toDataInfo(s.User, rt),
+		Code:   toDataInfo(s.Code, rt),
+		Page:   toDataInfo(s.Page, rt),
+		Token:  toDataInfo(s.Token, rt),
+		Memory: toDataInfo(s.Memory, rt),
+		Data:   toDataInfo(s.Data, rt),
 
 		PublicKey: []byte(s.PublicKey),
 		RootHash:  []byte(s.RootHash),

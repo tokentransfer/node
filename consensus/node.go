@@ -693,6 +693,53 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 		}
 		return result, nil
 
+	case "getMeta":
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			entry, err := n.GetEntry(rootAccount)
+			if err != nil {
+				return nil, err
+			}
+			ss := entry.storage
+
+			symbol := util.ToString(&item, "symbol")
+			account, info, err := ss.ReadMeta(libcore.Symbol(symbol))
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{
+				"account": account.String(),
+				"info":    info,
+			}, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+
+	case "getToken":
+		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
+			entry, err := n.GetEntry(rootAccount)
+			if err != nil {
+				return nil, err
+			}
+			ss := entry.storage
+
+			symbol := util.ToString(&item, "symbol")
+			index := util.ToUint64(&item, "index")
+			account, info, err := ss.ReadToken(libcore.Symbol(symbol), index)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{
+				"account": account.String(),
+				"info":    info,
+			}, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+
 	case "getTransactionCount":
 		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
 			as := n.accountService

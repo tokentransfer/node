@@ -292,10 +292,14 @@ func CheckTotal(key string, s string, decimals int64) (int64, error) {
 	return z.IntPart(), nil
 }
 
-func GetVersionKey(name string, version uint64, seperator string) string {
-	return fmt.Sprintf("%s%s%d", name, seperator, version)
+func GetTokenKey(symbol string, index uint64) string {
+	return fmt.Sprintf("%s-%d", symbol, index)
 }
 
-func GetTransactionKey(account libcore.Address, sequence uint64, seperator string) string {
-	return fmt.Sprintf("%s%s%d", account.String(), seperator, sequence)
+func GetVersionKey(name string, version uint64) string {
+	return fmt.Sprintf("%s-%d", name, version)
+}
+
+func GetTransactionKey(account libcore.Address, sequence uint64) string {
+	return fmt.Sprintf("%s-%d", account.String(), sequence)
 }

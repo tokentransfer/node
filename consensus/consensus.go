@@ -152,7 +152,7 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 						return false, err
 					}
 				}
-				a, _, _ := ss.ReadMeta(info.Symbol)
+				a, _, _ := ss.ReadMeta(libcore.Symbol(info.Symbol))
 				if a != nil && a.String() != fromAccount.String() {
 					return false, util.ErrorOfUnmatched("account", "meta info", a.String(), fromAccount.String())
 				}
@@ -162,7 +162,7 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 				if !(len(info.Symbol) > 0 && len(info.Items) > 0) {
 					return false, util.ErrorOfInvalid("format", "token info")
 				}
-				a, meta, err := ss.ReadMeta(info.Symbol)
+				a, meta, err := ss.ReadMeta(libcore.Symbol(info.Symbol))
 				if err != nil {
 					return false, err
 				}
@@ -532,7 +532,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			if !ok {
 				accounts = append(accounts, retAccount.String())
 			}
-			retEntry.info.Data = &block.DataInfo{
+			retEntry.info.Memory = &block.DataInfo{
 				Hash:    retHash,
 				Content: retContent,
 			}
@@ -586,7 +586,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 
 		case core.CORE_META_INFO:
 			info := msg.(*pb.MetaInfo)
-			metaHash, err := ss.WriteMeta(tx.Account, info)
+			metaHash, metaContent, err := ss.WriteMeta(tx.Account, info)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -595,13 +595,40 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 				return cost, nil, util.ErrorOfNotFound("account entry", tx.Account.String())
 			}
 			accountEntry.info.Token = &block.DataInfo{
-				Hash: metaHash,
+				Hash:    metaHash,
+				Content: metaContent,
 			}
 
 		case core.CORE_TOKEN_INFO:
-			// info := msg.(*pb.TokenInfo)
+			info := msg.(*pb.TokenInfo)
+
+			metaAccount, _, err := ss.ReadMeta(libcore.Symbol(info.Symbol))
+			if err != nil {
+				return cost, nil, err
+			}
+			ok, metaEntry, err := service.getAccountEntry(rootAccount, metaAccount, accountMap)
+			if err != nil {
+				return cost, nil, err
+			}
+			if !ok {
+				accounts = append(accounts, metaAccount.String())
+			}
+			metaContent := metaEntry.info.Token.Content
+			tokenHash, metaContent, err := ss.WriteToken(tx.Account, info, metaContent)
+			if err != nil {
+				return cost, nil, err
+			}
+			accountEntry, ok := accountMap[tx.Account.String()]
+			if !ok {
+				return cost, nil, util.ErrorOfNotFound("account entry", tx.Account.String())
+			}
+			accountEntry.info.Token = &block.DataInfo{
+				Hash: tokenHash,
+			}
+			metaEntry.info.Token.Content = metaContent
 
 		case core.CORE_DATA_INFO:
+		case core.CORE_GROUP_INFO:
 		default:
 			return cost, nil, util.ErrorOfUnknown("format", "info")
 		}

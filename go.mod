@@ -22,7 +22,7 @@ require (
 	github.com/tjfoc/gmsm v1.4.1
 	github.com/tokentransfer/check v0.0.0-20220325011756-9433b88b4878
 	github.com/tokentransfer/go-MerklePatriciaTree v0.0.0-20230322010733-91ec8f899a24
-	github.com/tokentransfer/interfaces v0.0.0-20230512134716-5d2e414d4994
+	github.com/tokentransfer/interfaces v0.0.0-20230513031043-83f918357201
 	google.golang.org/protobuf v1.28.1
 )
 

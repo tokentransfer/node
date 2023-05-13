@@ -324,12 +324,12 @@ func (s *StorageService) WriteCode(account libcore.Address, wasmCode []byte, abi
 	return codeHash, nil
 }
 
-func (s *StorageService) ReadMeta(symbol string) (libcore.Address, *pb.MetaInfo, error) {
+func (s *StorageService) ReadMeta(symbol libcore.Symbol) (libcore.Address, *pb.MetaInfo, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	_, _, _, metaData, err := s.readData(rootGroup, "token", "meta", symbol)
+	_, _, _, metaData, err := s.readData(rootGroup, "token", "meta", symbol.String())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -363,43 +363,122 @@ func toMetaInfo(m *map[string]interface{}, key string) *pb.MetaInfo {
 	return nil
 }
 
-func (s *StorageService) WriteMeta(account libcore.Address, info *pb.MetaInfo) (libcore.Hash, error) {
+func (s *StorageService) WriteMeta(account libcore.Address, info *pb.MetaInfo) (libcore.Hash, []byte, error) {
 	rootGroup, err := s.getRoot(nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	metaData, err := core.MarshalData(map[string]interface{}{
 		"account": account.String(),
 		"info":    info,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	_, _, _, metaHash, err := s.writeData(rootGroup, "token", "meta", info.Symbol, metaData)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return metaHash, nil
+	metaContent, err := core.MarshalData(map[string]interface{}{
+		"index": uint64(0),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return metaHash, metaContent, nil
 }
 
-func (s *StorageService) ReadData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address) ([]byte, error) {
+func (s *StorageService) ReadToken(symbol libcore.Symbol, index uint64) (libcore.Address, *pb.TokenInfo, error) {
+	rootGroup, err := s.getRoot(nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, _, _, tokenData, err := s.readData(rootGroup, "token", "token", util.GetTokenKey(symbol.String(), index))
+	if err != nil {
+		return nil, nil, err
+	}
+	t, msg, err := core.UnmarshalData(tokenData)
+	if err != nil {
+		return nil, nil, err
+	}
+	if t != core.CORE_DATA_MAP {
+		return nil, nil, util.ErrorOfInvalid("data map", "data")
+	}
+	m := msg.(map[string]interface{})
+	account := util.ToString(&m, "account")
+	_, a, err := as.NewAccountFromAddress(account)
+	if err != nil {
+		return nil, nil, err
+	}
+	info := toTokenInfo(&m, "info")
+	return a, info, nil
+}
+
+func toTokenInfo(m *map[string]interface{}, key string) *pb.TokenInfo {
+	if m != nil {
+		data := (*m)[key]
+		if data != nil {
+			info, ok := data.(*pb.TokenInfo)
+			if ok {
+				return info
+			}
+		}
+	}
+	return nil
+}
+
+func (s *StorageService) WriteToken(account libcore.Address, info *pb.TokenInfo, metaContent []byte) (libcore.Hash, []byte, error) {
+	rootGroup, err := s.getRoot(nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	tokenData, err := core.MarshalData(map[string]interface{}{
+		"account": account.String(),
+		"info":    info,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	_, _, _, tokenHash, err := s.writeData(rootGroup, "token", "token", util.GetTokenKey(info.Symbol, info.Index), tokenData)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	t, d, err := core.UnmarshalData(metaContent)
+	if err != nil {
+		return nil, nil, err
+	}
+	if t != core.CORE_DATA_MAP {
+		return nil, nil, util.ErrorOfInvalid("data map", "data")
+	}
+	m := d.(map[string]interface{})
+	index := util.ToUint64(&m, "index")
+	m["index"] = index + 1
+	metaContent, err = core.MarshalData(m)
+	if err != nil {
+		return nil, nil, err
+	}
+	return tokenHash, metaContent, nil
+}
+
+func (s *StorageService) ReadMemory(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address) ([]byte, error) {
 	rootGroup, err := s.getRoot(rootAccount)
 	if err != nil {
 		return nil, err
 	}
-	_, _, _, data, err := s.readData(rootGroup, "data", dataAccount.String(), codeAccount.String())
+	_, _, _, data, err := s.readData(rootGroup, "memory", dataAccount.String(), codeAccount.String())
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func (s *StorageService) WriteData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) WriteMemory(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.getRoot(rootAccount)
 	if err != nil {
 		return nil, nil, err
 	}
-	rootHash, _, _, dataHash, err := s.writeData(rootGroup, "data", dataAccount.String(), codeAccount.String(), data)
+	rootHash, _, _, dataHash, err := s.writeData(rootGroup, "memory", dataAccount.String(), codeAccount.String(), data)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -596,11 +675,11 @@ func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, f
 	}
 	var wasmData []byte
 	if len(inputs) == 0 {
-		wasmData, _ = s.ReadData(fromAccount, fromAccount, toAccount)
+		wasmData, _ = s.ReadMemory(fromAccount, fromAccount, toAccount)
 	} else {
 		inputDatas := &pb.DataList{}
 		for _, input := range inputs {
-			wasmData, _ := s.ReadData(fromAccount, fromAccount, input)
+			wasmData, _ := s.ReadMemory(fromAccount, fromAccount, input)
 			inputDatas.List = append(inputDatas.List, &pb.Data{
 				Bytes: wasmData,
 			})
@@ -616,7 +695,7 @@ func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, f
 	}
 	if newWasmData != nil {
 		if len(outputs) == 0 {
-			rootHash, dataHash, err := s.WriteData(fromAccount, fromAccount, toAccount, newWasmData)
+			rootHash, dataHash, err := s.WriteMemory(fromAccount, fromAccount, toAccount, newWasmData)
 			if err != nil {
 				return 0, nil, nil, nil, nil, err
 			}
@@ -637,7 +716,7 @@ func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, f
 			resultInfos := &pb.DataList{}
 			for index, outputData := range outputDatas.List {
 				output := outputs[index]
-				_, dataHash, err := s.WriteData(toAccount, toAccount, output, outputData.Bytes)
+				_, dataHash, err := s.WriteMemory(toAccount, toAccount, output, outputData.Bytes)
 				if err != nil {
 					return 0, nil, nil, nil, nil, err
 				}
@@ -671,7 +750,7 @@ func (s *StorageService) CallContract(rootAccount libcore.Address, dataAccount l
 	if err != nil {
 		return 0, nil, err
 	}
-	wasmData, _ := s.ReadData(rootAccount, dataAccount, codeAccount)
+	wasmData, _ := s.ReadMemory(rootAccount, dataAccount, codeAccount)
 	usedCost, _, resultData, err := vm.RunWasm(int64(1000000), wasmCode, abiCode, wasmData, method, params, true) // remainCost
 	if err != nil {
 		return 0, nil, err
@@ -685,7 +764,7 @@ func (s *StorageService) CallContract(rootAccount libcore.Address, dataAccount l
 }
 
 func (s *StorageService) GetContractData(rootAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, format string) (int64, interface{}, error) {
-	wasmData, _ := s.ReadData(rootAccount, dataAccount, codeAccount)
+	wasmData, _ := s.ReadMemory(rootAccount, dataAccount, codeAccount)
 	var r interface{}
 	var e error
 	switch format {
