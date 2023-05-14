@@ -67,6 +67,61 @@ func (x *Data) GetBytes() []byte {
 	return nil
 }
 
+type DataEntry struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Name  string `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	Value *Data  `protobuf:"bytes,2,opt,name=Value,proto3" json:"Value,omitempty"`
+}
+
+func (x *DataEntry) Reset() {
+	*x = DataEntry{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_data_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DataEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DataEntry) ProtoMessage() {}
+
+func (x *DataEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_data_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DataEntry.ProtoReflect.Descriptor instead.
+func (*DataEntry) Descriptor() ([]byte, []int) {
+	return file_data_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *DataEntry) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DataEntry) GetValue() *Data {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
 type DataList struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -78,7 +133,7 @@ type DataList struct {
 func (x *DataList) Reset() {
 	*x = DataList{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_data_proto_msgTypes[1]
+		mi := &file_data_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -91,7 +146,7 @@ func (x *DataList) String() string {
 func (*DataList) ProtoMessage() {}
 
 func (x *DataList) ProtoReflect() protoreflect.Message {
-	mi := &file_data_proto_msgTypes[1]
+	mi := &file_data_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -104,7 +159,7 @@ func (x *DataList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataList.ProtoReflect.Descriptor instead.
 func (*DataList) Descriptor() ([]byte, []int) {
-	return file_data_proto_rawDescGZIP(), []int{1}
+	return file_data_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DataList) GetList() []*Data {
@@ -119,13 +174,13 @@ type DataMap struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Map map[string]*Data `protobuf:"bytes,1,rep,name=Map,proto3" json:"Map,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Map []*DataEntry `protobuf:"bytes,1,rep,name=Map,proto3" json:"Map,omitempty"`
 }
 
 func (x *DataMap) Reset() {
 	*x = DataMap{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_data_proto_msgTypes[2]
+		mi := &file_data_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -138,7 +193,7 @@ func (x *DataMap) String() string {
 func (*DataMap) ProtoMessage() {}
 
 func (x *DataMap) ProtoReflect() protoreflect.Message {
-	mi := &file_data_proto_msgTypes[2]
+	mi := &file_data_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -151,10 +206,10 @@ func (x *DataMap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataMap.ProtoReflect.Descriptor instead.
 func (*DataMap) Descriptor() ([]byte, []int) {
-	return file_data_proto_rawDescGZIP(), []int{2}
+	return file_data_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *DataMap) GetMap() map[string]*Data {
+func (x *DataMap) GetMap() []*DataEntry {
 	if x != nil {
 		return x.Map
 	}
@@ -166,18 +221,18 @@ var File_data_proto protoreflect.FileDescriptor
 var file_data_proto_rawDesc = []byte{
 	0x0a, 0x0a, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x02, 0x70, 0x62,
 	0x22, 0x1c, 0x0a, 0x04, 0x44, 0x61, 0x74, 0x61, 0x12, 0x14, 0x0a, 0x05, 0x42, 0x79, 0x74, 0x65,
-	0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x42, 0x79, 0x74, 0x65, 0x73, 0x22, 0x28,
-	0x0a, 0x08, 0x44, 0x61, 0x74, 0x61, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x1c, 0x0a, 0x04, 0x4c, 0x69,
-	0x73, 0x74, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x08, 0x2e, 0x70, 0x62, 0x2e, 0x44, 0x61,
-	0x74, 0x61, 0x52, 0x04, 0x4c, 0x69, 0x73, 0x74, 0x22, 0x73, 0x0a, 0x07, 0x44, 0x61, 0x74, 0x61,
-	0x4d, 0x61, 0x70, 0x12, 0x26, 0x0a, 0x03, 0x4d, 0x61, 0x70, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b,
-	0x32, 0x14, 0x2e, 0x70, 0x62, 0x2e, 0x44, 0x61, 0x74, 0x61, 0x4d, 0x61, 0x70, 0x2e, 0x4d, 0x61,
-	0x70, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x03, 0x4d, 0x61, 0x70, 0x1a, 0x40, 0x0a, 0x08, 0x4d,
-	0x61, 0x70, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x1e, 0x0a, 0x05, 0x76, 0x61, 0x6c,
-	0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x08, 0x2e, 0x70, 0x62, 0x2e, 0x44, 0x61,
-	0x74, 0x61, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0x06, 0x5a,
-	0x04, 0x2e, 0x3b, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x42, 0x79, 0x74, 0x65, 0x73, 0x22, 0x3f,
+	0x0a, 0x09, 0x44, 0x61, 0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x12, 0x0a, 0x04, 0x4e,
+	0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x4e, 0x61, 0x6d, 0x65, 0x12,
+	0x1e, 0x0a, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x08,
+	0x2e, 0x70, 0x62, 0x2e, 0x44, 0x61, 0x74, 0x61, 0x52, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x22,
+	0x28, 0x0a, 0x08, 0x44, 0x61, 0x74, 0x61, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x1c, 0x0a, 0x04, 0x4c,
+	0x69, 0x73, 0x74, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x08, 0x2e, 0x70, 0x62, 0x2e, 0x44,
+	0x61, 0x74, 0x61, 0x52, 0x04, 0x4c, 0x69, 0x73, 0x74, 0x22, 0x2a, 0x0a, 0x07, 0x44, 0x61, 0x74,
+	0x61, 0x4d, 0x61, 0x70, 0x12, 0x1f, 0x0a, 0x03, 0x4d, 0x61, 0x70, 0x18, 0x01, 0x20, 0x03, 0x28,
+	0x0b, 0x32, 0x0d, 0x2e, 0x70, 0x62, 0x2e, 0x44, 0x61, 0x74, 0x61, 0x45, 0x6e, 0x74, 0x72, 0x79,
+	0x52, 0x03, 0x4d, 0x61, 0x70, 0x42, 0x06, 0x5a, 0x04, 0x2e, 0x3b, 0x70, 0x62, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -194,15 +249,15 @@ func file_data_proto_rawDescGZIP() []byte {
 
 var file_data_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_data_proto_goTypes = []interface{}{
-	(*Data)(nil),     // 0: pb.Data
-	(*DataList)(nil), // 1: pb.DataList
-	(*DataMap)(nil),  // 2: pb.DataMap
-	nil,              // 3: pb.DataMap.MapEntry
+	(*Data)(nil),      // 0: pb.Data
+	(*DataEntry)(nil), // 1: pb.DataEntry
+	(*DataList)(nil),  // 2: pb.DataList
+	(*DataMap)(nil),   // 3: pb.DataMap
 }
 var file_data_proto_depIdxs = []int32{
-	0, // 0: pb.DataList.List:type_name -> pb.Data
-	3, // 1: pb.DataMap.Map:type_name -> pb.DataMap.MapEntry
-	0, // 2: pb.DataMap.MapEntry.value:type_name -> pb.Data
+	0, // 0: pb.DataEntry.Value:type_name -> pb.Data
+	0, // 1: pb.DataList.List:type_name -> pb.Data
+	1, // 2: pb.DataMap.Map:type_name -> pb.DataEntry
 	3, // [3:3] is the sub-list for method output_type
 	3, // [3:3] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name
@@ -229,7 +284,7 @@ func file_data_proto_init() {
 			}
 		}
 		file_data_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DataList); i {
+			switch v := v.(*DataEntry); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -241,6 +296,18 @@ func file_data_proto_init() {
 			}
 		}
 		file_data_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DataList); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_data_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*DataMap); i {
 			case 0:
 				return &v.state

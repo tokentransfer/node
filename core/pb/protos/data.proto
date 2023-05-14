@@ -7,10 +7,15 @@ message Data {
     bytes Bytes = 1;    //[0] as type
 }
 
+message DataEntry {
+    string Name  = 1;
+    Data Value   = 2;
+}
+
 message DataList {
     repeated Data List = 1;
 }
 
 message DataMap {
-    map<string, Data> Map  = 1;
+    repeated DataEntry Map  = 1;
 }

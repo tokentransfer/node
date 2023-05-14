@@ -15,5 +15,4 @@ message PeerInfo {
     bytes PublicKey   = 2;
     int64 BlockNumber = 3;
     int64 PeerCount   = 4;
-    map<string, string> Properties = 5;
 }

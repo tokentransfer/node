@@ -66,12 +66,17 @@ message AccountState {
 message GroupInfo {
     bytes Hash		   	= 1;
     repeated DataInfo List    	= 2;
-    map<string, DataInfo> Map 	= 3;
+    repeated DataInfoEntry Map 	= 3;
 }
 
 message DataInfo {
     bytes Hash      = 1;
     bytes Content   = 2;
+}
+
+message DataInfoEntry {
+    string Name	   = 1;
+    DataInfo Value = 2;
 }
 
 message MetaItem {
