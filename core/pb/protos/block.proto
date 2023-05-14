@@ -104,7 +104,7 @@ message TokenInfo {
 }
 
 message ContractInfo {
-    bytes Account	    = 1;
+    AccountInfo Account	    = 1;
     repeated bytes Inputs   = 2;
     repeated bytes Outputs  = 3;
     string Method           = 4;
@@ -123,10 +123,15 @@ message PageInfo {
 }
 
 message UserInfo {
-    bytes Account   = 1;
-    bytes Key       = 2;
-    bytes Nonce     = 3;
-    DataInfo Data   = 4;
+    AccountInfo Account	    = 1;
+    bytes Key       	    = 2;
+    bytes Nonce     	    = 3;
+    DataInfo Data   	    = 4;
+}
+
+message AccountInfo {
+    bytes Code	= 1;
+    bytes Data	= 2;
 }
 
 message PayloadInfo {
