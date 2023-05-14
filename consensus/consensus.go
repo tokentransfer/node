@@ -417,7 +417,7 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 	datas := make([]*block.DataInfo, 0)
 	for _, a := range stateList {
 		entry := accountMap[a]
-		if entry.lastInfo == nil || entry.info == nil {
+		if entry.lastInfo == nil && entry.info == nil {
 			return nil, util.ErrorOfInvalid("account info", a)
 		} else {
 			if entry.lastInfo == nil {
@@ -606,6 +606,20 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 				return cost, nil, util.ErrorOfNotFound("account entry", tx.Account.String())
 			}
 			accountEntry.info.Token = dataInfo
+
+			stateType := libblock.GetStateTypeByName(info.Symbol)
+			if len(stateType.String()) > 0 {
+				_, createAccount, _ := as.NewAccountFromAddress(info.Items[0].Value)
+				if createAccount != nil {
+					ok, _, err = service.getAccountEntry(rootAccount, createAccount, accountMap)
+					if err != nil {
+						return cost, nil, err
+					}
+					if !ok {
+						accounts = append(accounts, createAccount.String())
+					}
+				}
+			}
 
 		case core.CORE_DATA_INFO:
 		case core.CORE_GROUP_INFO:
