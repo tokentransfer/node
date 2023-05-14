@@ -12,6 +12,8 @@ import (
 	"github.com/tokentransfer/node/block"
 	"github.com/tokentransfer/node/config"
 	"github.com/tokentransfer/node/core"
+	"github.com/tokentransfer/node/core/pb"
+	"github.com/tokentransfer/node/crypto"
 	"github.com/tokentransfer/node/storage"
 	"github.com/tokentransfer/node/util"
 
@@ -128,6 +130,41 @@ func (suite *NodeSuite) load(c *C) *Node {
 func (suite *NodeSuite) close(c *C, n *Node) {
 	err := n.Close()
 	c.Assert(err, IsNil)
+}
+
+func (suite *NodeSuite) testMap(c *C) {
+	cs := &crypto.CryptoService{}
+
+	var hash libcore.Hash
+	for i := 0; i < 1000; i++ {
+		account := "eth.0xc287B1266732495Fe8c93CE3Ba631597153fdd91"
+		info := &pb.TokenInfo{
+			Symbol: "AccountState",
+			Index:  uint64(0),
+			Items: []*pb.TokenItem{
+				{
+					Name:  "account",
+					Value: account,
+				},
+			},
+		}
+		m := map[string]interface{}{
+			"account": account,
+			"info":    info,
+			"ofni":    "info",
+			"9FBFE47230265132F22802E2F5A9CADEE98FBBB349FAD1BD00522F9DD2A6DEB6": "9FBFE47230265132F22802E2F5A9CADEE98FBBB349FAD1BD00522F9DD2A6DEB6",
+			"04647AA6C646CCA3A5FEDC32844C8B98DFFB7C0C17461FB1A65CA83E1157F040": "04647AA6C646CCA3A5FEDC32844C8B98DFFB7C0C17461FB1A65CA83E1157F040",
+		}
+		data, err := core.MarshalData(m)
+		c.Assert(err, IsNil)
+		h, err := cs.Hash(data)
+		c.Assert(err, IsNil)
+		if i == 0 {
+			hash = h
+		} else {
+			c.Assert(hash.String(), Equals, h.String())
+		}
+	}
 }
 
 func (suite *NodeSuite) testGas(c *C) {

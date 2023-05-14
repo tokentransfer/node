@@ -1,8 +1,10 @@
 package core
 
 import (
+	"bytes"
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/tokentransfer/node/core/pb"
 	"github.com/tokentransfer/node/util"
@@ -323,29 +325,47 @@ func MarshalData(data interface{}) ([]byte, error) {
 		}
 		return Marshal(list)
 	case map[string]interface{}:
-		m := &pb.DataMap{Map: make(map[string]*pb.Data)}
-		for k, v := range data {
-			data, err := MarshalData(v)
+		list := make([]string, 0)
+		for k, _ := range data {
+			list = append(list, k)
+		}
+		l, keys := GetList(list)
+		m := &pb.DataMap{Map: make([]*pb.DataEntry, l)}
+		for i := 0; i < l; i++ {
+			k := keys[i]
+			v := data[k]
+			d, err := MarshalData(v)
 			if err != nil {
 				return nil, err
 			}
-			if m.Map == nil {
-				m.Map = make(map[string]*pb.Data)
+			m.Map[i] = &pb.DataEntry{
+				Name: k,
+				Value: &pb.Data{
+					Bytes: d,
+				},
 			}
-			m.Map[k] = &pb.Data{Bytes: data}
 		}
 		return Marshal(m)
 	case *map[string]interface{}:
-		m := &pb.DataMap{Map: make(map[string]*pb.Data)}
-		for k, v := range *data {
-			data, err := MarshalData(v)
+		list := make([]string, 0)
+		for k := range *data {
+			list = append(list, k)
+		}
+		l, keys := GetList(list)
+		m := &pb.DataMap{Map: make([]*pb.DataEntry, l)}
+		for i := 0; i < l; i++ {
+			k := keys[i]
+			v := (*data)[k]
+			d, err := MarshalData(v)
 			if err != nil {
 				return nil, err
 			}
-			if m.Map == nil {
-				m.Map = make(map[string]*pb.Data)
+			m.Map[i] = &pb.DataEntry{
+				Name: k,
+				Value: &pb.Data{
+					Bytes: d,
+				},
 			}
-			m.Map[k] = &pb.Data{Bytes: data}
 		}
 		return Marshal(m)
 	case proto.Message:
@@ -476,12 +496,12 @@ func UnmarshalData(data []byte) (DataType, interface{}, error) {
 		}
 		m := msg.(*pb.DataMap)
 		rm := make(map[string]interface{})
-		for k, v := range m.Map {
-			_, sdata, err := UnmarshalData(v.Bytes)
+		for _, v := range m.Map {
+			_, sdata, err := UnmarshalData(v.Value.Bytes)
 			if err != nil {
 				return 0, nil, err
 			}
-			rm[k] = sdata
+			rm[v.Name] = sdata
 		}
 		return meta, rm, nil
 	default:
@@ -554,6 +574,28 @@ func GetMeta(data []byte) DataType {
 		return DataType(data[0])
 	}
 	return 0
+}
+
+func GetList(m []string) (int, []string) {
+	list := make([][]byte, 0)
+	for _, k := range m {
+		list = append(list, []byte(k))
+	}
+	sort.Slice(list, func(i, j int) bool {
+		li := len(list[i])
+		lj := len(list[j])
+		if li != lj {
+			return li < lj
+		}
+		return bytes.Compare(list[i], list[j]) < 0
+	})
+	l := len(list)
+	keys := make([]string, l)
+	for i := 0; i < len(list); i++ {
+		k := string(list[i])
+		keys[i] = k
+	}
+	return l, keys
 }
 
 func Unmarshal(data []byte) (DataType, proto.Message, error) {

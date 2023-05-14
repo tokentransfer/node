@@ -43,20 +43,17 @@ func (suite *StorageSuite) TestProto(c *C) {
 	}
 	listData, err := core.Marshal(list)
 	c.Assert(err, IsNil)
-	m := &pb.DataMap{
-		Map: map[string]*pb.Data{
-			"v0": {
-				Bytes: data1,
-			},
-			"v2": {
-				Bytes: data2,
-			},
-			"list": {
-				Bytes: listData,
-			},
+	mapData, err := core.MarshalData(map[string]*pb.Data{
+		"v0": {
+			Bytes: data1,
 		},
-	}
-	mapData, err := core.Marshal(m)
+		"v2": {
+			Bytes: data2,
+		},
+		"list": {
+			Bytes: listData,
+		},
+	})
 	c.Assert(err, IsNil)
 	fmt.Println(hex.EncodeToString(mapData))
 }

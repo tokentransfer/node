@@ -74,13 +74,13 @@ func fromDataList(infos []*pb.DataInfo) []*DataInfo {
 	return list
 }
 
-func fromDataMap(m map[string]*pb.DataInfo) map[string]*DataInfo {
+func fromDataMap(m []*pb.DataInfoEntry) map[string]*DataInfo {
 	if m == nil {
 		return nil
 	}
 	r := make(map[string]*DataInfo)
-	for k, v := range m {
-		r[k] = FromDataInfo(v)
+	for _, v := range m {
+		r[v.Name] = FromDataInfo(v.Value)
 	}
 	return r
 }
@@ -114,13 +114,23 @@ func toDataList(infos []*DataInfo, rt libcrypto.RawType) []*pb.DataInfo {
 	return list
 }
 
-func toDataMap(m map[string]*DataInfo, rt libcrypto.RawType) map[string]*pb.DataInfo {
+func toDataMap(m map[string]*DataInfo, rt libcrypto.RawType) []*pb.DataInfoEntry {
 	if m == nil {
 		return nil
 	}
-	r := make(map[string]*pb.DataInfo)
-	for k, v := range m {
-		r[k] = ToDataInfo(v, rt)
+	list := make([]string, 0)
+	for k := range m {
+		list = append(list, k)
+	}
+	l, keys := core.GetList(list)
+	r := make([]*pb.DataInfoEntry, l)
+	for i := 0; i < l; i++ {
+		k := keys[i]
+		v := m[k]
+		r[i] = &pb.DataInfoEntry{
+			Name:  k,
+			Value: ToDataInfo(v, rt),
+		}
 	}
 	return r
 }
