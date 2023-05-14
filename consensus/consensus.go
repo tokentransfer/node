@@ -130,9 +130,10 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 				}
 			case core.CORE_USER_INFO:
 				info := msg.(*pb.UserInfo)
-				if !(len(info.Account) > 0 && info.Data != nil && (len(info.Data.Content) > 0 || len(info.Data.Hash) > 0)) {
+				if !(info.Account != nil && len(info.Account.Data) > 0 && len(info.Account.Code) > 0 && info.Data != nil && (len(info.Data.Content) > 0 || len(info.Data.Hash) > 0)) {
 					return false, util.ErrorOfInvalid("format", "user info")
 				}
+
 			case core.CORE_META_INFO:
 				info := msg.(*pb.MetaInfo)
 				if len(info.Symbol) == 0 {
@@ -503,12 +504,22 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			info := msg.(*pb.ContractInfo)
 
 			dataAccount := tx.Account
-			if len(info.Account) > 0 {
-				_, account, err := as.NewAccountFromBytes(info.Account)
-				if err != nil {
-					return 0, nil, err
+			codeAccount := tx.Account
+			if info.Account != nil {
+				if len(info.Account.Data) > 0 {
+					_, a, err := as.NewAccountFromBytes(info.Account.Data)
+					if err != nil {
+						return 0, nil, err
+					}
+					dataAccount = a
 				}
-				dataAccount = account
+				if len(info.Account.Code) > 0 {
+					_, a, err := as.NewAccountFromBytes(info.Account.Code)
+					if err != nil {
+						return 0, nil, err
+					}
+					codeAccount = a
+				}
 			}
 
 			inputs, err := getAccounts(as, info.Inputs)
@@ -519,7 +530,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			if err != nil {
 				return 0, nil, err
 			}
-			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(remainCost, tx.Account, dataAccount, tx.Account, info.Method, info.Params, inputs, outputs)
+			usedCost, retAccount, _, retHash, retContent, err := ss.RunContract(remainCost, tx.Account, dataAccount, codeAccount, info.Method, info.Params, inputs, outputs)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -566,11 +577,27 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 
 		case core.CORE_USER_INFO:
 			info := msg.(*pb.UserInfo)
-			_, account, err := as.NewAccountFromBytes(info.Account)
-			if err != nil {
-				return cost, nil, err
+
+			dataAccount := tx.Account
+			codeAccount := tx.Account
+			if info.Account != nil {
+				if len(info.Account.Data) > 0 {
+					_, a, err := as.NewAccountFromBytes(info.Account.Data)
+					if err != nil {
+						return 0, nil, err
+					}
+					dataAccount = a
+				}
+				if len(info.Account.Code) > 0 {
+					_, a, err := as.NewAccountFromBytes(info.Account.Code)
+					if err != nil {
+						return 0, nil, err
+					}
+					codeAccount = a
+				}
 			}
-			userHash, userAccount, err := ss.WriteUser(tx.Account, tx.Account, account, info)
+
+			userHash, userAccount, err := ss.WriteUser(tx.Account, dataAccount, codeAccount, info)
 			if err != nil {
 				return cost, nil, err
 			}
@@ -608,7 +635,8 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			accountEntry.info.Token = dataInfo
 
 			stateType := libblock.GetStateTypeByName(info.Symbol)
-			if len(stateType.String()) > 0 {
+			switch stateType {
+			case block.ACCOUNT_STATE:
 				_, createAccount, _ := as.NewAccountFromAddress(info.Items[0].Value)
 				if createAccount != nil {
 					ok, _, err = service.getAccountEntry(rootAccount, createAccount, accountMap)

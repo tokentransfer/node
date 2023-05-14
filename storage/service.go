@@ -702,18 +702,18 @@ func (s *StorageService) CreateContract(account libcore.Address, wasmCode []byte
 	return libcore.Hash(s.storage.Root()), libcore.Hash(k), nil
 }
 
-func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, fromAccount libcore.Address, toAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Address, libcore.Hash, libcore.Hash, []byte, error) {
-	wasmCode, abiCode, err := s.ReadCode(toAccount)
+func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, dataAccount libcore.Address, codeAccount libcore.Address, method string, params [][]byte, inputs []libcore.Address, outputs []libcore.Address) (int64, libcore.Address, libcore.Hash, libcore.Hash, []byte, error) {
+	wasmCode, abiCode, err := s.ReadCode(codeAccount)
 	if err != nil {
 		return 0, nil, nil, nil, nil, err
 	}
 	var wasmData []byte
 	if len(inputs) == 0 {
-		wasmData, _ = s.ReadMemory(fromAccount, toAccount)
+		wasmData, _ = s.ReadMemory(dataAccount, codeAccount)
 	} else {
 		inputDatas := &pb.DataList{}
 		for _, input := range inputs {
-			wasmData, _ := s.ReadMemory(fromAccount, input)
+			wasmData, _ := s.ReadMemory(dataAccount, input)
 			inputDatas.List = append(inputDatas.List, &pb.Data{
 				Bytes: wasmData,
 			})
@@ -723,18 +723,18 @@ func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, f
 			return 0, nil, nil, nil, nil, err
 		}
 	}
-	usedCost, newWasmData, resultData, err := vm.RunWasm(int64(cost), wasmCode, abiCode, wasmData, method, params, (signAccount.String() == fromAccount.String())) // remainCost
+	usedCost, newWasmData, resultData, err := vm.RunWasm(int64(cost), wasmCode, abiCode, wasmData, method, params, (signAccount.String() == dataAccount.String())) // remainCost
 	if err != nil {
 		return 0, nil, nil, nil, nil, err
 	}
 	if newWasmData != nil {
 		if len(outputs) == 0 {
-			rootHash, dataHash, err := s.WriteMemory(fromAccount, toAccount, newWasmData)
+			rootHash, dataHash, err := s.WriteMemory(dataAccount, codeAccount, newWasmData)
 			if err != nil {
 				return 0, nil, nil, nil, nil, err
 			}
-			glog.Infoln("> run contract", usedCost, fromAccount.String(), toAccount.String(), method, len(inputs), len(outputs), len(wasmData), len(newWasmData), string(resultData))
-			return usedCost, fromAccount, rootHash, dataHash, resultData, nil
+			glog.Infoln("> run contract", usedCost, dataAccount.String(), codeAccount.String(), method, len(inputs), len(outputs), len(wasmData), len(newWasmData), string(resultData))
+			return usedCost, dataAccount, rootHash, dataHash, resultData, nil
 		} else {
 			t, msg, err := core.UnmarshalData(newWasmData)
 			if err != nil {
@@ -750,7 +750,7 @@ func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, f
 			resultInfos := &pb.DataList{}
 			for index, outputData := range outputDatas.List {
 				output := outputs[index]
-				_, dataHash, err := s.WriteMemory(toAccount, output, outputData.Bytes)
+				_, dataHash, err := s.WriteMemory(dataAccount, output, outputData.Bytes)
 				if err != nil {
 					return 0, nil, nil, nil, nil, err
 				}
@@ -770,12 +770,12 @@ func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, f
 			if err != nil {
 				return 0, nil, nil, nil, nil, err
 			}
-			glog.Infoln("> run contract", usedCost, fromAccount.String(), toAccount.String(), method, len(inputs), len(outputs), len(wasmData), len(newWasmData), len(resultDatas), string(resultData))
-			return usedCost, toAccount, nil, dataHash, resultDatas, nil
+			glog.Infoln("> run contract", usedCost, dataAccount.String(), codeAccount.String(), method, len(inputs), len(outputs), len(wasmData), len(newWasmData), len(resultDatas), string(resultData))
+			return usedCost, dataAccount, nil, dataHash, resultDatas, nil
 		}
 	} else {
-		glog.Infoln("> run contract", usedCost, fromAccount.String(), toAccount.String(), method, resultData)
-		return usedCost, fromAccount, nil, nil, resultData, nil
+		glog.Infoln("> run contract", usedCost, dataAccount.String(), codeAccount.String(), method, resultData)
+		return usedCost, dataAccount, nil, nil, resultData, nil
 	}
 }
 
