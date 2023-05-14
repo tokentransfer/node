@@ -1,7 +1,6 @@
 package block
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/tokentransfer/node/core"
@@ -131,9 +130,24 @@ func (tx *Transaction) Raw(rt libcrypto.RawType) ([]byte, error) {
 			}
 			return core.Marshal(t)
 		}
-	default:
-		return nil, util.ErrorOfInvalid("raw type", fmt.Sprintf("%d", rt))
 	}
+	account, err := AddressToByte(tx.Account)
+	if err != nil {
+		return nil, err
+	}
+
+	t := &pb.Transaction{
+		TransactionType: uint32(tx.TransactionType),
+
+		Account:  account,
+		Sequence: tx.Sequence,
+		Gas:      tx.Gas,
+		Payload:  toPayloadInfo(tx.Payload, rt),
+
+		PublicKey: []byte(tx.PublicKey),
+		Signature: []byte(tx.Signature),
+	}
+	return core.Marshal(t)
 }
 
 func (tx *Transaction) GetTransactionType() libblock.TransactionType {

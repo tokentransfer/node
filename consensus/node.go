@@ -897,7 +897,6 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 	case "getTransactionCount":
 		result, err := n._call(params, func(rootAccount libcore.Address, item map[string]interface{}) (interface{}, error) {
 			as := n.accountService
-
 			address := util.ToString(&item, "address")
 			_, a, err := as.NewAccountFromAddress(address)
 			if err != nil {

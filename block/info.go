@@ -191,13 +191,11 @@ func ToDataInfo(info *DataInfo, rt libcrypto.RawType) *pb.DataInfo {
 			}
 		case libcrypto.RawIgnoreVariableFields:
 			return &pb.DataInfo{
-				Hash:    []byte(info.Hash),
-				Content: info.Content,
+				Hash: []byte(info.Hash),
 			}
 		case libcrypto.RawIgnoreSigningFields:
 			return &pb.DataInfo{
-				Hash:    []byte(info.Hash),
-				Content: info.Content,
+				Hash: []byte(info.Hash),
 			}
 		case libcrypto.RawIgnoreContent:
 			return &pb.DataInfo{
