@@ -73,33 +73,33 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 	if tx.Sequence != sequence {
 		return false, util.ErrorOfInvalid("sequence", fmt.Sprintf("%d != %d", tx.Sequence, sequence))
 	}
-
-	info, err := service.GetAccountInfo(rootAccount, fromAccount)
-	if err != nil || info == nil {
-		return false, util.ErrorOfNotFound("account", fromAccount.String())
-	}
 	if rootAccount != nil {
 		if tx.Gas < 10 {
 			return false, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < 10", tx.Gas))
 		}
-		gasValue, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
-		if err != nil {
-			return false, err
-		}
-		fromValue, err := ss.GetGas(fromAccount)
-		if err != nil {
-			return false, err
-		}
-		remain, err := fromValue.Subtract(*gasValue)
-		if err != nil {
-			return false, err
-		}
-		isNegative, err := remain.IsNegative()
-		if err != nil {
-			return false, err
-		}
-		if isNegative {
-			return false, util.ErrorOf("insuffient", "gas", remain.String())
+		// gasValue, err := util.NewValue(fmt.Sprintf("%d", tx.Gas))
+		// if err != nil {
+		// 	return false, err
+		// }
+		// fromValue, err := ss.GetGas(fromAccount)
+		// if err != nil {
+		// 	return false, err
+		// }
+		// remain, err := fromValue.Subtract(*gasValue)
+		// if err != nil {
+		// 	return false, err
+		// }
+		// isNegative, err := remain.IsNegative()
+		// if err != nil {
+		// 	return false, err
+		// }
+		// if isNegative {
+		// 	return false, util.ErrorOf("insuffient", "gas", remain.String())
+		// }
+	} else {
+		info, err := service.GetAccountInfo(rootAccount, fromAccount)
+		if err != nil || info == nil {
+			return false, util.ErrorOfNotFound("account", fromAccount.String())
 		}
 	}
 	if tx.Payload != nil && len(tx.Payload.Infos) > 0 {
@@ -172,7 +172,7 @@ func (service *ConsensusService) VerifyTransaction(rootAccount libcore.Address, 
 				}
 
 			case core.CORE_DATA_INFO:
-			case core.CORE_PEER_INFO:
+			case core.CORE_GROUP_INFO:
 			default:
 				return false, util.ErrorOfInvalid("format", "info")
 			}
@@ -391,10 +391,10 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 		if tx.Gas < gas {
 			return nil, util.ErrorOf("insufficient", "gas", fmt.Sprintf("%d < %d", tx.Gas, gas))
 		}
-		fromEntry.gas, err = service.removeBalance(fromEntry.lastGas, *gasAmount)
-		if err != nil {
-			return nil, err
-		}
+		// fromEntry.gas, err = service.removeBalance(fromEntry.lastGas, *gasAmount)
+		// if err != nil {
+		// 	return nil, err
+		// }
 		gasEntry.gas, err = service.addBalance(gasEntry.lastGas, *gasAmount)
 		if err != nil {
 			return nil, err
@@ -436,6 +436,12 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 				if lastHash.String() != hash.String() {
 					entry.info.Version = entry.info.Version + 1
 					states = append(states, entry.info)
+				}
+			}
+			if rootAccount != nil && entry.gas != nil {
+				err := ss.UpdateGas(rootAccount, *entry.gas)
+				if err != nil {
+					return nil, err
 				}
 			}
 		}
