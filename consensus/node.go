@@ -49,7 +49,7 @@ type Node struct {
 	accountService   libaccount.AccountService
 	consensusService *ConsensusService
 
-	entryMap    map[string]*Entry
+	entryMap    *sync.Map
 	entryLocker *sync.RWMutex
 
 	storageService    *storage.StorageService
@@ -83,7 +83,7 @@ func NewNode() *Node {
 
 		transactionLocker: &sync.Mutex{},
 
-		entryMap:    make(map[string]*Entry),
+		entryMap:    &sync.Map{},
 		entryLocker: &sync.RWMutex{},
 
 		accountService: account.NewAccountService(),
@@ -122,6 +122,15 @@ func (n *Node) Init(c libcore.Config) error {
 	n.storageService = storageService
 
 	return nil
+}
+
+func (n *Node) GetRoots() []string {
+	list := make([]string, 0)
+	n.entryMap.Range(func(k, v interface{}) bool {
+		list = append(list, k.(string))
+		return true
+	})
+	return list
 }
 
 func (n *Node) getContractData(rootAccount libcore.Address, txm map[string]interface{}) (int64, interface{}, error) {
@@ -1343,20 +1352,18 @@ func (n *Node) Call(method string, params []interface{}) (interface{}, error) {
 }
 
 func (n *Node) GetEntry(rootAccount libcore.Address) (*Entry, error) {
-	n.entryLocker.RLock()
 	root := util.GetString(rootAccount)
-	entry, ok := n.entryMap[root]
-	n.entryLocker.RUnlock()
+	entry, ok := n.entryMap.Load(root)
 	if ok {
-		return entry, nil
+		return entry.(*Entry), nil
 	}
 
 	n.entryLocker.Lock()
 	defer n.entryLocker.Unlock()
 
-	entry, ok = n.entryMap[root]
+	entry, ok = n.entryMap.Load(root)
 	if ok {
-		return entry, nil
+		return entry.(*Entry), nil
 	}
 
 	ms, err := n.getMerkleService(rootAccount)
@@ -1374,12 +1381,12 @@ func (n *Node) GetEntry(rootAccount libcore.Address) (*Entry, error) {
 		txlist: make([]libblock.TransactionWithData, 0),
 		txmap:  make(map[string]libblock.TransactionWithData),
 	}
-	err = n.load(rootAccount, entry)
+	err = n.load(rootAccount, entry.(*Entry))
 	if err != nil {
 		return nil, err
 	}
-	n.entryMap[root] = entry
-	return entry, nil
+	n.entryMap.Store(root, entry)
+	return entry.(*Entry), nil
 }
 
 func (n *Node) getMerkleService(rootAccount libcore.Address) (libstore.MerkleService, error) {
@@ -1857,8 +1864,9 @@ func (n *Node) GenerateBlock(rootAccount libcore.Address, rb libblock.Block) (li
 func (n *Node) generate() {
 	for {
 		hasTx := false
-		for root, entry := range n.entryMap {
+		for _, root := range n.GetRoots() {
 			_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
+			entry, _ := n.GetEntry(rootAccount)
 			if entry.Consensused && len(entry.txlist) > 0 {
 				hasTx = hasTx || true
 
@@ -1893,7 +1901,9 @@ func (n *Node) generate() {
 			}
 		}
 		if !hasTx {
-			for root, entry := range n.entryMap {
+			for _, root := range n.GetRoots() {
+				_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
+				entry, _ := n.GetEntry(rootAccount)
 				if entry.Consensused {
 					glog.Infof("=== %s: block %d, %s, prepare %d, %d\n", root, entry.GetBlockNumber(), entry.GetBlockHash(), entry.GetBlockNumber()+1, len(entry.txlist))
 				}
@@ -1901,7 +1911,9 @@ func (n *Node) generate() {
 
 			for i := 0; i < int(n.config.GetBlockDuration()*5); i++ {
 				hasTx := false
-				for _, entry := range n.entryMap {
+				for _, root := range n.GetRoots() {
+					_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
+					entry, _ := n.GetEntry(rootAccount)
 					if len(entry.txlist) > 0 {
 						hasTx = true
 						break
@@ -1933,8 +1945,9 @@ func (n *Node) broadcast(data []byte) {
 func (n *Node) connect() {
 	config := n.config
 	for {
-		for root, entry := range n.entryMap {
+		for _, root := range n.GetRoots() {
 			_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
+			entry, _ := n.GetEntry(rootAccount)
 			list := n.ListPeerBy(rootAccount)
 			e := n.self.getPeerEntry(rootAccount)
 			e.PeerCount = int64(len(list))
@@ -2509,7 +2522,9 @@ func (n *Node) Start() error {
 }
 
 func (n *Node) Close() error {
-	for _, entry := range n.entryMap {
+	for _, root := range n.GetRoots() {
+		_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
+		entry, _ := n.GetEntry(rootAccount)
 		if entry.merkle != nil {
 			if err := entry.merkle.Close(); err != nil {
 				return err
@@ -2565,7 +2580,7 @@ func (n *Node) discovery() {
 		if err != nil {
 			glog.Error(err)
 		} else {
-			for root := range n.entryMap {
+			for _, root := range n.GetRoots() {
 				_, rootAccount, _ := n.accountService.NewAccountFromAddress(root)
 				rootData, err := block.AddressToByte(rootAccount)
 				if err != nil {

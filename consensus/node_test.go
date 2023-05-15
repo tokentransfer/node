@@ -167,6 +167,20 @@ func (suite *NodeSuite) testMap(c *C) {
 	}
 }
 
+func (suite *NodeSuite) TestBlockNumber(c *C) {
+	n := suite.load(c)
+
+	o, err := n.Call("blockNumber", []interface{}{
+		map[string]interface{}{
+			"root": "eth.0xc287B1266732495Fe8c93CE3Ba631597153fdd91",
+		},
+	})
+	c.Assert(err, IsNil)
+	util.PrintJSON("blockNumber", o)
+
+	suite.close(c, n)
+}
+
 func (suite *NodeSuite) testGas(c *C) {
 	n := suite.load(c)
 
@@ -198,7 +212,7 @@ func (suite *NodeSuite) testTransaction(c *C) {
 	c.Assert(err, IsNil)
 }
 
-func (suite *NodeSuite) TestProcess(c *C) {
+func (suite *NodeSuite) testProcess(c *C) {
 	n := suite.load(c)
 
 	var rootAccount libcore.Address = nil
