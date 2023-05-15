@@ -1932,8 +1932,8 @@ func (n *Node) connect() {
 				e := p.getPeerEntry(rootAccount)
 				glog.Infoln("==> :", root, i+1, p.GetIndex(n), p.GetAddress(n), p.Id, e.Status, e.BlockNumber, e.PeerCount)
 			}
-			if len(list) == 0 {
-				entry.Consensused = n.PrepareConsensus(rootAccount)
+			if len(config.GetBootstraps()) == 0 {
+				entry.Consensused = true
 			}
 		}
 
@@ -1950,11 +1950,6 @@ func (n *Node) SendRequestInfo(p *Peer) {
 }
 
 func (n *Node) PrepareConsensus(rootAccount libcore.Address) bool {
-	l := len(n.config.GetBootstraps())
-	if l == 0 {
-		return true
-	}
-
 	root := util.GetString(rootAccount)
 	list := n.ListPeerBy(rootAccount)
 	count := int64(0)
