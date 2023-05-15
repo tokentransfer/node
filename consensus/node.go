@@ -1468,14 +1468,16 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 						BlockIndex: uint64(0),
 					},
 				},
-				&block.AccountState{
+			}
+			if gasAccount.String() != rootAccount.String() {
+				states = append(states, &block.AccountState{
 					State: block.State{
 						StateType:  block.ACCOUNT_STATE,
 						Account:    gasAccount,
 						Sequence:   uint64(0),
 						BlockIndex: uint64(0),
 					},
-				},
+				})
 			}
 		} else {
 			account := n.config.GetGasAccount()
