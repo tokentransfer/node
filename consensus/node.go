@@ -1686,13 +1686,6 @@ func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bo
 	ms := entry.merkle
 	ss := entry.storage
 
-	blk := b.(*block.Block)
-	srh := ss.RootHash()
-	sbh := blk.GetRootHash()
-	if srh.String() != sbh.String() {
-		return false, util.ErrorOfUnmatched("root hash", "block", srh.String(), sbh.String())
-	}
-
 	ok = true
 	err = nil
 
@@ -1814,6 +1807,14 @@ func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bo
 		err = util.ErrorOfUnmatched("hash", "state", b.GetStateHash().String(), stateHash.String())
 		return
 	}
+
+	blk := b.(*block.Block)
+	srh := ss.RootHash()
+	sbh := blk.GetRootHash()
+	if srh.String() != sbh.String() {
+		return false, util.ErrorOfUnmatched("root hash", "block", srh.String(), sbh.String())
+	}
+
 	return
 }
 
