@@ -1974,7 +1974,7 @@ func (n *Node) PrepareConsensus(rootAccount libcore.Address) bool {
 			}
 		}
 	}
-	if count > 0 && (count+1) == currentCount {
+	if count > 0 && (count) == currentCount {
 		for i := 0; i < len(list); i++ {
 			p := list[i]
 			e, ok := p.peermap[root]
