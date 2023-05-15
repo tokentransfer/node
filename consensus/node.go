@@ -1686,6 +1686,13 @@ func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bo
 	ms := entry.merkle
 	ss := entry.storage
 
+	blk := b.(*block.Block)
+	srh := ss.RootHash()
+	sbh := blk.GetRootHash()
+	if srh.String() != sbh.String() {
+		return false, util.ErrorOfUnmatched("root hash", "block", srh.String(), sbh.String())
+	}
+
 	ok = true
 	err = nil
 
@@ -1748,8 +1755,6 @@ func (n *Node) VerifyBlock(rootAccount libcore.Address, b libblock.Block) (ok bo
 			return
 		}
 		if arh.String() != brh.String() {
-			util.PrintJSON("last", txWithData.GetReceipt())
-			util.PrintJSON("current", newWithData.GetReceipt())
 			ok = false
 			err = util.ErrorOfUnmatched("raw hash", "transaction receipt", arh.String(), brh.String())
 			return

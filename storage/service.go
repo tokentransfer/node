@@ -495,24 +495,24 @@ func (s *StorageService) WriteToken(account libcore.Address, info *pb.TokenInfo)
 	return dataInfo, nil
 }
 
-func (s *StorageService) ReadMemory(dataAccount libcore.Address, codeAccount libcore.Address) ([]byte, error) {
+func (s *StorageService) ReadContract(dataAccount libcore.Address, codeAccount libcore.Address) ([]byte, error) {
 	rootGroup, err := s.getRoot()
 	if err != nil {
 		return nil, err
 	}
-	_, _, _, data, err := s.readData(rootGroup, "memory", dataAccount.String(), codeAccount.String())
+	_, _, _, data, err := s.readData(rootGroup, "contract", dataAccount.String(), codeAccount.String())
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func (s *StorageService) WriteMemory(dataAccount libcore.Address, codeAccount libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
+func (s *StorageService) WriteContract(dataAccount libcore.Address, codeAccount libcore.Address, data []byte) (libcore.Hash, libcore.Hash, error) {
 	rootGroup, err := s.getRoot()
 	if err != nil {
 		return nil, nil, err
 	}
-	rootHash, _, _, dataHash, err := s.writeData(rootGroup, "memory", dataAccount.String(), codeAccount.String(), data)
+	rootHash, _, _, dataHash, err := s.writeData(rootGroup, "contract", dataAccount.String(), codeAccount.String(), data)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -709,11 +709,11 @@ func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, d
 	}
 	var wasmData []byte
 	if len(inputs) == 0 {
-		wasmData, _ = s.ReadMemory(dataAccount, codeAccount)
+		wasmData, _ = s.ReadContract(dataAccount, codeAccount)
 	} else {
 		inputDatas := &pb.DataList{}
 		for _, input := range inputs {
-			wasmData, _ := s.ReadMemory(dataAccount, input)
+			wasmData, _ := s.ReadContract(dataAccount, input)
 			inputDatas.List = append(inputDatas.List, &pb.Data{
 				Bytes: wasmData,
 			})
@@ -729,7 +729,7 @@ func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, d
 	}
 	if newWasmData != nil {
 		if len(outputs) == 0 {
-			rootHash, dataHash, err := s.WriteMemory(dataAccount, codeAccount, newWasmData)
+			rootHash, dataHash, err := s.WriteContract(dataAccount, codeAccount, newWasmData)
 			if err != nil {
 				return 0, nil, nil, nil, nil, err
 			}
@@ -750,7 +750,7 @@ func (s *StorageService) RunContract(cost uint64, signAccount libcore.Address, d
 			resultInfos := &pb.DataList{}
 			for index, outputData := range outputDatas.List {
 				output := outputs[index]
-				_, dataHash, err := s.WriteMemory(dataAccount, output, outputData.Bytes)
+				_, dataHash, err := s.WriteContract(dataAccount, output, outputData.Bytes)
 				if err != nil {
 					return 0, nil, nil, nil, nil, err
 				}
@@ -784,7 +784,7 @@ func (s *StorageService) CallContract(dataAccount libcore.Address, codeAccount l
 	if err != nil {
 		return 0, nil, err
 	}
-	wasmData, _ := s.ReadMemory(dataAccount, codeAccount)
+	wasmData, _ := s.ReadContract(dataAccount, codeAccount)
 	usedCost, _, resultData, err := vm.RunWasm(int64(1000000), wasmCode, abiCode, wasmData, method, params, true) // remainCost
 	if err != nil {
 		return 0, nil, err
@@ -798,7 +798,7 @@ func (s *StorageService) CallContract(dataAccount libcore.Address, codeAccount l
 }
 
 func (s *StorageService) GetContractData(dataAccount libcore.Address, codeAccount libcore.Address, format string) (int64, interface{}, error) {
-	wasmData, _ := s.ReadMemory(dataAccount, codeAccount)
+	wasmData, _ := s.ReadContract(dataAccount, codeAccount)
 	var r interface{}
 	var e error
 	switch format {
