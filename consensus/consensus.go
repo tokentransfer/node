@@ -440,8 +440,10 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 			}
 		}
 	}
-	datas := ss.SnapshotSandbox()
-
+	datas, err := ss.SnapshotSandbox()
+	if err != nil {
+		return nil, err
+	}
 	r := &block.Receipt{
 		TransactionResult: 0,
 		States:            states,

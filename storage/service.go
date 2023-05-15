@@ -109,17 +109,28 @@ func (s *StorageService) CreateSandbox() error {
 	return nil
 }
 
-func (s *StorageService) SnapshotSandbox() []*block.DataInfo {
+func (s *StorageService) SnapshotSandbox() ([]*block.DataInfo, error) {
 	db := s.stackdb.Top()
-	list := make([]*block.DataInfo, 0)
+	list := make([][]byte, 0)
 	db.ListData(func(k, v []byte) error {
-		list = append(list, &block.DataInfo{
+		list = append(list, k)
+		return nil
+	})
+	l, list := core.GetSort(list)
+
+	rs := make([]*block.DataInfo, 0)
+	for i := 0; i < l; i++ {
+		k := list[i]
+		v, err := db.GetData(k)
+		if err != nil {
+			return nil, err
+		}
+		rs = append(rs, &block.DataInfo{
 			Hash:    libcore.Hash(k),
 			Content: v,
 		})
-		return nil
-	})
-	return list
+	}
+	return rs, nil
 }
 
 func (s *StorageService) RestoreSandbox(list []*block.DataInfo) error {

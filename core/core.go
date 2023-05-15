@@ -598,6 +598,18 @@ func GetList(m []string) (int, []string) {
 	return l, keys
 }
 
+func GetSort(list [][]byte) (int, [][]byte) {
+	sort.Slice(list, func(i, j int) bool {
+		li := len(list[i])
+		lj := len(list[j])
+		if li != lj {
+			return li < lj
+		}
+		return bytes.Compare(list[i], list[j]) < 0
+	})
+	return len(list), list
+}
+
 func Unmarshal(data []byte) (DataType, proto.Message, error) {
 	if len(data) == 0 {
 		return 0, nil, util.ErrorOfInvalid("data", "null")

@@ -241,7 +241,7 @@ func (s *chunkStorage) Close() error {
 }
 
 func (s *chunkStorage) _putEntry(key core.Key, entry *chunkEntry) error {
-	k := []byte(key.String())
+	k := []byte(key)
 	v, err := entry.MarshalBinary()
 	if err != nil {
 		return err
@@ -289,7 +289,7 @@ func (s *chunkStorage) putEntry(key core.Key, entry *chunkEntry) (int64, bool, e
 }
 
 func (s *chunkStorage) getEntry(key core.Key) (*chunkEntry, bool) {
-	data, err := s.entries.GetData([]byte(key.String()))
+	data, err := s.entries.GetData([]byte(key))
 	if err != nil {
 		return nil, false
 	}
@@ -305,7 +305,7 @@ func (s *chunkStorage) getEntry(key core.Key) (*chunkEntry, bool) {
 }
 
 func (s *chunkStorage) removeEntry(key core.Key) error {
-	err := s.entries.RemoveData([]byte(key.String()))
+	err := s.entries.RemoveData([]byte(key))
 	if err != nil {
 		return err
 	}
