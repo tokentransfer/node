@@ -349,6 +349,7 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 	}
 	fromSequence := fromEntry.info.Sequence + 1 // sequence of from from account, +1
 	fromEntry.info.Sequence = fromSequence
+	fromEntry.info.PublicKey = tx.PublicKey
 
 	if tx.Sequence != fromSequence {
 		return nil, util.ErrorOf("error", "sequence", fmt.Sprintf("%d != %d", tx.Sequence, fromSequence))
@@ -541,7 +542,7 @@ func (service *ConsensusService) ProcessPayload(rootAccount libcore.Address, rem
 			if !ok {
 				accounts = append(accounts, retAccount.String())
 			}
-			retEntry.info.Memory = &block.DataInfo{
+			retEntry.info.Contract = &block.DataInfo{
 				Hash:    retHash,
 				Content: retContent,
 			}

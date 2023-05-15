@@ -63,12 +63,12 @@ type AccountState struct {
 
 	Name string
 
-	User   *DataInfo
-	Code   *DataInfo
-	Page   *DataInfo
-	Token  *DataInfo
-	Memory *DataInfo
-	Data   *DataInfo
+	User     *DataInfo
+	Code     *DataInfo
+	Page     *DataInfo
+	Token    *DataInfo
+	Contract *DataInfo
+	Data     *DataInfo
 
 	PublicKey libcore.PublicKey
 	RootHash  libcore.Hash
@@ -119,7 +119,7 @@ func (s *AccountState) UnmarshalBinary(data []byte) error {
 	s.Code = FromDataInfo(state.Code)
 	s.Page = FromDataInfo(state.Page)
 	s.Token = FromDataInfo(state.Token)
-	s.Memory = FromDataInfo(state.Memory)
+	s.Contract = FromDataInfo(state.Contract)
 	s.Data = FromDataInfo(state.Data)
 
 	s.PublicKey = libcore.PublicKey(state.PublicKey)
@@ -149,13 +149,13 @@ func (s *AccountState) Raw(rt libcrypto.RawType) ([]byte, error) {
 				Version:    s.Version,
 			},
 
-			Name:   s.Name,
-			User:   ToDataInfo(s.User, rt),
-			Code:   ToDataInfo(s.Code, rt),
-			Page:   ToDataInfo(s.Page, rt),
-			Token:  ToDataInfo(s.Token, rt),
-			Memory: ToDataInfo(s.Memory, rt),
-			Data:   ToDataInfo(s.Data, rt),
+			Name:     s.Name,
+			User:     ToDataInfo(s.User, rt),
+			Code:     ToDataInfo(s.Code, rt),
+			Page:     ToDataInfo(s.Page, rt),
+			Token:    ToDataInfo(s.Token, rt),
+			Contract: ToDataInfo(s.Contract, rt),
+			Data:     ToDataInfo(s.Data, rt),
 
 			PublicKey: []byte(s.PublicKey),
 			RootHash:  []byte(s.RootHash),
@@ -170,13 +170,13 @@ func (s *AccountState) Raw(rt libcrypto.RawType) ([]byte, error) {
 			Version:   s.Version,
 		},
 
-		Name:   s.Name,
-		User:   ToDataInfo(s.User, rt),
-		Code:   ToDataInfo(s.Code, rt),
-		Page:   ToDataInfo(s.Page, rt),
-		Token:  ToDataInfo(s.Token, rt),
-		Memory: ToDataInfo(s.Memory, rt),
-		Data:   ToDataInfo(s.Data, rt),
+		Name:     s.Name,
+		User:     ToDataInfo(s.User, rt),
+		Code:     ToDataInfo(s.Code, rt),
+		Page:     ToDataInfo(s.Page, rt),
+		Token:    ToDataInfo(s.Token, rt),
+		Contract: ToDataInfo(s.Contract, rt),
+		Data:     ToDataInfo(s.Data, rt),
 
 		PublicKey: []byte(s.PublicKey),
 		RootHash:  []byte(s.RootHash),

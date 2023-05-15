@@ -2394,12 +2394,12 @@ func (n *Node) LoadPageByNameOrAddress(nameOrAddress string) (*zipfs.FileSystem,
 	var data []byte
 	_, account, err := n.accountService.NewAccountFromAddress(nameOrAddress)
 	if err != nil {
-		data, err = ss.ReadPageByAddress(account)
+		data, err = ss.ReadPageByName(nameOrAddress)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		data, err = ss.ReadPageByName(nameOrAddress)
+		data, err = ss.ReadPageByAddress(account)
 		if err != nil {
 			return nil, err
 		}
