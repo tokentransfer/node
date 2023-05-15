@@ -134,6 +134,16 @@ func (s *StorageService) RestoreSandbox(list []*block.DataInfo) error {
 	return nil
 }
 
+func (s *StorageService) UpdateSandbox() error {
+	s.locker.Lock()
+	defer s.locker.Unlock()
+
+	if err := s.storage.Update(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *StorageService) CommitSandbox() error {
 	s.locker.Lock()
 	defer s.locker.Unlock()

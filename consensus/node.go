@@ -1540,6 +1540,8 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 		}
 	} else {
 		glog.Infof("=== package %d transactions in block %d\n", len(list), v.GetIndex()+1)
+		ss.CreateSandbox()
+		defer ss.CancelSandbox()
 
 		stateMap := map[string][]uint64{}
 		for i := 0; i < len(list); i++ {
@@ -1606,6 +1608,11 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 			}
 		}
 
+		err := ss.UpdateSandbox()
+		if err != nil {
+			return nil, err
+		}
+
 		b = &block.Block{
 			Account:    rootAccount,
 			BlockIndex: v.GetIndex() + 1,
@@ -1622,7 +1629,7 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 			Timestamp: time.Now().UnixNano(),
 		}
 
-		err := ms.Cancel()
+		err = ms.Cancel()
 		if err != nil {
 			return nil, err
 		}
