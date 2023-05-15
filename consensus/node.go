@@ -1439,19 +1439,19 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 		}
 		var states []libblock.State
 		if rootAccount != nil {
-			v, err := util.NewValue("100000000000000")
-			if err != nil {
-				return nil, err
-			}
-			err = ss.UpdateGas(rootAccount, *v)
-			if err != nil {
-				return nil, err
-			}
+			// v, err := util.NewValue("100000000000000")
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// err = ss.UpdateGas(rootAccount, *v)
+			// if err != nil {
+			// 	return nil, err
+			// }
 			gasAccount := config.GetGasAccount()
-			err = ss.UpdateGas(gasAccount, v.ZeroClone())
-			if err != nil {
-				return nil, err
-			}
+			// err = ss.UpdateGas(gasAccount, v.ZeroClone())
+			// if err != nil {
+			// 	return nil, err
+			// }
 			states = []libblock.State{
 				&block.AccountState{
 					State: block.State{
@@ -1461,25 +1461,33 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 						BlockIndex: uint64(0),
 					},
 				},
-			}
-		} else {
-			account := n.config.GetGasAccount()
-			info := &pb.MetaInfo{
-				Symbol: block.ACCOUNT_STATE.String(),
-				Total:  int64(-1),
-				Items: []*pb.MetaItem{
-					{
-						Name:    "account",
-						Type:    core.CORE_DATA_STRING.String(),
-						Options: make([]string, 0),
-						Desc:    "the account",
+				&block.AccountState{
+					State: block.State{
+						StateType:  block.ACCOUNT_STATE,
+						Account:    gasAccount,
+						Sequence:   uint64(0),
+						BlockIndex: uint64(0),
 					},
 				},
 			}
-			dataInfo, err := ss.WriteMeta(account, info)
-			if err != nil {
-				return nil, err
-			}
+		} else {
+			account := n.config.GetGasAccount()
+			// info := &pb.MetaInfo{
+			// 	Symbol: block.ACCOUNT_STATE.String(),
+			// 	Total:  int64(-1),
+			// 	Items: []*pb.MetaItem{
+			// 		{
+			// 			Name:    "account",
+			// 			Type:    core.CORE_DATA_STRING.String(),
+			// 			Options: make([]string, 0),
+			// 			Desc:    "the account",
+			// 		},
+			// 	},
+			// }
+			// dataInfo, err := ss.WriteMeta(account, info)
+			// if err != nil {
+			// 	return nil, err
+			// }
 			states = []libblock.State{
 				&block.AccountState{
 					State: block.State{
@@ -1488,7 +1496,7 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 						Sequence:   uint64(0),
 						BlockIndex: uint64(0),
 					},
-					Token: dataInfo,
+					// Token: dataInfo,
 				},
 			}
 		}
