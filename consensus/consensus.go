@@ -20,9 +20,6 @@ type accountEntry struct {
 	lastInfo *block.AccountState
 	info     *block.AccountState
 
-	lastData *block.DataInfo
-	data     *block.DataInfo
-
 	lastGas *util.Value
 	gas     *util.Value
 }
@@ -330,6 +327,11 @@ func (service *ConsensusService) getAccountEntry(rootAccount libcore.Address, ac
 
 func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address, t libblock.Transaction) (libblock.TransactionWithData, error) {
 	config := service.n.config
+	entry, err := service.n.GetEntry(rootAccount)
+	if err != nil {
+		return nil, err
+	}
+	ss := entry.storage
 
 	tx, ok := t.(*block.Transaction)
 	if !ok {
@@ -414,9 +416,7 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 		}
 	}
 
-	dataMap := make(map[string]*block.DataInfo)
 	states := make([]libblock.State, 0)
-	datas := make([]*block.DataInfo, 0)
 	for _, a := range stateList {
 		entry := accountMap[a]
 		if entry.lastInfo == nil && entry.info == nil {
@@ -439,18 +439,8 @@ func (service *ConsensusService) ProcessTransaction(rootAccount libcore.Address,
 				}
 			}
 		}
-		if entry.data != nil {
-			info := entry.data
-			if len(info.Hash) == 0 {
-				return nil, util.ErrorOfEmpty("data hash", "account entry")
-			}
-			_, ok := dataMap[info.Hash.String()]
-			if !ok {
-				dataMap[info.Hash.String()] = info
-				datas = append(datas, info)
-			}
-		}
 	}
+	datas := ss.SnapshotSandbox()
 
 	r := &block.Receipt{
 		TransactionResult: 0,

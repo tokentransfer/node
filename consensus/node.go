@@ -1566,6 +1566,12 @@ func (n *Node) _generateBlock(rootAccount libcore.Address, list []libblock.Trans
 				return nil, err
 			}
 
+			rp := r.(*block.Receipt)
+			err = ss.RestoreSandbox(rp.Datas)
+			if err != nil {
+				return nil, err
+			}
+
 			glog.Infof("=== %d %s\n", i, txWithData.GetTransaction().GetHash().String())
 		}
 
