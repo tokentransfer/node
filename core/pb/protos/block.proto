@@ -56,7 +56,7 @@ message AccountState {
     DataInfo Code       = 4;
     DataInfo Page       = 5;
     DataInfo Token      = 6;
-    DataInfo Memory	= 7;
+    DataInfo Contract	= 7;
     DataInfo Data       = 8;
 
     bytes PublicKey     = 9;
